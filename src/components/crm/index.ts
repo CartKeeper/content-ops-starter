@@ -10,3 +10,6 @@ export { InvoiceTable } from './InvoiceTable';
 export type { InvoiceRecord, InvoiceStatus } from './InvoiceTable';
 export { TaskList } from './TaskList';
 export type { TaskRecord } from './TaskList';
+export { StatCard } from './StatCard';
+export { OverviewChart } from './OverviewChart';
+export type { ChartPoint, Timeframe } from './OverviewChart';
