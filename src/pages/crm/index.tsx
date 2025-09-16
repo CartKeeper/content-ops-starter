@@ -1,5 +1,6 @@
 import * as React from 'react';
 import Head from 'next/head';
+import type { GetServerSideProps } from 'next';
 
 import {
     BookingList,
@@ -10,9 +11,16 @@ import {
     TaskList,
     type BookingRecord,
     type ClientRecord,
+    type ClientStatus,
     type InvoiceRecord,
     type TaskRecord
 } from '../../components/crm';
+
+export type CRMPageProps = {
+    clients?: ClientRecord[];
+    isSupabaseConnected?: boolean;
+    supabaseError?: string | null;
+};
 
 const metrics = [
     {
@@ -85,7 +93,7 @@ const bookings: BookingRecord[] = [
     }
 ];
 
-const clients: ClientRecord[] = [
+const sampleClients: ClientRecord[] = [
     {
         id: 'cl-01',
         name: 'Evelyn Sanders',
@@ -184,18 +192,177 @@ const quickActions = [
     { id: 'upload-gallery', label: 'Upload gallery' }
 ];
 
-export default function PhotographyCrmDashboard() {
+type SupabaseClientRow = Record<string, unknown>;
+
+const parseString = (value: unknown): string => {
+    if (typeof value === 'string') {
+        return value.trim();
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return String(value);
+    }
+
+    return '';
+};
+
+const parseNumber = (value: unknown): number => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return Math.max(0, Math.round(value));
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
+    }
+
+    return 0;
+};
+
+const parseDate = (value: unknown): string => {
+    if (!value) {
+        return '';
+    }
+
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    if (typeof value === 'string') {
+        return value.trim();
+    }
+
+    if (typeof value === 'number') {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+    }
+
+    return '';
+};
+
+const normalizeStatus = (value: unknown): ClientStatus => {
+    if (typeof value !== 'string') {
+        return 'Active';
+    }
+
+    const normalized = value.trim().toLowerCase();
+
+    if (['lead', 'prospect', 'new', 'potential'].includes(normalized)) {
+        return 'Lead';
+    }
+
+    if (['archived', 'inactive', 'former', 'lost', 'closed'].includes(normalized)) {
+        return 'Archived';
+    }
+
+    return 'Active';
+};
+
+const resolveId = (row: SupabaseClientRow, index: number): string => {
+    const candidates = [row.id, row.uuid, row.client_id, row.external_id, row.email];
+
+    for (const candidate of candidates) {
+        const stringCandidate = parseString(candidate);
+        if (stringCandidate) {
+            return stringCandidate;
+        }
+    }
+
+    const name = parseString(row.name);
+
+    if (name) {
+        return `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${index}`;
+    }
+
+    return `client-${index}`;
+};
+
+const combineName = (row: SupabaseClientRow): string => {
+    const directName = parseString(row.name);
+
+    if (directName) {
+        return directName;
+    }
+
+    const firstName = parseString(row.first_name ?? row.firstName);
+    const lastName = parseString(row.last_name ?? row.lastName);
+    const combined = [firstName, lastName].filter(Boolean).join(' ').trim();
+
+    return combined || 'Unnamed Client';
+};
+
+const normalizeClients = (rows: SupabaseClientRow[]): ClientRecord[] =>
+    rows.map((row, index) => {
+        const lastShoot = parseDate(
+            row.lastShoot ??
+                row.last_shoot ??
+                row.last_session ??
+                row.lastSession ??
+                row.last_shoot_date ??
+                row.lastSessionAt
+        );
+        const upcoming = parseDate(
+            row.upcomingShoot ??
+                row.upcoming_shoot ??
+                row.next_session ??
+                row.nextShoot ??
+                row.next_shoot_date ??
+                row.nextSessionAt
+        );
+        const phone = parseString(
+            row.phone ??
+                row.phone_number ??
+                row.phoneNumber ??
+                row.mobile ??
+                row.mobile_number ??
+                row.telephone
+        );
+
+        return {
+            id: resolveId(row, index),
+            name: combineName(row),
+            email: parseString(row.email) || '—',
+            phone: phone || undefined,
+            shoots:
+                parseNumber(
+                    row.shoots ??
+                        row.sessions ??
+                        row.session_count ??
+                        row.total_shoots ??
+                        row.bookings_count ??
+                        row.projects_count
+                ) || 0,
+            lastShoot: lastShoot || '',
+            upcomingShoot: upcoming || undefined,
+            status: normalizeStatus(row.status ?? row.client_status ?? row.stage ?? row.state)
+        };
+    });
+
+export default function PhotographyCrmDashboard({
+    clients = sampleClients,
+    isSupabaseConnected = false,
+    supabaseError = null
+}: CRMPageProps) {
+    const hasSupabaseClients = isSupabaseConnected && (clients?.length ?? 0) > 0;
+    const showEmptyState = isSupabaseConnected && (clients?.length ?? 0) === 0;
+    const displayedClients = hasSupabaseClients ? (clients as ClientRecord[]) : sampleClients;
+
     return (
         <>
             <Head>
                 <title>Photography CRM Dashboard</title>
-                <meta name="description" content="Command center for managing photography clients, shoots and invoices." />
+                <meta
+                    name="description"
+                    content="Command center for managing photography clients, shoots and invoices."
+                />
             </Head>
             <main className="min-h-screen bg-slate-50 pb-16">
                 <div className="mx-auto max-w-7xl px-6 pt-12">
                     <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                         <div>
-                            <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Studio Command Center</p>
+                            <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">
+                                Studio Command Center
+                            </p>
                             <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">
                                 Photography CRM Dashboard
                             </h1>
@@ -237,7 +404,27 @@ export default function PhotographyCrmDashboard() {
                                 description="From loyal regulars to new leads, see who needs attention next."
                                 action={<button className="text-sm font-semibold text-indigo-600">View all clients</button>}
                             >
-                                <ClientTable clients={clients} />
+                                {!isSupabaseConnected && (
+                                    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                                        {supabaseError ||
+                                            'Connect your Supabase project to replace these sample contacts with live CRM data.'}
+                                    </div>
+                                )}
+
+                                {isSupabaseConnected && hasSupabaseClients && (
+                                    <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                                        Synced {clients.length} contact{clients.length === 1 ? '' : 's'} from Supabase.
+                                    </div>
+                                )}
+
+                                {showEmptyState ? (
+                                    <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+                                        You haven't added any contacts to Supabase yet. Add a record to the{' '}
+                                        <code className="font-mono text-xs">clients</code> table to see it here.
+                                    </div>
+                                ) : (
+                                    <ClientTable clients={displayedClients} />
+                                )}
                             </SectionCard>
                         </div>
                         <div className="space-y-6">
@@ -262,3 +449,36 @@ export default function PhotographyCrmDashboard() {
         </>
     );
 }
+
+export const getServerSideProps: GetServerSideProps<CRMPageProps> = async () => {
+    try {
+        const { getSupabaseClient } = await import('../../utils/supabase-client');
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase.from('clients').select('*');
+
+        if (error) {
+            throw error;
+        }
+
+        const rows = Array.isArray(data) ? data : [];
+        const normalizedClients = normalizeClients(rows);
+
+        return {
+            props: {
+                clients: normalizedClients,
+                isSupabaseConnected: true,
+                supabaseError: null
+            }
+        };
+    } catch (error) {
+        console.error('Failed to load clients from Supabase', error);
+        return {
+            props: {
+                clients: sampleClients,
+                isSupabaseConnected: false,
+                supabaseError:
+                    'We could not connect to Supabase, so sample contacts are shown instead. Double-check your SUPABASE_URL and key environment variables.'
+            }
+        };
+    }
+};
