@@ -9,6 +9,7 @@ import {
     XAxis,
     YAxis
 } from 'recharts';
+import type { TooltipContentProps } from 'recharts';
 
 export type Timeframe = 'weekly' | 'monthly' | 'yearly';
 
@@ -44,11 +45,9 @@ const compactCurrencyFormatter = new Intl.NumberFormat('en-US', {
 const formatCurrency = (value: number) => currencyFormatter.format(value);
 const formatCurrencyCompact = (value: number) => compactCurrencyFormatter.format(value);
 
-type ChartTooltipProps = {
-    active?: boolean;
-    payload?: Array<{ value?: number; name?: string; dataKey?: string }>;
-    label?: string;
-};
+type ChartValueType = number | string | Array<number | string>;
+type ChartNameType = string | number;
+type ChartTooltipProps = Partial<TooltipContentProps<ChartValueType, ChartNameType>>;
 
 function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
     if (!active || !payload || payload.length === 0) {
