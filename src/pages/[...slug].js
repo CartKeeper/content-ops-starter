@@ -41,7 +41,11 @@ function Page(props) {
 
 export function getStaticPaths() {
     const data = allContent();
-    const paths = resolveStaticPaths(data);
+    const paths = resolveStaticPaths(data)
+        .filter((path) => path && path !== '/')
+        .map((path) => ({
+            params: { slug: path.split('/').filter(Boolean) }
+        }));
     return { paths, fallback: false };
 }
 
