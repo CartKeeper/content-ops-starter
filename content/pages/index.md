@@ -1,6 +1,6 @@
 ---
-title: Home
-slug: /
+title: Landing
+slug: /landing
 sections:
   - type: GenericSection
     title:
