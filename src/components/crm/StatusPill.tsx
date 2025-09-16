@@ -9,10 +9,10 @@ type StatusPillProps = {
 };
 
 const toneStyles: Record<StatusTone, string> = {
-    success: 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/40',
-    warning: 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/40',
-    danger: 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-500/40',
-    info: 'bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-200 dark:ring-indigo-500/40',
+    success: 'bg-[#E5F6FF] text-[#0F9BD7] ring-[#A4E9FF] dark:bg-[#123F58] dark:text-[#63E8FF] dark:ring-[#2F8BB8]',
+    warning: 'bg-[#FFF4E8] text-[#C97200] ring-[#FFD8A8] dark:bg-[#4D2C16] dark:text-[#FFC99C] dark:ring-[#C97200]',
+    danger: 'bg-[#FFE6F5] text-[#D61B7B] ring-[#FF9CD5] dark:bg-[#4D1331] dark:text-[#FF9FD8] dark:ring-[#7A1D4C]',
+    info: 'bg-[#E9E7FF] text-[#4534FF] ring-[#C5C0FF] dark:bg-[#2A1F67] dark:text-[#AEB1FF] dark:ring-[#4E46C8]',
     neutral: 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-700/40 dark:text-slate-200 dark:ring-slate-600'
 };
 

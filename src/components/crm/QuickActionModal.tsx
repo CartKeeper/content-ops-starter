@@ -50,7 +50,7 @@ type QuickActionModalProps = {
 };
 
 const inputBaseStyles =
-    'w-full rounded-xl border border-white/50 bg-white/60 px-3 py-2 text-sm text-slate-800 shadow-sm backdrop-blur focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700/80 dark:bg-slate-900/60 dark:text-slate-100 dark:focus:border-indigo-400';
+    'w-full rounded-xl border border-white/50 bg-white/60 px-3 py-2 text-sm text-slate-800 shadow-sm backdrop-blur focus:border-[#5D3BFF] focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:border-slate-700/80 dark:bg-slate-900/60 dark:text-slate-100 dark:focus:border-[#7ADFFF] dark:focus:ring-[#4DE5FF]';
 
 export function QuickActionModal({
     type,
@@ -196,13 +196,13 @@ export function QuickActionModal({
                 <button
                     type="button"
                     onClick={onClose}
-                    className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-sm transition hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-900/60 dark:text-slate-300"
+                    className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-sm transition hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:bg-slate-900/60 dark:text-slate-300"
                     aria-label="Close modal"
                 >
                     ×
                 </button>
                 <div className="mb-6 space-y-2">
-                    <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+                    <span className="inline-flex items-center rounded-full border border-[#C5C0FF] bg-[#E9E7FF] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#4534FF] dark:border-[#4E46C8] dark:bg-[#2A1F67] dark:text-[#AEB1FF]">
                         {type === 'booking' && 'Schedule shoot'}
                         {type === 'invoice' && 'Create invoice'}
                         {type === 'gallery' && 'Upload gallery'}
@@ -221,19 +221,19 @@ export function QuickActionModal({
                             />
                         ))}
                     </div>
-                    {error ? <p className="text-sm text-rose-500">{error}</p> : null}
+                    {error ? <p className="text-sm text-[#D61B7B]">{error}</p> : null}
                     <div className="flex flex-wrap justify-end gap-3 pt-2">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                            className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-400"
+                            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] px-5 py-2 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-70"
                         >
                             {isSubmitting ? 'Saving…' : submitLabel}
                         </button>
@@ -326,7 +326,7 @@ function FieldInput({ field, value, onChange }: FieldInputProps) {
                         type="checkbox"
                         checked={Boolean(value)}
                         onChange={(event) => onChange(event.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
+                        className="h-4 w-4 rounded border-slate-300 text-[#5D3BFF] focus:ring-[#4DE5FF] dark:border-slate-600"
                     />
                     <span>{field.placeholder || 'Enabled'}</span>
                 </label>
