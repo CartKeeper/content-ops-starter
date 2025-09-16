@@ -1,11 +1,7 @@
 declare module 'recharts' {
-    export type TooltipContentProps<TValue = any, TName = any> = {
-        active?: boolean;
-        payload?: Array<{ value?: TValue; name?: TName; dataKey?: string }>;
-        label?: string;
-    };
+    export * from 'recharts/types/index';
 
-    const Recharts: any;
+    const Recharts: typeof import('recharts/types/index');
     export default Recharts;
 }
 

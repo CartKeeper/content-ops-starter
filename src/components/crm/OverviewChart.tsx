@@ -1,7 +1,5 @@
 import * as React from 'react';
 import classNames from 'classnames';
-import * as Recharts from 'recharts';
-
 import {
     CRM_BRAND_ACCENT,
     CRM_BRAND_ACCENT_EMPHASIS,
@@ -9,6 +7,17 @@ import {
     CRM_BRAND_ACCENT_GLOW_SOFT,
     GLASS_PANEL_CLASSNAME
 } from './theme';
+import {
+    Bar,
+    CartesianGrid,
+    ComposedChart,
+    Line,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
+} from 'recharts';
+import type { TooltipContentProps } from 'recharts';
 
 export type Timeframe = 'weekly' | 'monthly' | 'yearly';
 
@@ -45,24 +54,11 @@ const compactCurrencyFormatter = new Intl.NumberFormat('en-US', {
 const formatCurrency = (value: number) => currencyFormatter.format(value);
 const formatCurrencyCompact = (value: number) => compactCurrencyFormatter.format(value);
 
-type RechartsModule = typeof import('recharts') & {
-    Bar: React.ComponentType<Record<string, unknown>>;
-    CartesianGrid: React.ComponentType<Record<string, unknown>>;
-    ComposedChart: React.ComponentType<Record<string, unknown>>;
-    Line: React.ComponentType<Record<string, unknown>>;
-    ResponsiveContainer: React.ComponentType<Record<string, unknown>>;
-    Tooltip: React.ComponentType<Record<string, unknown>>;
-    XAxis: React.ComponentType<Record<string, unknown>>;
-    YAxis: React.ComponentType<Record<string, unknown>>;
-};
+type ChartValueType = number | string | Array<number | string>;
+type ChartNameType = string | number;
 
-const { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } = Recharts as RechartsModule;
-
-type ChartTooltipProps = {
+type ChartTooltipProps = Partial<TooltipContentProps<ChartValueType, ChartNameType>> & {
     isDarkMode?: boolean;
-    active?: boolean;
-    payload?: Array<{ value?: number; name?: string; dataKey?: string }>;
-    label?: string;
 };
 
 function ChartTooltip({ active, payload, label, isDarkMode }: ChartTooltipProps) {
