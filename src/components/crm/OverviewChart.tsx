@@ -18,15 +18,6 @@ export type ChartPoint = {
     revenue: number;
 };
 
-const Bar = (Recharts as any).Bar as React.ComponentType<any>;
-const Line = (Recharts as any).Line as React.ComponentType<any>;
-const CartesianGrid = (Recharts as any).CartesianGrid as React.ComponentType<any>;
-const ComposedChart = (Recharts as any).ComposedChart as React.ComponentType<any>;
-const ResponsiveContainer = (Recharts as any).ResponsiveContainer as React.ComponentType<any>;
-const Tooltip = (Recharts as any).Tooltip as React.ComponentType<any>;
-const XAxis = (Recharts as any).XAxis as React.ComponentType<any>;
-const YAxis = (Recharts as any).YAxis as React.ComponentType<any>;
-
 type OverviewChartProps = {
     data: Record<Timeframe, ChartPoint[]>;
     isDarkMode?: boolean;
@@ -54,11 +45,24 @@ const compactCurrencyFormatter = new Intl.NumberFormat('en-US', {
 const formatCurrency = (value: number) => currencyFormatter.format(value);
 const formatCurrencyCompact = (value: number) => compactCurrencyFormatter.format(value);
 
+type RechartsModule = typeof import('recharts') & {
+    Bar: React.ComponentType<Record<string, unknown>>;
+    CartesianGrid: React.ComponentType<Record<string, unknown>>;
+    ComposedChart: React.ComponentType<Record<string, unknown>>;
+    Line: React.ComponentType<Record<string, unknown>>;
+    ResponsiveContainer: React.ComponentType<Record<string, unknown>>;
+    Tooltip: React.ComponentType<Record<string, unknown>>;
+    XAxis: React.ComponentType<Record<string, unknown>>;
+    YAxis: React.ComponentType<Record<string, unknown>>;
+};
+
+const { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } = Recharts as RechartsModule;
+
 type ChartTooltipProps = {
+    isDarkMode?: boolean;
     active?: boolean;
     payload?: Array<{ value?: number; name?: string; dataKey?: string }>;
     label?: string;
-    isDarkMode?: boolean;
 };
 
 function ChartTooltip({ active, payload, label, isDarkMode }: ChartTooltipProps) {
@@ -69,7 +73,7 @@ function ChartTooltip({ active, payload, label, isDarkMode }: ChartTooltipProps)
     const shootsEntry = payload.find((entry) => entry.dataKey === 'shoots');
     const revenueEntry = payload.find((entry) => entry.dataKey === 'revenue');
 
-    const accentColor = isDarkMode ? '#5EEAD4' : '#0F766E';
+    const accentColor = isDarkMode ? CRM_BRAND_ACCENT : CRM_BRAND_ACCENT_EMPHASIS;
     const surfaceClass = isDarkMode
         ? 'border-white/10 bg-[#0b162c]/90 text-slate-200'
         : 'border-white/40 bg-white/95 text-slate-600';
@@ -129,25 +133,38 @@ export function OverviewChart({ data, isDarkMode = false }: OverviewChartProps) 
     const totalShoots = activeData.reduce((total, point) => total + point.shoots, 0);
     const totalRevenue = activeData.reduce((total, point) => total + point.revenue, 0);
 
-    const chartColors = React.useMemo(
-        () => ({
+    const chartColors = React.useMemo(() => {
+        const accentTone = isDarkMode ? CRM_BRAND_ACCENT : CRM_BRAND_ACCENT_EMPHASIS;
+
+        return {
             axis: isDarkMode ? 'rgba(203, 213, 225, 0.65)' : 'rgba(71, 85, 105, 0.65)',
             grid: isDarkMode ? 'rgba(148, 163, 184, 0.22)' : 'rgba(100, 116, 139, 0.18)',
-            cursor: isDarkMode ? 'rgba(94, 234, 212, 0.12)' : 'rgba(45, 212, 191, 0.08)',
-            barStart: isDarkMode ? 'rgba(94, 234, 212, 0.55)' : 'rgba(45, 212, 191, 0.55)',
-            barEnd: isDarkMode ? 'rgba(17, 94, 89, 0.22)' : 'rgba(45, 212, 191, 0.12)',
-            lineStroke: isDarkMode ? '#5EEAD4' : CRM_BRAND_ACCENT_EMPHASIS,
+            cursor: isDarkMode ? 'rgba(45, 212, 191, 0.12)' : 'rgba(45, 212, 191, 0.08)',
+            barStart: 'rgba(45, 212, 191, 0.55)',
+            barEnd: isDarkMode ? 'rgba(15, 118, 110, 0.25)' : 'rgba(45, 212, 191, 0.12)',
+            lineStroke: accentTone,
             dotStroke: isDarkMode ? '#030a16' : '#ecfeff',
-            legendAccent: isDarkMode ? '#5EEAD4' : CRM_BRAND_ACCENT_EMPHASIS,
-            legendRing: isDarkMode ? 'rgba(94, 234, 212, 0.4)' : 'rgba(45, 212, 191, 0.35)',
+            legendAccent: accentTone,
+            legendRing: isDarkMode ? 'rgba(45, 212, 191, 0.4)' : 'rgba(45, 212, 191, 0.35)',
             legendTextClass: isDarkMode ? 'text-slate-400' : 'text-slate-500'
-        }),
+        };
+    }, [isDarkMode]);
+
+    const activeToggleStyles = React.useMemo(
+        () =>
+            isDarkMode
+                ? {
+                      backgroundColor: 'rgba(45, 212, 191, 0.18)',
+                      color: CRM_BRAND_ACCENT,
+                      boxShadow: '0 0 0 1px rgba(45, 212, 191, 0.4)'
+                  }
+                : {
+                      backgroundColor: 'rgba(20, 184, 166, 0.18)',
+                      color: CRM_BRAND_ACCENT_EMPHASIS,
+                      boxShadow: '0 0 0 1px rgba(20, 184, 166, 0.3)'
+                  },
         [isDarkMode]
     );
-
-    const activeToggleStyles = isDarkMode
-        ? { backgroundColor: 'rgba(94, 234, 212, 0.18)', color: '#5EEAD4', boxShadow: '0 0 0 1px rgba(94, 234, 212, 0.4)' }
-        : { backgroundColor: 'rgba(45, 212, 191, 0.18)', color: '#0F766E', boxShadow: '0 0 0 1px rgba(45, 212, 191, 0.3)' };
 
     return (
         <section className={classNames(GLASS_PANEL_CLASSNAME, 'p-6')}>
