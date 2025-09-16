@@ -2,6 +2,38 @@
     "type": "CrmInvoices",
     "items": [
         {
+            "id": "1036",
+            "client": "Evergreen Architects",
+            "project": "Retainer Renewal",
+            "amount": 2100,
+            "dueDate": "2025-05-31",
+            "status": "Sent"
+        },
+        {
+            "id": "1035",
+            "client": "Sona Patel",
+            "project": "Campaign Phase 2",
+            "amount": 2750,
+            "dueDate": "2025-06-09",
+            "status": "Sent"
+        },
+        {
+            "id": "1034",
+            "client": "Harrison & June",
+            "project": "Album Design",
+            "amount": 1800,
+            "dueDate": "2025-05-25",
+            "status": "Draft"
+        },
+        {
+            "id": "1033",
+            "client": "Evergreen Architects",
+            "project": "Interior Vignette Set",
+            "amount": 1650,
+            "dueDate": "2025-03-19",
+            "status": "Paid"
+        },
+        {
             "id": "1031",
             "client": "Evelyn Sanders",
             "project": "Engagement Session",
