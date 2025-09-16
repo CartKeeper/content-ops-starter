@@ -46,33 +46,60 @@ export default function DashboardPage({ clients, bookings, invoices }: Dashboard
             }
         >
             <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-                <DashboardCard
-                    title="Active clients"
-                    value={String(clients.length)}
-                    accent="Across weddings, portraits & recurring sessions"
-                    description="Add upcoming clients directly from inquiry forms or the CRM to keep your pipeline visible."
-                />
+                <DashboardCard title="Active clients" value={String(clients.length)}>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-500">
+                        Across weddings, portraits & recurring sessions
+                    </p>
+                    <p className="mt-3 leading-relaxed text-slate-600">
+                        Add upcoming clients directly from inquiry forms or the CRM to keep your pipeline visible.
+                    </p>
+                </DashboardCard>
                 <DashboardCard
                     title="Upcoming shoots"
                     value={String(upcomingBookings.length)}
-                    accent={nextBooking ? `Next: ${nextBooking.shootType} on ${new Intl.DateTimeFormat('en-US', {
-                            month: 'short',
-                            day: 'numeric'
-                        }).format(new Date(nextBooking.date))}` : 'No shoots on the calendar'}
-                    description="Confirm shot lists, assistants and gear prep ahead of time so every production runs smoothly."
-                />
+                    trend={
+                        nextBooking
+                            ? {
+                                  value: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(
+                                      new Date(nextBooking.date)
+                                  ),
+                                  label: `Next: ${nextBooking.shootType}`
+                              }
+                            : {
+                                  value: 'No shoots scheduled',
+                                  isPositive: false
+                              }
+                    }
+                >
+                    <p className="leading-relaxed text-slate-600">
+                        Confirm shot lists, assistants and gear prep ahead of time so every production runs smoothly.
+                    </p>
+                </DashboardCard>
                 <DashboardCard
                     title="Outstanding invoices"
                     value={formatCurrency(outstandingTotal)}
-                    accent={`${outstandingInvoices.length} awaiting payment`}
-                    description="Send payment reminders or convert drafts into final invoices before the due date hits."
-                />
+                    trend={{
+                        value: `${outstandingInvoices.length} open`,
+                        label: 'Awaiting payment',
+                        isPositive: outstandingInvoices.length === 0
+                    }}
+                >
+                    <p className="leading-relaxed text-slate-600">
+                        Send payment reminders or convert drafts into final invoices before the due date hits.
+                    </p>
+                </DashboardCard>
                 <DashboardCard
                     title="Completed this month"
                     value={String(completedThisMonth.length)}
-                    accent="Shoots delivered and ready for testimonials"
-                    description="Celebrate the wins—archive galleries, request reviews and update your portfolio."
-                />
+                    trend={{
+                        value: `${completedThisMonth.length} delivered`,
+                        label: 'Ready for testimonials'
+                    }}
+                >
+                    <p className="leading-relaxed text-slate-600">
+                        Celebrate the wins—archive galleries, request reviews and update your portfolio.
+                    </p>
+                </DashboardCard>
             </section>
 
             <section className="grid gap-6 lg:grid-cols-2">
