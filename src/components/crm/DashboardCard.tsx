@@ -15,8 +15,8 @@ type DashboardCardProps = {
 
 const trendClassNames = (isPositive?: boolean) =>
     classNames('text-sm font-medium', {
-        'text-emerald-600 dark:text-emerald-400': isPositive !== false,
-        'text-rose-600 dark:text-rose-400': isPositive === false
+        'text-[#0F9BD7] dark:text-[#63E8FF]': isPositive !== false,
+        'text-[#D61B7B] dark:text-[#FF9FD8]': isPositive === false
     });
 
 export function DashboardCard({ title, value, trend, className, children }: DashboardCardProps) {

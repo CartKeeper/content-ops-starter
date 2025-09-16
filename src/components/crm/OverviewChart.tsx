@@ -64,7 +64,7 @@ function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
                 {shootsEntry && (
                     <div className="flex items-center justify-between gap-6">
                         <span className="flex items-center gap-2">
-                            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" aria-hidden="true" />
+                            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#5D3BFF]" aria-hidden="true" />
                             Shoots
                         </span>
                         <span className="font-semibold text-slate-900 dark:text-white">{shootsEntry.value}</span>
@@ -74,7 +74,7 @@ function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
                     <div className="flex items-center justify-between gap-6">
                         <span className="flex items-center gap-2">
                             <span
-                                className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border-2 border-emerald-400"
+                                className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border-2 border-[#F45DC8]"
                                 aria-hidden="true"
                             />
                             Revenue
@@ -136,11 +136,11 @@ export function OverviewChart({ data }: OverviewChartProps) {
             <div className="mt-6 space-y-6">
                 <div className="flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
                     <div className="flex items-center gap-2">
-                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" aria-hidden="true" />
+                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#5D3BFF]" aria-hidden="true" />
                         Shoots
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border-2 border-emerald-400" aria-hidden="true" />
+                        <span className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border-2 border-[#F45DC8]" aria-hidden="true" />
                         Revenue
                     </div>
                 </div>
@@ -165,8 +165,8 @@ export function OverviewChart({ data }: OverviewChartProps) {
                                     >
                                         <defs>
                                             <linearGradient id="shootsGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="rgba(99, 102, 241, 0.65)" />
-                                                <stop offset="100%" stopColor="rgba(99, 102, 241, 0.15)" />
+                                                <stop offset="0%" stopColor="rgba(93, 59, 255, 0.68)" />
+                                                <stop offset="100%" stopColor="rgba(77, 229, 255, 0.18)" />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.12} strokeDasharray="4 6" />
@@ -195,17 +195,17 @@ export function OverviewChart({ data }: OverviewChartProps) {
                                         />
                                         <Tooltip
                                             content={(tooltipProps) => <ChartTooltip {...tooltipProps} />}
-                                            cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }}
+                                            cursor={{ fill: 'rgba(93, 59, 255, 0.08)' }}
                                         />
                                         <Bar yAxisId="shoots" dataKey="shoots" fill="url(#shootsGradient)" radius={[10, 10, 0, 0]} maxBarSize={40} />
                                         <Line
                                             yAxisId="revenue"
                                             type="monotone"
                                             dataKey="revenue"
-                                            stroke="#10b981"
+                                            stroke="#F45DC8"
                                             strokeWidth={3}
-                                            dot={{ r: 5, strokeWidth: 2, stroke: '#0f172a', fill: '#10b981' }}
-                                            activeDot={{ r: 6 }}
+                                            dot={{ r: 5, strokeWidth: 2, stroke: '#0f172a', fill: '#F45DC8' }}
+                                            activeDot={{ r: 6, fill: '#F45DC8' }}
                                         />
                                     </ComposedChart>
                                 </ResponsiveContainer>

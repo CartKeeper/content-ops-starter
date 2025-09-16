@@ -13,3 +13,4 @@ export type { TaskRecord } from './TaskList';
 export { StatCard } from './StatCard';
 export { OverviewChart } from './OverviewChart';
 export type { ChartPoint, Timeframe } from './OverviewChart';
+export { ApertureMark } from './ApertureMark';

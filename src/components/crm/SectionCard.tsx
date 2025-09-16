@@ -22,7 +22,7 @@ export function SectionCard({ title, description, action, children, className }:
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
                     {description && <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">{description}</p>}
                 </div>
-                {action && <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">{action}</div>}
+                {action && <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-[#4534FF] dark:text-[#9DAAFF]">{action}</div>}
             </div>
             <div className="mt-5">{children}</div>
         </section>

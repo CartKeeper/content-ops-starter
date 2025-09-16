@@ -13,6 +13,7 @@ import {
     SectionCard,
     StatCard,
     TaskList,
+    ApertureMark,
     type BookingRecord,
     type BookingStatus,
     type InvoiceRecord,
@@ -626,50 +627,67 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                 </Link>
                             ))}
                         </nav>
-                        <div className="px-6 pb-8 text-xs text-slate-500">
-                            <p className="font-semibold text-slate-200">Codex Environment</p>
-                            <p className="mt-1 text-slate-400">Organize every shoot, deliverable, and client moment.</p>
+                        <div className="px-6 pb-8">
+                            <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-4 text-xs text-slate-400 shadow-lg">
+                                <ApertureMark
+                                    className="mt-0.5 h-7 w-7 text-white/90"
+                                    title="Aperture Codex brand insignia"
+                                />
+                                <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.48em] text-slate-300">
+                                        Codex Environment
+                                    </p>
+                                    <p className="mt-2 leading-relaxed text-slate-400">
+                                        Organize every shoot, deliverable, and client moment.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </aside>
                     <div className="flex min-h-screen flex-1 flex-col">
                         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-6 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-900/80">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 font-semibold text-white shadow-sm">
-                                    CE
-                                </div>
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.32em] text-indigo-600 dark:text-indigo-400">
-                                        Codex Environment
+                            <div className="flex items-center gap-3 py-1">
+                                <span className="relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-white/10">
+                                    <ApertureMark
+                                        className="h-7 w-7 text-slate-900 drop-shadow-sm dark:text-white/90"
+                                        title="Aperture Codex brand mark"
+                                    />
+                                </span>
+                                <div className="leading-tight">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.64em] text-[#4534FF] dark:text-[#9DAAFF]">
+                                        Aperture
                                     </p>
-                                    <p className="text-base font-semibold text-slate-900 dark:text-white">Studio CRM</p>
+                                    <p className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+                                        Studio CRM
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
                                     type="button"
                                     onClick={toggleDarkMode}
-                                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
+                                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
                                     aria-label={isDarkMode ? 'Activate light mode' : 'Activate dark mode'}
                                 >
                                     {isDarkMode ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
                                 </button>
                                 <button
                                     type="button"
-                                    className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
+                                    className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
                                     aria-label="Open notifications"
                                 >
                                     <BellIcon className="h-5 w-5" />
-                                    <span className="absolute right-2 top-2 inline-flex h-2 w-2 rounded-full bg-rose-500"></span>
+                                    <span className="absolute right-2 top-2 inline-flex h-2 w-2 rounded-full bg-[#F45DC8]"></span>
                                 </button>
                                 <div className="relative" ref={userMenuRef}>
                                     <button
                                         type="button"
                                         onClick={() => setIsUserMenuOpen((open) => !open)}
-                                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 pl-1 pr-3 text-sm font-medium text-slate-700 shadow-sm transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:text-white"
+                                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 pl-1 pr-3 text-sm font-medium text-slate-700 shadow-sm transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:text-white"
                                         aria-haspopup="menu"
                                         aria-expanded={isUserMenuOpen}
                                     >
-                                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] text-sm font-semibold text-white shadow-sm">
                                             AL
                                         </span>
                                         <span className="hidden text-left sm:block">
@@ -695,7 +713,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                             <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 pt-10">
                                 <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                                     <div>
-                                        <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                                        <p className="text-sm font-semibold uppercase tracking-widest text-[#4534FF] dark:text-[#9DAAFF]">
                                             Studio Command Center
                                         </p>
                                         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">
@@ -712,7 +730,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                                 key={action.id}
                                                 type="button"
                                                 onClick={() => setActiveModal(action.modal)}
-                                                className="inline-flex items-center justify-center rounded-full border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-50 dark:border-indigo-500/40 dark:bg-slate-900/60 dark:text-indigo-300 dark:hover:bg-slate-800/60"
+                                                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4DE5FF] dark:focus:ring-offset-slate-900"
                                             >
                                                 {action.label}
                                             </button>
@@ -745,7 +763,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                                 className="h-16 w-16 rounded-full border border-slate-200 bg-white p-1 dark:border-slate-700"
                                             />
                                             <div>
-                                                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-indigo-600 dark:text-indigo-400">
+                                                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#4534FF] dark:text-[#9DAAFF]">
                                                     Lead Photographer
                                                 </p>
                                                 <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">Avery Logan</h2>
@@ -778,14 +796,14 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                             </div>
                                         </div>
                                         <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800">
-                                            <h3 className="text-xs font-semibold uppercase tracking-[0.32em] text-indigo-600 dark:text-indigo-400">Galleries</h3>
+                                            <h3 className="text-xs font-semibold uppercase tracking-[0.32em] text-[#4534FF] dark:text-[#9DAAFF]">Galleries</h3>
                                             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                                                 {deliveredGalleries} delivered · {pendingGalleries} pending ({galleryCompletion}% complete)
                                             </p>
                                             <div className="mt-4 flex items-center gap-3">
                                                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
                                                     <div
-                                                        className="h-full rounded-full bg-indigo-500"
+                                                        className="h-full rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF]"
                                                         style={{ width: `${galleryCompletion}%` }}
                                                     />
                                                 </div>
@@ -806,7 +824,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                             title="Upcoming Shoots"
                                             description="Stay ready for every session with a quick view of the week ahead."
                                             action={
-                                                <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                                <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
                                                     Open calendar
                                                 </button>
                                             }
@@ -818,7 +836,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                             title="Active Clients"
                                             description="From loyal regulars to new leads, see who needs attention next."
                                             action={
-                                                <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                                <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
                                                     View all clients
                                                 </button>
                                             }
@@ -838,7 +856,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                             title="Studio Tasks"
                                             description="Keep production moving with next actions across your team."
                                             action={
-                                                <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+                                                <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
                                                     Create task
                                                 </button>
                                             }
@@ -916,8 +934,8 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                                                 className={[
                                                                     'inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold',
                                                                     reminder.daysUntil <= 3
-                                                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-                                                                        : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300'
+                                                                        ? 'bg-[#FFE6F5] text-[#D61B7B] dark:bg-[#4D1331] dark:text-[#FF9FD8]'
+                                                                        : 'bg-[#E9E7FF] text-[#4534FF] dark:bg-[#2A1F67] dark:text-[#AEB1FF]'
                                                                 ].join(' ')}
                                                             >
                                                                 {formatDaysUntil(reminder.daysUntil)}
@@ -962,8 +980,8 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                                                     className={[
                                                                         'font-semibold',
                                                                         gallery.isOverdue
-                                                                            ? 'text-rose-600 dark:text-rose-400'
-                                                                            : 'text-emerald-600 dark:text-emerald-400'
+                                                                            ? 'text-[#D61B7B] dark:text-[#FF9FD8]'
+                                                                            : 'text-[#0F9BD7] dark:text-[#63E8FF]'
                                                                     ].join(' ')}
                                                                 >
                                                                     {formatDeadline(gallery.daysRemaining)}

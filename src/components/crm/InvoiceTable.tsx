@@ -45,7 +45,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceRecord[] }) {
                     </div>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                         <StatusPill tone={statusToneMap[invoice.status]}>{invoice.status}</StatusPill>
-                        <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">View invoice</button>
+                        <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">View invoice</button>
                     </div>
                 </div>
             ))}
