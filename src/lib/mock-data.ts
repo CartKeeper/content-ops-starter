@@ -1,11 +1,17 @@
+export type ClientStatus = 'Active' | 'Lead' | 'Archived';
+
 export type Client = {
     id: string;
     name: string;
+    company?: string;
     email: string;
-    phone: string;
-    location: string;
-    lastShootDate: string;
-    tags: string[];
+    phone?: string;
+    location?: string;
+    shoots: number;
+    lastShoot: string;
+    upcomingShoot?: string;
+    status: ClientStatus;
+    tags?: string[];
     notes?: string;
 };
 
@@ -57,20 +63,28 @@ export const clients: Client[] = [
     {
         id: 'client-olivia-rivera',
         name: 'Olivia Rivera',
+        company: 'Rivera Events',
         email: 'olivia.rivera@example.com',
         phone: '+1 (312) 555-9023',
         location: 'Chicago, IL',
-        lastShootDate: '2023-10-02',
+        shoots: 18,
+        lastShoot: '2023-10-02',
+        upcomingShoot: '2024-05-18',
+        status: 'Active',
         tags: ['wedding', 'vip'],
         notes: 'Prefers natural light and candid shots. Following up about spring engagement session.'
     },
     {
         id: 'client-liam-nguyen',
         name: 'Liam Nguyen',
+        company: 'Nguyen Studio',
         email: 'liam.nguyen@example.com',
         phone: '+1 (415) 555-4411',
         location: 'San Francisco, CA',
-        lastShootDate: '2023-12-14',
+        shoots: 5,
+        lastShoot: '2023-12-14',
+        upcomingShoot: '2024-03-08',
+        status: 'Lead',
         tags: ['branding'],
         notes: 'Launching a new personal brand site in Q2. Needs lifestyle portraits.'
     },
@@ -80,7 +94,9 @@ export const clients: Client[] = [
         email: 'amelia.cho@example.com',
         phone: '+1 (646) 555-7312',
         location: 'New York, NY',
-        lastShootDate: '2024-01-09',
+        shoots: 9,
+        lastShoot: '2024-01-09',
+        status: 'Active',
         tags: ['family', 'repeat'],
         notes: 'Booked annual family mini-session. Loves quick turnarounds.'
     }

@@ -1,7 +1,7 @@
 import type { GetStaticProps } from 'next';
 import Link from 'next/link';
 import { CRMLayout } from '../../components/crm/CRMLayout';
-import { ClientTable } from '../../components/crm/ClientTable';
+import ClientTable from '../../components/crm/ClientTable';
 import type { Client } from '../../lib/mock-data';
 import { getClients } from '../../lib/api';
 

@@ -50,7 +50,7 @@ export default function ClientProfilePage({ client, bookings, invoices }: Client
                             </div>
                             <div>
                                 <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Last shoot</p>
-                                <p className="mt-1">{formatDate(client.lastShootDate)}</p>
+                                <p className="mt-1">{formatDate(client.lastShoot)}</p>
                             </div>
                         </div>
                         {client.notes && (

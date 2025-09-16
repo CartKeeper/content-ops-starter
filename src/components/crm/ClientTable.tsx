@@ -1,66 +1,59 @@
-import Link from 'next/link';
-import type { Client } from '../../lib/mock-data';
-import { getClientById } from '../../lib/api';
+import * as React from 'react';
+import dayjs from 'dayjs';
 
-function formatDate(date: string) {
-    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(date));
-}
+import StatusPill, { StatusTone } from './StatusPill';
+import type { Client } from '../../lib/mock-data';
+
+const statusToneMap: Record<Client['status'], StatusTone> = {
+    Active: 'success',
+    Lead: 'info',
+    Archived: 'neutral'
+};
+
+const formatDate = (value?: string) => (value ? dayjs(value).format('MMM D, YYYY') : '—');
 
 type ClientTableProps = {
     clients: Client[];
 };
 
-export function ClientTable({ clients }: ClientTableProps) {
+export default function ClientTable({ clients }: ClientTableProps) {
     return (
-        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50">
-            <table className="min-w-full divide-y divide-slate-800 text-sm">
-                <thead className="bg-slate-900/80">
-                    <tr className="text-left text-xs uppercase tracking-[0.25em] text-slate-400">
-                        <th scope="col" className="px-6 py-4">
+        <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-left">
+                <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <tr>
+                        <th scope="col" className="px-5 py-3">
                             Client
                         </th>
-                        <th scope="col" className="px-6 py-4">
-                            Contact
+                        <th scope="col" className="px-5 py-3">
+                            Shoots
                         </th>
-                        <th scope="col" className="px-6 py-4">
-                            Last Shoot
+                        <th scope="col" className="px-5 py-3">
+                            Last Session
                         </th>
-                        <th scope="col" className="px-6 py-4">
-                            Tags
+                        <th scope="col" className="px-5 py-3">
+                            Upcoming
                         </th>
-                        <th scope="col" className="px-6 py-4 text-right">
-                            Actions
+                        <th scope="col" className="px-5 py-3">
+                            Status
                         </th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80">
+                <tbody className="divide-y divide-slate-100 text-sm">
                     {clients.map((client) => (
-                        <tr key={client.id} className="text-slate-200 transition hover:bg-slate-900">
-                            <td className="px-6 py-4">
-                                <p className="font-medium text-white">{client.name}</p>
-                                <p className="text-xs text-slate-400">{client.location}</p>
+                        <tr key={client.id} className="hover:bg-slate-50">
+                            <td className="px-5 py-4">
+                                <div className="font-medium text-slate-900">{client.name}</div>
+                                <div className="text-sm text-slate-500">{client.email}</div>
                             </td>
-                            <td className="px-6 py-4">
-                                <p>{client.email}</p>
-                                <p className="text-xs text-slate-400">{client.phone}</p>
+                            <td className="px-5 py-4">
+                                <div className="text-sm font-medium text-slate-900">{client.shoots}</div>
+                                {client.phone && <div className="text-xs text-slate-500">{client.phone}</div>}
                             </td>
-                            <td className="px-6 py-4 text-slate-300">{formatDate(client.lastShootDate)}</td>
-                            <td className="px-6 py-4">
-                                <div className="flex flex-wrap gap-2">
-                                    {client.tags.map((tag) => (
-                                        <span
-                                            key={tag}
-                                            className="inline-flex items-center rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300"
-                                        >
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            </td>
-                            <td className="px-6 py-4 text-right text-xs">
-                                <Link href={`/clients/${client.id}`} className="font-semibold text-emerald-300 hover:text-emerald-200">
-                                    View timeline
-                                </Link>
+                            <td className="px-5 py-4 text-slate-600">{formatDate(client.lastShoot)}</td>
+                            <td className="px-5 py-4 text-slate-600">{formatDate(client.upcomingShoot)}</td>
+                            <td className="px-5 py-4">
+                                <StatusPill tone={statusToneMap[client.status]}>{client.status}</StatusPill>
                             </td>
                         </tr>
                     ))}
@@ -68,16 +61,4 @@ export function ClientTable({ clients }: ClientTableProps) {
             </table>
         </div>
     );
-}
-
-export async function fetchClientSummary(clientId: string) {
-    const client = await getClientById(clientId);
-    if (!client) {
-        return undefined;
-    }
-    return {
-        name: client.name,
-        location: client.location,
-        lastShootDate: formatDate(client.lastShootDate)
-    };
 }
