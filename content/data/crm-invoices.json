@@ -4,115 +4,566 @@
         {
             "id": "1036",
             "client": "Evergreen Architects",
+            "clientEmail": "team@evergreenarchitects.com",
             "project": "Retainer Renewal",
-            "amount": 2100,
+            "issueDate": "2025-05-01",
             "dueDate": "2025-05-31",
-            "status": "Sent"
+            "status": "Sent",
+            "currency": "USD",
+            "amount": 2100,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Retainer Renewal creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1367.44,
+                    "total": 1367.44
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 586.05,
+                    "total": 586.05
+                }
+            ],
+            "totals": {
+                "subtotal": 1953.49,
+                "taxTotal": 146.51,
+                "total": 2100
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "classic",
+            "pdfUrl": "/invoices/invoice-1036.pdf",
+            "paymentLink": "https://pay.stripe.com/test_invoice_1036",
+            "lastSentAt": "2025-05-02T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1035",
             "client": "Sona Patel",
+            "clientEmail": "sona@patelcreative.co",
             "project": "Campaign Phase 2",
-            "amount": 2750,
+            "issueDate": "2025-05-10",
             "dueDate": "2025-06-09",
-            "status": "Sent"
+            "status": "Sent",
+            "currency": "USD",
+            "amount": 2750,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Campaign Phase 2 creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1790.7,
+                    "total": 1790.7
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 767.44,
+                    "total": 767.44
+                }
+            ],
+            "totals": {
+                "subtotal": 2558.14,
+                "taxTotal": 191.86,
+                "total": 2750
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "minimal",
+            "pdfUrl": "/invoices/invoice-1035.pdf",
+            "paymentLink": "https://pay.stripe.com/test_invoice_1035",
+            "lastSentAt": "2025-05-11T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1034",
             "client": "Harrison & June",
+            "clientEmail": "hello@harrisonandjune.com",
             "project": "Album Design",
-            "amount": 1800,
+            "issueDate": "2025-04-25",
             "dueDate": "2025-05-25",
-            "status": "Draft"
+            "status": "Draft",
+            "currency": "USD",
+            "amount": 1800,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Album Design creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1172.09,
+                    "total": 1172.09
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 502.33,
+                    "total": 502.33
+                }
+            ],
+            "totals": {
+                "subtotal": 1674.42,
+                "taxTotal": 125.58,
+                "total": 1800
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "branded",
+            "pdfUrl": "/invoices/invoice-1034.pdf",
+            "paymentLink": "https://pay.stripe.com/test_invoice_1034",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1033",
             "client": "Evergreen Architects",
+            "clientEmail": "team@evergreenarchitects.com",
             "project": "Interior Vignette Set",
-            "amount": 1650,
+            "issueDate": "2025-02-17",
             "dueDate": "2025-03-19",
-            "status": "Paid"
+            "status": "Paid",
+            "currency": "USD",
+            "amount": 1650,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Interior Vignette Set creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1074.42,
+                    "total": 1074.42
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 460.46,
+                    "total": 460.46
+                }
+            ],
+            "totals": {
+                "subtotal": 1534.88,
+                "taxTotal": 115.12,
+                "total": 1650
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "classic",
+            "pdfUrl": "/invoices/invoice-1033.pdf",
+            "lastSentAt": "2025-02-18T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1031",
             "client": "Evelyn Sanders",
+            "clientEmail": "evelyn@wanderlust.com",
             "project": "Engagement Session",
-            "amount": 1850,
+            "issueDate": "2025-04-06",
             "dueDate": "2025-05-06",
-            "status": "Sent"
+            "status": "Sent",
+            "currency": "USD",
+            "amount": 1850,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Engagement Session creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1204.65,
+                    "total": 1204.65
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 516.28,
+                    "total": 516.28
+                }
+            ],
+            "totals": {
+                "subtotal": 1720.93,
+                "taxTotal": 129.07,
+                "total": 1850
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "minimal",
+            "pdfUrl": "/invoices/invoice-1031.pdf",
+            "paymentLink": "https://pay.stripe.com/test_invoice_1031",
+            "lastSentAt": "2025-04-07T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1030",
             "client": "Harrison & June",
+            "clientEmail": "hello@harrisonandjune.com",
             "project": "Wedding Collection",
-            "amount": 5200,
+            "issueDate": "2025-04-18",
             "dueDate": "2025-05-18",
-            "status": "Overdue"
+            "status": "Overdue",
+            "currency": "USD",
+            "amount": 5200,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Wedding Collection creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 3386.05,
+                    "total": 3386.05
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 1451.16,
+                    "total": 1451.16
+                }
+            ],
+            "totals": {
+                "subtotal": 4837.21,
+                "taxTotal": 362.79,
+                "total": 5200
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "branded",
+            "pdfUrl": "/invoices/invoice-1030.pdf",
+            "paymentLink": "https://pay.stripe.com/test_invoice_1030",
+            "lastSentAt": "2025-04-19T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1029",
             "client": "Sona Patel",
+            "clientEmail": "sona@patelcreative.co",
             "project": "Brand Lifestyle Campaign",
-            "amount": 2400,
+            "issueDate": "2025-03-26",
             "dueDate": "2025-04-25",
-            "status": "Paid"
+            "status": "Paid",
+            "currency": "USD",
+            "amount": 2400,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Brand Lifestyle Campaign creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1562.79,
+                    "total": 1562.79
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 669.77,
+                    "total": 669.77
+                }
+            ],
+            "totals": {
+                "subtotal": 2232.56,
+                "taxTotal": 167.44,
+                "total": 2400
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "classic",
+            "pdfUrl": "/invoices/invoice-1029.pdf",
+            "lastSentAt": "2025-03-27T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1028",
             "client": "Fern & Pine Studio",
+            "clientEmail": "contact@fernandpine.com",
             "project": "Lookbook Launch",
-            "amount": 1950,
+            "issueDate": "2025-03-09",
             "dueDate": "2025-04-08",
-            "status": "Paid"
+            "status": "Paid",
+            "currency": "USD",
+            "amount": 1950,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Lookbook Launch creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1269.76,
+                    "total": 1269.76
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 544.19,
+                    "total": 544.19
+                }
+            ],
+            "totals": {
+                "subtotal": 1813.95,
+                "taxTotal": 136.05,
+                "total": 1950
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "minimal",
+            "pdfUrl": "/invoices/invoice-1028.pdf",
+            "lastSentAt": "2025-03-10T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1027",
             "client": "Evergreen Architects",
+            "clientEmail": "team@evergreenarchitects.com",
             "project": "Team Headshots",
-            "amount": 1650,
+            "issueDate": "2025-02-17",
             "dueDate": "2025-03-19",
-            "status": "Paid"
+            "status": "Paid",
+            "currency": "USD",
+            "amount": 1650,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Team Headshots creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1074.42,
+                    "total": 1074.42
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 460.46,
+                    "total": 460.46
+                }
+            ],
+            "totals": {
+                "subtotal": 1534.88,
+                "taxTotal": 115.12,
+                "total": 1650
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "branded",
+            "pdfUrl": "/invoices/invoice-1027.pdf",
+            "lastSentAt": "2025-02-18T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1026",
             "client": "Violet & Thread",
+            "clientEmail": "hello@violetandthread.com",
             "project": "Spring Collection",
-            "amount": 2100,
+            "issueDate": "2025-01-22",
             "dueDate": "2025-02-21",
-            "status": "Paid"
+            "status": "Paid",
+            "currency": "USD",
+            "amount": 2100,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Spring Collection creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1367.44,
+                    "total": 1367.44
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 586.05,
+                    "total": 586.05
+                }
+            ],
+            "totals": {
+                "subtotal": 1953.49,
+                "taxTotal": 146.51,
+                "total": 2100
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "classic",
+            "pdfUrl": "/invoices/invoice-1026.pdf",
+            "lastSentAt": "2025-01-23T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1025",
             "client": "Atlas Fitness",
+            "clientEmail": "hello@atlasfitness.co",
             "project": "Brand Campaign",
-            "amount": 2850,
+            "issueDate": "2024-12-30",
             "dueDate": "2025-01-29",
-            "status": "Paid"
+            "status": "Paid",
+            "currency": "USD",
+            "amount": 2850,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Brand Campaign creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1855.81,
+                    "total": 1855.81
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 795.35,
+                    "total": 795.35
+                }
+            ],
+            "totals": {
+                "subtotal": 2651.16,
+                "taxTotal": 198.84,
+                "total": 2850
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "minimal",
+            "pdfUrl": "/invoices/invoice-1025.pdf",
+            "lastSentAt": "2024-12-31T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1024",
             "client": "Harbor & Co",
+            "clientEmail": "hello@harborandco.com",
             "project": "Product Launch",
-            "amount": 2600,
+            "issueDate": "2024-11-12",
             "dueDate": "2024-12-12",
-            "status": "Paid"
+            "status": "Paid",
+            "currency": "USD",
+            "amount": 2600,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Product Launch creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1693.02,
+                    "total": 1693.02
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 725.58,
+                    "total": 725.58
+                }
+            ],
+            "totals": {
+                "subtotal": 2418.6,
+                "taxTotal": 181.4,
+                "total": 2600
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "branded",
+            "pdfUrl": "/invoices/invoice-1024.pdf",
+            "lastSentAt": "2024-11-13T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1023",
             "client": "Lumen Studio",
+            "clientEmail": "hello@lumenstudio.com",
             "project": "Agency Portfolio",
-            "amount": 3400,
+            "issueDate": "2024-10-17",
             "dueDate": "2024-11-16",
-            "status": "Paid"
+            "status": "Paid",
+            "currency": "USD",
+            "amount": 3400,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Agency Portfolio creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 2213.95,
+                    "total": 2213.95
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 948.84,
+                    "total": 948.84
+                }
+            ],
+            "totals": {
+                "subtotal": 3162.79,
+                "taxTotal": 237.21,
+                "total": 3400
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "classic",
+            "pdfUrl": "/invoices/invoice-1023.pdf",
+            "lastSentAt": "2024-10-18T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         },
         {
             "id": "1022",
             "client": "Beacon Realty",
+            "clientEmail": "accounts@beaconrealty.com",
             "project": "Property Showcase",
-            "amount": 1750,
+            "issueDate": "2024-09-05",
             "dueDate": "2024-10-05",
-            "status": "Paid"
+            "status": "Paid",
+            "currency": "USD",
+            "amount": 1750,
+            "taxRate": 0.075,
+            "lineItems": [
+                {
+                    "id": "item-1",
+                    "description": "Property Showcase creative coverage",
+                    "quantity": 1,
+                    "unitPrice": 1139.54,
+                    "total": 1139.54
+                },
+                {
+                    "id": "item-2",
+                    "description": "Post-production & delivery",
+                    "quantity": 1,
+                    "unitPrice": 488.37,
+                    "total": 488.37
+                }
+            ],
+            "totals": {
+                "subtotal": 1627.91,
+                "taxTotal": 122.09,
+                "total": 1750
+            },
+            "notes": "Payment due within 30 days of receipt.",
+            "template": "minimal",
+            "pdfUrl": "/invoices/invoice-1022.pdf",
+            "lastSentAt": "2024-09-06T00:00:00.000Z",
+            "customFields": {
+                "invoice-terms": "Net 30 payment window. Late fees applied after 7 days."
+            }
         }
     ]
 }
-

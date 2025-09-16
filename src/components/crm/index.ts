@@ -7,7 +7,7 @@ export type { ClientRecord, ClientStatus } from './ClientTable';
 export { BookingList } from './BookingList';
 export type { BookingRecord, BookingStatus } from './BookingList';
 export { InvoiceTable } from './InvoiceTable';
-export type { InvoiceRecord, InvoiceStatus } from './InvoiceTable';
+export type { InvoiceRecord, InvoiceStatus } from '../../types/invoice';
 export { TaskList } from './TaskList';
 export type { TaskRecord } from './TaskList';
 export { StatCard } from './StatCard';
