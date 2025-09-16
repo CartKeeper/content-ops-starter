@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 
 import StatusPill, { StatusTone } from './StatusPill';
 
-export type InvoiceStatus = 'Sent' | 'Paid' | 'Overdue';
+export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue';
 
 export type InvoiceRecord = {
     id: string;
@@ -15,6 +15,7 @@ export type InvoiceRecord = {
 };
 
 const statusToneMap: Record<InvoiceStatus, StatusTone> = {
+    Draft: 'neutral',
     Paid: 'success',
     Sent: 'info',
     Overdue: 'danger'

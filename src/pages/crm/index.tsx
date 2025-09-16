@@ -1,6 +1,4 @@
 import * as React from 'react';
-import fs from 'fs/promises';
-import path from 'path';
 import type { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -17,193 +15,20 @@ import {
     TaskList,
     type BookingRecord,
     type BookingStatus,
-    type ClientRecord,
     type InvoiceRecord,
-    type TaskRecord,
     type ChartPoint
 } from '../../components/crm';
-
-type GalleryStatus = 'Delivered' | 'Pending';
-
-type GalleryRecord = {
-    id: string;
-    client: string;
-    shootType: string;
-    deliveryDueDate?: string;
-    deliveredAt?: string;
-    status: GalleryStatus;
-};
-
-
-type CmsCollection<T> = {
-    items?: T[];
-};
-
-type PhotographyCrmDashboardProps = {
-    bookings: BookingRecord[];
-    invoices: InvoiceRecord[];
-};
-
-
-const clients: ClientRecord[] = [
-    {
-        id: 'cl-01',
-        name: 'Evelyn Sanders',
-        email: 'evelyn@wanderlust.com',
-        phone: '(415) 555-0108',
-        shoots: 7,
-        lastShoot: '2025-03-29',
-        upcomingShoot: '2025-05-11',
-        status: 'Active'
-    },
-    {
-        id: 'cl-02',
-        name: 'Harrison & June',
-        email: 'hello@harrisonandjune.com',
-        phone: '(424) 555-0145',
-        shoots: 3,
-        lastShoot: '2024-11-18',
-        upcomingShoot: '2025-05-18',
-        status: 'Lead'
-    },
-    {
-        id: 'cl-03',
-        name: 'Sona Patel',
-        email: 'sona@patelcreative.co',
-        phone: '(415) 555-0121',
-        shoots: 4,
-        lastShoot: '2025-04-02',
-        upcomingShoot: '2025-05-21',
-        status: 'Active'
-    },
-    {
-        id: 'cl-04',
-        name: 'Fern & Pine Studio',
-        email: 'contact@fernandpine.com',
-        phone: '(510) 555-0186',
-        shoots: 5,
-        lastShoot: '2025-04-04',
-        upcomingShoot: '2025-06-08',
-        status: 'Active'
-    },
-    {
-        id: 'cl-05',
-        name: 'Evergreen Architects',
-        email: 'team@evergreenarchitects.com',
-        phone: '(628) 555-0163',
-        shoots: 2,
-        lastShoot: '2025-03-18',
-        upcomingShoot: '2025-05-29',
-        status: 'Lead'
-    },
-    {
-        id: 'cl-06',
-        name: 'Atlas Fitness',
-        email: 'hello@atlasfitness.co',
-        phone: '(415) 555-0194',
-        shoots: 3,
-        lastShoot: '2025-01-22',
-        status: 'Active'
-    }
-];
-
-
-const galleryCollection: GalleryRecord[] = [
-    {
-        id: 'gal-01',
-        client: 'Evelyn Sanders',
-        shootType: 'Engagement Session',
-        deliveryDueDate: '2025-05-14',
-        status: 'Pending'
-    },
-    {
-        id: 'gal-02',
-        client: 'Harrison & June',
-        shootType: 'Wedding Weekend',
-        deliveryDueDate: '2025-05-27',
-        status: 'Pending'
-    },
-    {
-        id: 'gal-03',
-        client: 'Sona Patel',
-        shootType: 'Brand Lifestyle Campaign',
-        deliveredAt: '2025-04-28',
-        status: 'Delivered'
-    },
-    {
-        id: 'gal-04',
-        client: 'Fern & Pine Studio',
-        shootType: 'Lookbook Launch',
-        deliveredAt: '2025-04-10',
-        status: 'Delivered'
-    },
-    {
-        id: 'gal-05',
-        client: 'Evergreen Architects',
-        shootType: 'Team Headshots',
-        deliveredAt: '2025-03-23',
-        status: 'Delivered'
-    },
-    {
-        id: 'gal-06',
-        client: 'Violet & Thread',
-        shootType: 'Spring Collection',
-        deliveredAt: '2025-02-24',
-        status: 'Delivered'
-    },
-    {
-        id: 'gal-07',
-        client: 'Atlas Fitness',
-        shootType: 'Brand Campaign',
-        deliveredAt: '2025-02-02',
-        status: 'Delivered'
-    },
-    {
-        id: 'gal-08',
-        client: 'Harbor & Co',
-        shootType: 'Product Launch',
-        deliveredAt: '2024-12-18',
-        status: 'Delivered'
-    },
-    {
-        id: 'gal-09',
-        client: 'Lumen Studio',
-        shootType: 'Agency Portfolio',
-        deliveredAt: '2024-11-23',
-        status: 'Delivered'
-    },
-    {
-        id: 'gal-10',
-        client: 'Beacon Realty',
-        shootType: 'Property Showcase',
-        deliveredAt: '2024-10-12',
-        status: 'Delivered'
-    }
-];
-
-const tasks: TaskRecord[] = [
-    {
-        id: 'task-01',
-        title: 'Send Harrison & June final timeline',
-        dueDate: '2025-05-07',
-        assignee: 'You',
-        completed: false
-    },
-    {
-        id: 'task-02',
-        title: 'Cull and edit Sona Patel preview set',
-        dueDate: '2025-05-06',
-        assignee: 'Retouch Team',
-        completed: false
-    },
-    {
-        id: 'task-03',
-        title: 'Email Evelyn gallery delivery details',
-        dueDate: '2025-05-03',
-        assignee: 'You',
-        completed: true
-    }
-];
+import {
+    BellIcon,
+    CalendarIcon,
+    ChevronDownIcon,
+    GalleryIcon,
+    InvoiceIcon,
+    MoonIcon,
+    SunIcon
+} from '../../components/crm/icons';
+import { clients, galleryCollection, tasks } from '../../data/crm';
+import { readCmsCollection } from '../../utils/read-cms-collection';
 
 const quickActions = [
     { id: 'new-booking', label: 'Schedule shoot' },
@@ -220,6 +45,11 @@ const navigationItems = [
     { id: 'projects', label: 'Projects', href: '#' },
     { id: 'settings', label: 'Settings', href: '#' }
 ];
+
+type PhotographyCrmDashboardProps = {
+    bookings: BookingRecord[];
+    invoices: InvoiceRecord[];
+};
 
 export default function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboardProps) {
     const [isDarkMode, setIsDarkMode] = React.useState<boolean | null>(null);
@@ -870,30 +700,6 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
     );
 }
 
-async function readCmsCollection<T>(fileName: string): Promise<T[]> {
-    const filePath = path.join(process.cwd(), 'content', 'data', fileName);
-
-    try {
-        const raw = await fs.readFile(filePath, 'utf-8');
-        const parsed = JSON.parse(raw) as CmsCollection<T> | T[];
-
-        if (Array.isArray(parsed)) {
-            return parsed as T[];
-        }
-
-        if (parsed && typeof parsed === 'object') {
-            const items = (parsed as CmsCollection<T>).items;
-            if (Array.isArray(items)) {
-                return items as T[];
-            }
-        }
-    } catch (error) {
-        return [];
-    }
-
-    return [];
-}
-
 export const getStaticProps: GetStaticProps<PhotographyCrmDashboardProps> = async () => {
     const [bookings, invoices] = await Promise.all([
         readCmsCollection<BookingRecord>('crm-bookings.json'),
@@ -1096,72 +902,5 @@ function EarningsProgress({ percentage }: EarningsProgressProps) {
                 <span className="text-xs font-medium uppercase tracking-[0.32em] text-slate-500 dark:text-slate-400">to goal</span>
             </div>
         </div>
-    );
-}
-
-type IconProps = React.SVGProps<SVGSVGElement>;
-
-function CalendarIcon(props: IconProps) {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
-    );
-}
-
-function InvoiceIcon(props: IconProps) {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <path d="M6 2h12a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2-2-2V4a2 2 0 0 1 2-2z" />
-            <line x1="8" y1="8" x2="16" y2="8" />
-            <line x1="8" y1="12" x2="16" y2="12" />
-        </svg>
-    );
-}
-
-function GalleryIcon(props: IconProps) {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <rect x="3" y="5" width="18" height="14" rx="2" ry="2" />
-            <circle cx="9" cy="11" r="2" />
-            <path d="M3 17.5 7.5 13l3 3 3.5-4.5 5 5.5" />
-        </svg>
-    );
-}
-
-function MoonIcon(props: IconProps) {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <path d="M21 12.79A9 9 0 0 1 11.21 3 7 7 0 1 0 21 12.79z" />
-        </svg>
-    );
-}
-
-function SunIcon(props: IconProps) {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l1.41-1.41M16.24 7.76l1.41-1.41" />
-        </svg>
-    );
-}
-
-function BellIcon(props: IconProps) {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
-    );
-}
-
-function ChevronDownIcon(props: IconProps) {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <path d="M6 9l6 6 6-6" />
-        </svg>
     );
 }
