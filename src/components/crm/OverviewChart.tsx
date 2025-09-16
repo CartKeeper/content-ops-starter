@@ -10,6 +10,11 @@ import {
     YAxis
 } from 'recharts';
 import type { TooltipContentProps } from 'recharts';
+import type {
+    Payload,
+    ValueType,
+    NameType
+} from 'recharts/types/component/DefaultTooltipContent';
 
 export type Timeframe = 'weekly' | 'monthly' | 'yearly';
 
@@ -45,17 +50,41 @@ const compactCurrencyFormatter = new Intl.NumberFormat('en-US', {
 const formatCurrency = (value: number) => currencyFormatter.format(value);
 const formatCurrencyCompact = (value: number) => compactCurrencyFormatter.format(value);
 
-type ChartValueType = number | string | Array<number | string>;
-type ChartNameType = string | number;
-type ChartTooltipProps = Partial<TooltipContentProps<ChartValueType, ChartNameType>>;
+type ChartDataKey = 'shoots' | 'revenue';
+type ChartTooltipProps = TooltipContentProps<ValueType, NameType>;
+type ChartTooltipPayload = Payload<ValueType, NameType> & { dataKey?: ChartDataKey };
+
+function findChartEntry(entries: ChartTooltipPayload[], key: ChartDataKey) {
+    return entries.find((entry) => entry.dataKey === key);
+}
+
+function toNumericValue(value: ValueType | undefined): number {
+    if (typeof value === 'number') {
+        return value;
+    }
+    if (Array.isArray(value)) {
+        const [first] = value;
+        if (typeof first === 'number') {
+            return first;
+        }
+        const parsedArrayValue = Number(first ?? 0);
+        return Number.isFinite(parsedArrayValue) ? parsedArrayValue : 0;
+    }
+    if (value === undefined || value === null) {
+        return 0;
+    }
+    const parsedValue = Number(value);
+    return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
 
 function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
     if (!active || !payload || payload.length === 0) {
         return null;
     }
 
-    const shootsEntry = payload.find((entry) => entry.dataKey === 'shoots');
-    const revenueEntry = payload.find((entry) => entry.dataKey === 'revenue');
+    const entries = payload as ChartTooltipPayload[];
+    const shootsEntry = findChartEntry(entries, 'shoots');
+    const revenueEntry = findChartEntry(entries, 'revenue');
 
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">
@@ -67,7 +96,7 @@ function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
                             <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#5D3BFF]" aria-hidden="true" />
                             Shoots
                         </span>
-                        <span className="font-semibold text-slate-900 dark:text-white">{shootsEntry.value}</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{toNumericValue(shootsEntry.value)}</span>
                     </div>
                 )}
                 {revenueEntry && (
@@ -80,7 +109,7 @@ function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
                             Revenue
                         </span>
                         <span className="font-semibold text-slate-900 dark:text-white">
-                            {formatCurrency(Number(revenueEntry.value))}
+                            {formatCurrency(toNumericValue(revenueEntry.value))}
                         </span>
                     </div>
                 )}
