@@ -2,9 +2,22 @@ import * as React from 'react';
 import dayjs from 'dayjs';
 
 import StatusPill, { StatusTone } from './StatusPill';
-import type { Client } from '../../lib/mock-data';
 
-const statusToneMap: Record<Client['status'], StatusTone> = {
+export type ClientStatus = 'Active' | 'Lead' | 'Archived';
+
+export type ClientRecord = {
+    id: string;
+    name: string;
+    company?: string;
+    email: string;
+    phone?: string;
+    shoots: number;
+    lastShoot: string;
+    upcomingShoot?: string;
+    status: ClientStatus;
+};
+
+const statusToneMap: Record<ClientStatus, StatusTone> = {
     Active: 'success',
     Lead: 'info',
     Archived: 'neutral'
@@ -12,11 +25,7 @@ const statusToneMap: Record<Client['status'], StatusTone> = {
 
 const formatDate = (value?: string) => (value ? dayjs(value).format('MMM D, YYYY') : '—');
 
-type ClientTableProps = {
-    clients: Client[];
-};
-
-export default function ClientTable({ clients }: ClientTableProps) {
+export function ClientTable({ clients }: { clients: ClientRecord[] }) {
     return (
         <div className="overflow-hidden rounded-2xl border border-slate-200">
             <table className="min-w-full divide-y divide-slate-200 text-left">
@@ -62,3 +71,5 @@ export default function ClientTable({ clients }: ClientTableProps) {
         </div>
     );
 }
+
+export default ClientTable;
