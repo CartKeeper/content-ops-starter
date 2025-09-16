@@ -1,4 +1,15 @@
 import * as React from 'react';
+import type { TooltipContentProps } from 'recharts';
+import {
+    Bar,
+    CartesianGrid,
+    ComposedChart,
+    Line,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
+} from 'recharts';
 
 export type Timeframe = 'weekly' | 'monthly' | 'yearly';
 
@@ -13,44 +24,77 @@ type OverviewChartProps = {
 };
 
 const timeframeOptions: Array<{ id: Timeframe; label: string }> = [
-    { id: 'weekly', label: 'Weekly' },
-    { id: 'monthly', label: 'Monthly' },
-    { id: 'yearly', label: 'Yearly' }
+    { id: 'weekly', label: 'This week' },
+    { id: 'monthly', label: 'This month' },
+    { id: 'yearly', label: 'This year' }
 ];
 
-const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+});
+
+const compactCurrencyFormatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1
+});
+
+const formatCurrency = (value: number) => currencyFormatter.format(value);
+const formatCurrencyCompact = (value: number) => compactCurrencyFormatter.format(value);
+
+function ChartTooltip({ active, payload, label }: TooltipContentProps<number, string>) {
+    if (!active || !payload || payload.length === 0) {
+        return null;
+    }
+
+    const shootsEntry = payload.find((entry) => entry.dataKey === 'shoots');
+    const revenueEntry = payload.find((entry) => entry.dataKey === 'revenue');
+
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">{label}</p>
+            <div className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
+                {shootsEntry && (
+                    <div className="flex items-center justify-between gap-6">
+                        <span className="flex items-center gap-2">
+                            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" aria-hidden="true" />
+                            Shoots
+                        </span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{shootsEntry.value}</span>
+                    </div>
+                )}
+                {revenueEntry && (
+                    <div className="flex items-center justify-between gap-6">
+                        <span className="flex items-center gap-2">
+                            <span
+                                className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border-2 border-emerald-400"
+                                aria-hidden="true"
+                            />
+                            Revenue
+                        </span>
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                            {formatCurrency(Number(revenueEntry.value))}
+                        </span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 export function OverviewChart({ data }: OverviewChartProps) {
     const [timeframe, setTimeframe] = React.useState<Timeframe>('monthly');
+    const [isMounted, setIsMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     const activeData = data[timeframe] ?? [];
-    const maxRevenue = Math.max(0, ...activeData.map((item) => item.revenue));
-    const maxShoots = Math.max(0, ...activeData.map((item) => item.shoots));
-
-    const chartHeight = 220;
-    const chartPadding = 24;
-    const barWidth = 28;
-    const gap = 32;
-    const datasetLength = activeData.length;
-    const svgWidth =
-        datasetLength > 0
-            ? chartPadding * 2 + datasetLength * barWidth + Math.max(datasetLength - 1, 0) * gap
-            : chartPadding * 2 + barWidth;
-    const svgHeight = chartHeight + chartPadding * 2;
-    const baselineY = svgHeight - chartPadding;
-
-    const revenuePoints = activeData.map((point, index) => {
-        const x = chartPadding + index * (barWidth + gap) + barWidth / 2;
-        const ratio = maxRevenue > 0 ? point.revenue / maxRevenue : 0;
-        const y = baselineY - ratio * chartHeight;
-        return { x, y };
-    });
-
-    const revenuePath = revenuePoints
-        .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`)
-        .join(' ');
-
+    const hasData = activeData.length > 0;
     const totalShoots = activeData.reduce((total, point) => total + point.shoots, 0);
     const totalRevenue = activeData.reduce((total, point) => total + point.revenue, 0);
 
@@ -71,6 +115,7 @@ export function OverviewChart({ data }: OverviewChartProps) {
                                 key={option.id}
                                 type="button"
                                 onClick={() => setTimeframe(option.id)}
+                                aria-pressed={isActive}
                                 className={[
                                     'rounded-full px-3 py-1 transition',
                                     isActive
@@ -96,75 +141,74 @@ export function OverviewChart({ data }: OverviewChartProps) {
                     </div>
                 </div>
                 <div className="overflow-x-auto">
-                    {datasetLength === 0 ? (
+                    {!hasData ? (
                         <p className="rounded-xl bg-slate-50 p-6 text-sm text-slate-500 dark:bg-slate-800/40 dark:text-slate-400">
                             No analytics available for this timeframe yet.
                         </p>
                     ) : (
-                        <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="h-64 w-full min-w-[540px]" role="img">
-                            <title>Chart showing booked shoots and revenue performance</title>
-                            <defs>
-                                <linearGradient id="chartBarGradient" x1="0" x2="0" y1="0" y2="1">
-                                    <stop offset="0%" stopColor="rgba(99, 102, 241, 0.55)" />
-                                    <stop offset="100%" stopColor="rgba(99, 102, 241, 0.15)" />
-                                </linearGradient>
-                            </defs>
-                            {Array.from({ length: 5 }).map((_, index) => {
-                                const y = chartPadding + (chartHeight / 4) * index;
-                                return (
-                                    <line
-                                        key={`grid-${index}`}
-                                        x1={chartPadding - 12}
-                                        x2={svgWidth - chartPadding + 12}
-                                        y1={y}
-                                        y2={y}
-                                        stroke="currentColor"
-                                        strokeWidth={1}
-                                        className="text-slate-100 dark:text-slate-800"
-                                    />
-                                );
-                            })}
-                            {activeData.map((point, index) => {
-                                const barHeight = maxShoots > 0 ? (point.shoots / maxShoots) * chartHeight : 0;
-                                const x = chartPadding + index * (barWidth + gap);
-                                const y = baselineY - barHeight;
-
-                                return (
-                                    <g key={point.label}>
-                                        <rect x={x} y={y} width={barWidth} height={barHeight} rx={8} fill="url(#chartBarGradient)" />
-                                        <text
-                                            x={x + barWidth / 2}
-                                            y={baselineY + 20}
-                                            textAnchor="middle"
-                                            className="fill-slate-500 text-xs dark:fill-slate-400"
-                                        >
-                                            {point.label}
-                                        </text>
-                                    </g>
-                                );
-                            })}
-                            {revenuePath && (
-                                <path
-                                    d={revenuePath}
-                                    fill="none"
-                                    stroke="rgba(16, 185, 129, 0.85)"
-                                    strokeWidth={3}
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
+                        <div className="h-72 min-w-[560px] text-slate-400 dark:text-slate-500">
+                            {!isMounted ? (
+                                <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                                    Loading chart…
+                                </div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ComposedChart
+                                        data={activeData}
+                                        margin={{ top: 24, right: 16, bottom: 12, left: 0 }}
+                                        role="img"
+                                        aria-label="Chart showing booked shoots and revenue performance"
+                                    >
+                                        <defs>
+                                            <linearGradient id="shootsGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="rgba(99, 102, 241, 0.65)" />
+                                                <stop offset="100%" stopColor="rgba(99, 102, 241, 0.15)" />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.12} strokeDasharray="4 6" />
+                                        <XAxis
+                                            dataKey="label"
+                                            axisLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tickLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tick={{ fill: 'currentColor', fontSize: 12 }}
+                                        />
+                                        <YAxis
+                                            yAxisId="shoots"
+                                            allowDecimals={false}
+                                            axisLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tickLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tick={{ fill: 'currentColor', fontSize: 12 }}
+                                            domain={[0, (dataMax: number) => (dataMax ? Math.ceil(dataMax * 1.2) : 1)]}
+                                        />
+                                        <YAxis
+                                            yAxisId="revenue"
+                                            orientation="right"
+                                            axisLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tickLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tick={{ fill: 'currentColor', fontSize: 12 }}
+                                            tickFormatter={(value: number) => formatCurrencyCompact(value)}
+                                            domain={[0, (dataMax: number) => (dataMax ? Math.ceil(dataMax * 1.15) : 1)]}
+                                        />
+                                        <Tooltip
+                                            content={(tooltipProps: TooltipContentProps<number, string>) => (
+                                                <ChartTooltip {...tooltipProps} />
+                                            )}
+                                            cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }}
+                                        />
+                                        <Bar yAxisId="shoots" dataKey="shoots" fill="url(#shootsGradient)" radius={[10, 10, 0, 0]} maxBarSize={40} />
+                                        <Line
+                                            yAxisId="revenue"
+                                            type="monotone"
+                                            dataKey="revenue"
+                                            stroke="#10b981"
+                                            strokeWidth={3}
+                                            dot={{ r: 5, strokeWidth: 2, stroke: '#0f172a', fill: '#10b981' }}
+                                            activeDot={{ r: 6 }}
+                                        />
+                                    </ComposedChart>
+                                </ResponsiveContainer>
                             )}
-                            {revenuePoints.map((point, index) => (
-                                <circle
-                                    key={`point-${index}`}
-                                    cx={point.x}
-                                    cy={point.y}
-                                    r={5}
-                                    fill="#0f172a"
-                                    stroke="rgba(16, 185, 129, 0.95)"
-                                    strokeWidth={3}
-                                />
-                            ))}
-                        </svg>
+                        </div>
                     )}
                 </div>
                 <dl className="grid gap-4 sm:grid-cols-2">
