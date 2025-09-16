@@ -1,4 +1,5 @@
 import * as React from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { motion } from 'framer-motion';
 
 import {
@@ -62,7 +63,6 @@ export function QuickActionModal({
     onSubmit,
     baseFields
 }: QuickActionModalProps) {
-    const overlayRef = React.useRef<HTMLDivElement | null>(null);
     const formRef = React.useRef<HTMLFormElement | null>(null);
     const { getActiveFieldsForModal } = useQuickActionSettings();
     const dynamicFields = getActiveFieldsForModal(type);
@@ -101,17 +101,6 @@ export function QuickActionModal({
     }, [fields]);
 
     React.useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                onClose();
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
-
-    React.useEffect(() => {
         if (typeof window === 'undefined') {
             return;
         }
@@ -124,7 +113,7 @@ export function QuickActionModal({
         };
     }, []);
 
-    React.useEffect(() => {
+    const focusInitialField = React.useCallback(() => {
         if (!formRef.current) {
             return;
         }
@@ -133,11 +122,9 @@ export function QuickActionModal({
         focusable?.focus();
     }, []);
 
-    const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
-        if (event.target === overlayRef.current) {
-            onClose();
-        }
-    };
+    React.useEffect(() => {
+        focusInitialField();
+    }, [focusInitialField, fields]);
 
     const handleChange = (field: InternalField, value: string | number | boolean) => {
         setFormValues((previous) => ({ ...previous, [field.fieldKey]: value }));
@@ -183,73 +170,85 @@ export function QuickActionModal({
     };
 
     return (
-        <motion.div
-            ref={overlayRef}
-            onClick={handleOverlayClick}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-        >
-            <motion.div
-                role="dialog"
-                aria-modal="true"
-                className="relative w-full max-w-2xl rounded-3xl border border-white/20 bg-white/80 p-8 shadow-2xl backdrop-blur-xl transition dark:border-slate-700/60 dark:bg-slate-950/70"
-                onClick={(event) => event.stopPropagation()}
-                initial={{ opacity: 0, y: 32, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -24, scale: 0.98 }}
-                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            >
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-sm transition hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:bg-slate-900/60 dark:text-slate-300"
-                    aria-label="Close modal"
+        <Dialog.Root open onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+            <Dialog.Portal forceMount>
+                <Dialog.Overlay asChild>
+                    <motion.div
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                    />
+                </Dialog.Overlay>
+                <Dialog.Content
+                    asChild
+                    onOpenAutoFocus={(event) => {
+                        event.preventDefault();
+                        focusInitialField();
+                    }}
                 >
-                    ×
-                </button>
-                <div className="mb-6 space-y-2">
-                    <span className="inline-flex items-center rounded-full border border-[#C5C0FF] bg-[#E9E7FF] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#4534FF] dark:border-[#4E46C8] dark:bg-[#2A1F67] dark:text-[#AEB1FF]">
-                        {type === 'booking' && 'Schedule shoot'}
-                        {type === 'invoice' && 'Create invoice'}
-                        {type === 'gallery' && 'Upload gallery'}
-                    </span>
-                    <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">{title}</h2>
-                    <p className="text-sm text-slate-600 dark:text-slate-300">{subtitle}</p>
-                </div>
-                <form ref={formRef} className="space-y-4" onSubmit={handleSubmit}>
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {fields.map((field) => (
-                            <FieldInput
-                                key={field.fieldKey}
-                                field={field}
-                                value={formValues[field.fieldKey]}
-                                onChange={(value) => handleChange(field, value)}
-                            />
-                        ))}
-                    </div>
-                    {error ? <p className="text-sm text-[#D61B7B]">{error}</p> : null}
-                    <div className="flex flex-wrap justify-end gap-3 pt-2">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] px-5 py-2 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-70"
-                        >
-                            {isSubmitting ? 'Saving…' : submitLabel}
-                        </button>
-                    </div>
-                </form>
-            </motion.div>
-        </motion.div>
+                    <motion.div
+                        className="relative z-[101] w-full max-w-2xl rounded-3xl border border-white/20 bg-white/80 p-8 shadow-2xl backdrop-blur-xl transition dark:border-slate-700/60 dark:bg-slate-950/70"
+                        initial={{ opacity: 0, y: 32, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -24, scale: 0.98 }}
+                        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                    >
+                        <Dialog.Close asChild>
+                            <button
+                                type="button"
+                                className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-sm transition hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:bg-slate-900/60 dark:text-slate-300"
+                                aria-label="Close modal"
+                            >
+                                ×
+                            </button>
+                        </Dialog.Close>
+                        <div className="mb-6 space-y-2">
+                            <span className="inline-flex items-center rounded-full border border-[#C5C0FF] bg-[#E9E7FF] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#4534FF] dark:border-[#4E46C8] dark:bg-[#2A1F67] dark:text-[#AEB1FF]">
+                                {type === 'booking' && 'Schedule shoot'}
+                                {type === 'invoice' && 'Create invoice'}
+                                {type === 'gallery' && 'Upload gallery'}
+                            </span>
+                            <Dialog.Title className="text-2xl font-semibold text-slate-900 dark:text-white">{title}</Dialog.Title>
+                            <Dialog.Description className="text-sm text-slate-600 dark:text-slate-300">
+                                {subtitle}
+                            </Dialog.Description>
+                        </div>
+                        <form ref={formRef} className="space-y-4" onSubmit={handleSubmit}>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {fields.map((field) => (
+                                    <FieldInput
+                                        key={field.fieldKey}
+                                        field={field}
+                                        value={formValues[field.fieldKey]}
+                                        onChange={(value) => handleChange(field, value)}
+                                    />
+                                ))}
+                            </div>
+                            {error ? <p className="text-sm text-[#D61B7B]">{error}</p> : null}
+                            <div className="flex flex-wrap justify-end gap-3 pt-2">
+                                <Dialog.Close asChild>
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                                    >
+                                        Cancel
+                                    </button>
+                                </Dialog.Close>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] px-5 py-2 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-70"
+                                >
+                                    {isSubmitting ? 'Saving…' : submitLabel}
+                                </button>
+                            </div>
+                        </form>
+                    </motion.div>
+                </Dialog.Content>
+            </Dialog.Portal>
+        </Dialog.Root>
     );
 }
 
