@@ -1,6 +1,7 @@
 {
     "name": "content-ops-starter",
     "version": "0.1.0",
+    "packageManager": "npm@11.4.2",
     "scripts": {
         "dev": "next dev",
         "build": "next build",
