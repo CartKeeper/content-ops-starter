@@ -734,7 +734,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                 </section>
 
                                 <div className="grid gap-6 xl:grid-cols-[2fr_minmax(0,1fr)]">
-                                    <OverviewChart data={analyticsData} />
+                                    <OverviewChart data={analyticsData} isDarkMode={isDarkMode ?? false} />
                                     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
                                         <div className="flex items-center gap-4">
                                             <Image
