@@ -15,27 +15,27 @@ type DashboardCardProps = {
 
 const trendClassNames = (isPositive?: boolean) =>
     classNames('text-sm font-medium', {
-        'text-emerald-600': isPositive !== false,
-        'text-rose-600': isPositive === false
+        'text-emerald-600 dark:text-emerald-400': isPositive !== false,
+        'text-rose-600 dark:text-rose-400': isPositive === false
     });
 
 export function DashboardCard({ title, value, trend, className, children }: DashboardCardProps) {
     return (
         <div
             className={classNames(
-                'flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md',
+                'flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900',
                 className
             )}
         >
-            <p className="text-sm font-medium text-slate-500">{title}</p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{value}</p>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-300">{title}</p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">{value}</p>
             {trend && (
                 <p className={classNames('mt-2 flex items-center gap-2', trendClassNames(trend.isPositive))}>
                     <span>{trend.value}</span>
-                    {trend.label && <span className="text-slate-500">{trend.label}</span>}
+                    {trend.label && <span className="text-slate-500 dark:text-slate-400">{trend.label}</span>}
                 </p>
             )}
-            {children && <div className="mt-4 flex-grow text-sm text-slate-500">{children}</div>}
+            {children && <div className="mt-4 flex-grow text-sm text-slate-500 dark:text-slate-300">{children}</div>}
         </div>
     );
 }
