@@ -21,6 +21,7 @@ import {
     type InvoiceStatus,
     type ChartPoint
 } from '../../components/crm';
+import { InvoiceBuilderModal, type InvoiceBuilderSubmitValues } from '../../components/crm/InvoiceBuilderModal';
 import {
     BellIcon,
     CalendarIcon,
@@ -175,54 +176,6 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
         [clientOptions]
     );
 
-    const invoiceFields = React.useMemo<QuickActionFormField[]>(
-        () => [
-            {
-                id: 'client',
-                label: 'Client',
-                inputType: 'select',
-                options: clientOptions,
-                defaultValue: clientOptions[0]?.value ?? '',
-                required: true
-            },
-            {
-                id: 'project',
-                label: 'Project name',
-                inputType: 'text',
-                placeholder: 'Describe the deliverable',
-                required: true
-            },
-            {
-                id: 'amount',
-                label: 'Amount',
-                inputType: 'number',
-                placeholder: '0.00',
-                step: 50,
-                required: true
-            },
-            {
-                id: 'dueDate',
-                label: 'Due date',
-                inputType: 'date',
-                defaultValue: dayjs().add(30, 'day').format('YYYY-MM-DD'),
-                required: true
-            },
-            {
-                id: 'status',
-                label: 'Status',
-                inputType: 'select',
-                options: [
-                    { value: 'Draft', label: 'Draft' },
-                    { value: 'Sent', label: 'Sent' },
-                    { value: 'Paid', label: 'Paid' },
-                    { value: 'Overdue', label: 'Overdue' }
-                ],
-                defaultValue: 'Sent'
-            }
-        ],
-        [clientOptions]
-    );
-
     const galleryFields = React.useMemo<QuickActionFormField[]>(
         () => [
             {
@@ -332,28 +285,72 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
     );
 
     const handleCreateInvoice = React.useCallback(
-        async (values: QuickActionModalSubmitValues) => {
-            const clientName = (values.client as string) || clientOptions[0]?.value || 'New Client';
-            const project = (values.project as string) || 'New Project';
-            const rawAmount = values.amount;
-            const amount = typeof rawAmount === 'number' ? rawAmount : Number(rawAmount);
-            const parsedAmount = Number.isFinite(amount) ? amount : 0;
-            const dueDate = (values.dueDate as string) || dayjs().add(30, 'day').format('YYYY-MM-DD');
-            const status = (values.status as InvoiceStatus) || 'Sent';
+        async (values: InvoiceBuilderSubmitValues) => {
+            const lineItems = values.lineItems.map((item, index) => ({
+                id: item.id || `item-${index + 1}`,
+                description: item.description,
+                quantity: Number(item.quantity),
+                unitPrice: Number(item.unitPrice),
+                total: Number(item.quantity) * Number(item.unitPrice)
+            }));
 
             const recordPayload: Record<string, unknown> = {
-                client: clientName,
-                project,
-                amount: parsedAmount,
-                dueDate,
-                status,
+                client: values.client,
+                clientEmail: values.clientEmail,
+                clientAddress: values.clientAddress,
+                project: values.project,
+                issueDate: values.issueDate,
+                dueDate: values.dueDate,
+                notes: values.notes,
+                taxRate: values.taxRate,
+                template: values.template,
+                status: 'Sent',
+                lineItems,
+                sendEmail: values.sendEmail,
+                generatePaymentLink: values.generatePaymentLink,
                 customFields: values.customFields
             };
 
             const created = await createRecord<InvoiceRecord>('invoices', recordPayload);
             setInvoiceList((previous) => [...previous, created]);
         },
-        [clientOptions, createRecord]
+        [createRecord]
+    );
+
+    const handleUpdateInvoiceStatus = React.useCallback(
+        async (id: string, status: InvoiceStatus) => {
+            const original = invoiceList.find((invoice) => invoice.id === id);
+            if (!original) {
+                return;
+            }
+
+            setInvoiceList((previous) => previous.map((invoice) => (invoice.id === id ? { ...invoice, status } : invoice)));
+
+            try {
+                const response = await fetch(`/api/crm/invoices?id=${encodeURIComponent(id)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Unable to update invoice status.');
+                }
+
+                const payload = (await response.json()) as { data?: InvoiceRecord } | undefined;
+                if (payload?.data) {
+                    setInvoiceList((previous) =>
+                        previous.map((invoice) => (invoice.id === id ? { ...invoice, ...payload.data } : invoice))
+                    );
+                }
+            } catch (updateError) {
+                console.error('Invoice status update failed', updateError);
+                setInvoiceList((previous) =>
+                    previous.map((invoice) => (invoice.id === id ? original : invoice))
+                );
+            }
+        },
+        [invoiceList]
     );
 
     const handleCreateGallery = React.useCallback(
@@ -850,7 +847,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                             title="Open Invoices"
                                             description="Collect payments faster with a focused list of outstanding balances."
                                         >
-                                            <InvoiceTable invoices={openInvoices} />
+                                            <InvoiceTable invoices={openInvoices} onUpdateStatus={handleUpdateInvoiceStatus} />
                                         </SectionCard>
 
                                         <SectionCard
@@ -1018,16 +1015,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                     />
                 ) : null}
                 {activeModal === 'invoice' ? (
-                    <QuickActionModal
-                        key="invoice"
-                        type="invoice"
-                        title="Create client invoice"
-                        subtitle="Send professional billing in seconds—amounts, due dates, and payment notes stay aligned."
-                        submitLabel="Save invoice"
-                        onClose={closeModal}
-                        onSubmit={handleCreateInvoice}
-                        baseFields={invoiceFields}
-                    />
+                    <InvoiceBuilderModal clients={clients} onClose={closeModal} onSubmit={handleCreateInvoice} />
                 ) : null}
                 {activeModal === 'gallery' ? (
                     <QuickActionModal

@@ -1,6 +1,6 @@
 import type { ClientRecord } from '../components/crm/ClientTable';
 import type { BookingStatus } from '../components/crm/BookingList';
-import type { InvoiceStatus } from '../components/crm/InvoiceTable';
+import type { InvoiceStatus } from '../types/invoice';
 import type { TaskRecord } from '../components/crm/TaskList';
 
 export type GalleryStatus = 'Delivered' | 'Pending';

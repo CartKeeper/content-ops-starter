@@ -82,6 +82,43 @@ const parseDateTime = (date: string, time: string) => dayjs(`${date} ${time}`, '
 
 export default function SidebarWorkspace({ bookings, invoices }: PhotographySidebarProps) {
     const [activeModule, setActiveModule] = React.useState<SidebarModuleId>('calendar');
+    const [invoiceList, setInvoiceList] = React.useState<InvoiceRecord[]>(() =>
+        Array.isArray(invoices) ? invoices : []
+    );
+
+    const handleUpdateInvoiceStatus = React.useCallback(
+        async (id: string, status: InvoiceStatus) => {
+            const original = invoiceList.find((invoice) => invoice.id === id);
+            if (!original) {
+                return;
+            }
+
+            setInvoiceList((previous) => previous.map((invoice) => (invoice.id === id ? { ...invoice, status } : invoice)));
+
+            try {
+                const response = await fetch(`/api/crm/invoices?id=${encodeURIComponent(id)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Unable to update invoice status.');
+                }
+
+                const payload = (await response.json()) as { data?: InvoiceRecord } | undefined;
+                if (payload?.data) {
+                    setInvoiceList((previous) =>
+                        previous.map((invoice) => (invoice.id === id ? { ...invoice, ...payload.data } : invoice))
+                    );
+                }
+            } catch (error) {
+                console.error('Invoice status update failed', error);
+                setInvoiceList((previous) => previous.map((invoice) => (invoice.id === id ? original : invoice)));
+            }
+        },
+        [invoiceList]
+    );
 
     const modules = React.useMemo<SidebarModuleDefinition[]>(
         () => [
@@ -104,7 +141,7 @@ export default function SidebarWorkspace({ bookings, invoices }: PhotographySide
                 label: 'Invoices',
                 description: 'Track invoice statuses and trigger reminders when payments stall.',
                 icon: ReceiptIcon,
-                render: () => <InvoicesModule invoices={invoices} />
+                render: () => <InvoicesModule invoices={invoiceList} onUpdateStatus={handleUpdateInvoiceStatus} />
             },
             {
                 id: 'galleries',
@@ -128,7 +165,7 @@ export default function SidebarWorkspace({ bookings, invoices }: PhotographySide
                 render: () => <SettingsModule />
             }
         ],
-        [bookings, invoices]
+        [bookings, handleUpdateInvoiceStatus, invoiceList]
     );
 
     const currentModule = modules.find((module) => module.id === activeModule) ?? modules[0];
@@ -445,11 +482,12 @@ function ClientsModule({ clients }: ClientsModuleProps) {
 
 type InvoicesModuleProps = {
     invoices: InvoiceRecord[];
+    onUpdateStatus?: (id: string, status: InvoiceStatus) => void;
 };
 
 const invoiceStatuses: InvoiceStatus[] = ['Draft', 'Sent', 'Paid', 'Overdue'];
 
-function InvoicesModule({ invoices }: InvoicesModuleProps) {
+function InvoicesModule({ invoices, onUpdateStatus }: InvoicesModuleProps) {
     const [statusFilter, setStatusFilter] = React.useState<InvoiceStatus>('Sent');
 
     const grouped = React.useMemo(() => {
@@ -500,7 +538,7 @@ function InvoicesModule({ invoices }: InvoicesModuleProps) {
             </div>
             <div className="space-y-4">
                 {filteredInvoices.map((invoice) => (
-                    <InvoiceActionCard key={invoice.id} invoice={invoice} />
+                    <InvoiceActionCard key={invoice.id} invoice={invoice} onUpdateStatus={onUpdateStatus} />
                 ))}
                 {filteredInvoices.length === 0 && (
                     <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-900">
@@ -516,11 +554,20 @@ function InvoicesModule({ invoices }: InvoicesModuleProps) {
     );
 }
 
-function InvoiceActionCard({ invoice }: { invoice: InvoiceRecord }) {
-    const canSendReminder = invoice.status === 'Sent' || invoice.status === 'Overdue';
-    const canMarkPaid = invoice.status === 'Sent' || invoice.status === 'Overdue';
-    const isPaid = invoice.status === 'Paid';
-    const isDraft = invoice.status === 'Draft';
+function InvoiceActionCard({
+    invoice,
+    onUpdateStatus
+}: {
+    invoice: InvoiceRecord;
+    onUpdateStatus?: (id: string, status: InvoiceStatus) => void;
+}) {
+    const handleStatusChange = (status: InvoiceStatus) => {
+        onUpdateStatus?.(invoice.id, status);
+    };
+
+    const showMarkSent = invoice.status === 'Draft' || invoice.status === 'Overdue';
+    const showMarkOverdue = invoice.status === 'Sent';
+    const showMarkPaid = invoice.status === 'Sent' || invoice.status === 'Overdue';
 
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
@@ -540,26 +587,53 @@ function InvoiceActionCard({ invoice }: { invoice: InvoiceRecord }) {
             <div className="mt-4 flex flex-wrap items-center gap-3">
                 <StatusPill tone={invoiceStatusTone[invoice.status]}>{invoice.status}</StatusPill>
                 <div className="ml-auto flex flex-wrap gap-3 text-sm font-semibold">
-                    {isDraft && (
-                        <button className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-indigo-600 transition hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20">
-                            Send invoice
+                    {showMarkSent ? (
+                        <button
+                            type="button"
+                            onClick={() => handleStatusChange('Sent')}
+                            className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-indigo-600 transition hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                        >
+                            Mark sent
                         </button>
-                    )}
-                    {canSendReminder && (
-                        <button className="rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                            Send reminder
+                    ) : null}
+                    {showMarkOverdue ? (
+                        <button
+                            type="button"
+                            onClick={() => handleStatusChange('Overdue')}
+                            className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-600 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                        >
+                            Mark overdue
                         </button>
-                    )}
-                    {canMarkPaid && (
-                        <button className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-600 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20">
+                    ) : null}
+                    {showMarkPaid ? (
+                        <button
+                            type="button"
+                            onClick={() => handleStatusChange('Paid')}
+                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-600 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+                        >
                             Mark paid
                         </button>
-                    )}
-                    {isPaid && (
-                        <button className="rounded-full border border-slate-200 px-3 py-1 text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                            View receipt
-                        </button>
-                    )}
+                    ) : null}
+                    {invoice.pdfUrl ? (
+                        <a
+                            href={invoice.pdfUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                            Download PDF
+                        </a>
+                    ) : null}
+                    {invoice.paymentLink ? (
+                        <a
+                            href={invoice.paymentLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-600 transition hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/20"
+                        >
+                            Pay online
+                        </a>
+                    ) : null}
                 </div>
             </div>
         </div>
