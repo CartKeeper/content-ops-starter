@@ -4,6 +4,7 @@ import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
 import dayjs from 'dayjs';
+import { AnimatePresence } from 'framer-motion';
 
 import {
     BookingList,
@@ -1003,39 +1004,44 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                     </div>
                 </div>
             </div>
-            {activeModal === 'booking' ? (
-                <QuickActionModal
-                    type="booking"
-                    title="Schedule a new shoot"
-                    subtitle="Turn a client request into a confirmed production timeline with quick context fields."
-                    submitLabel="Save booking"
-                    onClose={closeModal}
-                    onSubmit={handleCreateBooking}
-                    baseFields={bookingFields}
-                />
-            ) : null}
-            {activeModal === 'invoice' ? (
-                <QuickActionModal
-                    type="invoice"
-                    title="Create client invoice"
-                    subtitle="Send professional billing in seconds—amounts, due dates, and payment notes stay aligned."
-                    submitLabel="Save invoice"
-                    onClose={closeModal}
-                    onSubmit={handleCreateInvoice}
-                    baseFields={invoiceFields}
-                />
-            ) : null}
-            {activeModal === 'gallery' ? (
-                <QuickActionModal
-                    type="gallery"
-                    title="Upload gallery details"
-                    subtitle="Log delivery milestones, passwords, and presentation assets before sharing with clients."
-                    submitLabel="Save gallery"
-                    onClose={closeModal}
-                    onSubmit={handleCreateGallery}
-                    baseFields={galleryFields}
-                />
-            ) : null}
+            <AnimatePresence mode="wait">
+                {activeModal === 'booking' ? (
+                    <QuickActionModal
+                        key="booking"
+                        type="booking"
+                        title="Schedule a new shoot"
+                        subtitle="Turn a client request into a confirmed production timeline with quick context fields."
+                        submitLabel="Save booking"
+                        onClose={closeModal}
+                        onSubmit={handleCreateBooking}
+                        baseFields={bookingFields}
+                    />
+                ) : null}
+                {activeModal === 'invoice' ? (
+                    <QuickActionModal
+                        key="invoice"
+                        type="invoice"
+                        title="Create client invoice"
+                        subtitle="Send professional billing in seconds—amounts, due dates, and payment notes stay aligned."
+                        submitLabel="Save invoice"
+                        onClose={closeModal}
+                        onSubmit={handleCreateInvoice}
+                        baseFields={invoiceFields}
+                    />
+                ) : null}
+                {activeModal === 'gallery' ? (
+                    <QuickActionModal
+                        key="gallery"
+                        type="gallery"
+                        title="Upload gallery details"
+                        subtitle="Log delivery milestones, passwords, and presentation assets before sharing with clients."
+                        submitLabel="Save gallery"
+                        onClose={closeModal}
+                        onSubmit={handleCreateGallery}
+                        baseFields={galleryFields}
+                    />
+                ) : null}
+            </AnimatePresence>
         </>
     );
 }
