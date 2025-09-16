@@ -65,16 +65,40 @@ This starter includes Algolia search integration. To set it up:
 
 ## Configuring Supabase Storage
 
-The CRM API routes under `src/pages/api/` rely on [Supabase](https://supabase.com/) for persistence. To connect your project:
+The CRM API routes under `src/pages/api/` rely on [Supabase](https://supabase.com/) for persistence.
+
+### Connect your Netlify site to Supabase
+
+1. In Netlify, open **Site configuration** for the project you want to connect.
+2. Select **Supabase** in the sidebar and choose **Connect** on the Supabase extension card.
+3. Authorize Netlify to access your Supabase account, then pick the Supabase project and framework. Selecting **Other** lets you provide a custom prefix for the environment variables that will be created for you.
+4. Click **Save**. Netlify adds environment variables such as `SUPABASE_DATABASE_URL` and `SUPABASE_ANON_KEY` (or the prefixed equivalents) to your site.
+
+### Prepare your Supabase project and environment variables
 
 1. Create a Supabase project and note the project URL and service role key from the dashboard.
 2. Create `clients` and `projects` tables with the columns your application needs (for example: `id`, `name`, `email`, `notes`, timestamps, etc.).
-3. Add the following environment variables (for local development use `.env.local`):
-   - `SUPABASE_URL` – Your Supabase project URL.
-   - `SUPABASE_SERVICE_ROLE_KEY` – Service role key for server-side CRUD operations (alternatively use `SUPABASE_ANON_KEY` with adequate Row Level Security policies).
+3. For local development, add the Supabase variables to `.env.local`. The starter recognises either `SUPABASE_URL` or `SUPABASE_DATABASE_URL` for the project URL and prefers `SUPABASE_SERVICE_ROLE_KEY` (falling back to anonymous/public keys if provided).
 4. Redeploy or restart the Next.js server so the API routes can pick up the new variables.
 
 These API routes return JSON responses for GET, POST, PUT, and DELETE requests, so they can be consumed directly from front-end forms or integrations.
+
+### Using the Supabase client in your site
+
+When you need to interact with Supabase from the front end, create a client with the public environment variables that Netlify generated for your framework:
+
+```js
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+    process.env.SUPABASE_DATABASE_URL || process.env.SUPABASE_URL,
+    process.env.PUBLIC_SUPABASE_ANON_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        process.env.SUPABASE_ANON_KEY
+);
+```
+
+If you supplied a custom prefix while connecting the extension (for example `CRM_SUPABASE_DATABASE_URL`), use those prefixed names in your client code. The server-side utilities in this starter automatically detect environment variables that end with `SUPABASE_URL`, `SUPABASE_DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, or `SUPABASE_ANON_KEY`, even when they are prefixed.
 
 ## Next Steps
 
