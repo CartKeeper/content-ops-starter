@@ -12,6 +12,7 @@ export type InvoiceRecord = {
     amount: number;
     dueDate: string;
     status: InvoiceStatus;
+    customFields?: Record<string, string | boolean>;
 };
 
 const statusToneMap: Record<InvoiceStatus, StatusTone> = {

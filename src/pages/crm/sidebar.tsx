@@ -30,6 +30,7 @@ import {
 } from '../../components/crm/icons';
 import { galleryCollection, clients, projectPipeline } from '../../data/crm';
 import { readCmsCollection } from '../../utils/read-cms-collection';
+import { useQuickActionSettings } from '../../components/crm/quick-action-settings';
 
 import type { ProjectRecord, ProjectMilestone, GalleryRecord } from '../../data/crm';
 
@@ -724,6 +725,8 @@ function nextShoot(shoots: ProjectMilestone[]): ProjectMilestone | undefined {
 }
 
 function SettingsModule() {
+    const { fields, activeFields, setFieldActive } = useQuickActionSettings();
+
     return (
         <section className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
@@ -856,29 +859,38 @@ function SettingsModule() {
                     Configure the quick fields that appear in booking, invoice, and gallery modals.
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {[
-                        { id: 'shot-list', label: 'Shot list link', description: 'Attach Google Docs or Notion boards to shoots.' },
-                        { id: 'travel-notes', label: 'Travel notes', description: 'Collect parking, access, and travel tips.' },
-                        { id: 'assistant', label: 'Assistant assignment', description: 'Track who is supporting on-site.' },
-                        { id: 'invoice-notes', label: 'Invoice terms', description: 'Define payment schedules and policies.' },
-                        { id: 'gallery-password', label: 'Gallery password', description: 'Set unique access codes per client.' },
-                        { id: 'client-portal', label: 'Client portal toggle', description: 'Grant or revoke portal access instantly.' }
-                    ].map((field) => (
-                        <label
-                            key={field.id}
-                            className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm transition hover:border-indigo-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500/40"
-                        >
-                            <div className="flex items-center justify-between">
-                                <span className="font-semibold text-slate-900 dark:text-white">{field.label}</span>
-                                <input
-                                    type="checkbox"
-                                    defaultChecked
-                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900"
-                                />
-                            </div>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">{field.description}</span>
-                        </label>
-                    ))}
+                    {fields.map((field) => {
+                        const isActive = activeFields[field.id] !== false;
+                        return (
+                            <label
+                                key={field.id}
+                                className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm transition hover:border-indigo-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:hover:border-indigo-500/40"
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <span className="font-semibold text-slate-900 dark:text-white">{field.label}</span>
+                                        <div className="mt-1 flex flex-wrap gap-1 text-[0.625rem] font-semibold uppercase tracking-[0.24em] text-indigo-500 dark:text-indigo-300">
+                                            {field.modalTypes.map((type) => (
+                                                <span
+                                                    key={type}
+                                                    className="rounded-full bg-indigo-100/60 px-2 py-0.5 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200"
+                                                >
+                                                    {type}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={isActive}
+                                        onChange={(event) => setFieldActive(field.id, event.target.checked)}
+                                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900"
+                                    />
+                                </div>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">{field.description}</span>
+                            </label>
+                        );
+                    })}
                 </div>
             </div>
         </section>

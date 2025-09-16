@@ -1,5 +1,4 @@
 import * as React from 'react';
-import type { TooltipContentProps } from 'recharts';
 import {
     Bar,
     CartesianGrid,
@@ -45,7 +44,13 @@ const compactCurrencyFormatter = new Intl.NumberFormat('en-US', {
 const formatCurrency = (value: number) => currencyFormatter.format(value);
 const formatCurrencyCompact = (value: number) => compactCurrencyFormatter.format(value);
 
-function ChartTooltip({ active, payload, label }: TooltipContentProps<number, string>) {
+type ChartTooltipProps = {
+    active?: boolean;
+    payload?: Array<{ value?: number; name?: string; dataKey?: string }>;
+    label?: string;
+};
+
+function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
     if (!active || !payload || payload.length === 0) {
         return null;
     }
@@ -190,9 +195,7 @@ export function OverviewChart({ data }: OverviewChartProps) {
                                             domain={[0, (dataMax: number) => (dataMax ? Math.ceil(dataMax * 1.15) : 1)]}
                                         />
                                         <Tooltip
-                                            content={(tooltipProps: TooltipContentProps<number, string>) => (
-                                                <ChartTooltip {...tooltipProps} />
-                                            )}
+                                            content={(tooltipProps) => <ChartTooltip {...tooltipProps} />}
                                             cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }}
                                         />
                                         <Bar yAxisId="shoots" dataKey="shoots" fill="url(#shootsGradient)" radius={[10, 10, 0, 0]} maxBarSize={40} />

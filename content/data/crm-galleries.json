@@ -1,0 +1,85 @@
+{
+    "type": "CrmGalleries",
+    "items": [
+        {
+            "id": "gal-01",
+            "client": "Evelyn Sanders",
+            "shootType": "Engagement Session",
+            "deliveryDueDate": "2025-05-14",
+            "status": "Pending",
+            "coverImage": "/images/main-hero.jpg"
+        },
+        {
+            "id": "gal-02",
+            "client": "Harrison & June",
+            "shootType": "Wedding Weekend",
+            "deliveryDueDate": "2025-05-27",
+            "status": "Pending",
+            "coverImage": "/images/hero3.svg"
+        },
+        {
+            "id": "gal-03",
+            "client": "Sona Patel",
+            "shootType": "Brand Lifestyle Campaign",
+            "deliveredAt": "2025-04-28",
+            "status": "Delivered",
+            "coverImage": "/images/abstract-feature1.svg"
+        },
+        {
+            "id": "gal-04",
+            "client": "Fern & Pine Studio",
+            "shootType": "Lookbook Launch",
+            "deliveredAt": "2025-04-10",
+            "status": "Delivered",
+            "coverImage": "/images/abstract-feature2.svg"
+        },
+        {
+            "id": "gal-05",
+            "client": "Evergreen Architects",
+            "shootType": "Team Headshots",
+            "deliveredAt": "2025-03-23",
+            "status": "Delivered",
+            "coverImage": "/images/abstract-feature3.svg"
+        },
+        {
+            "id": "gal-06",
+            "client": "Violet & Thread",
+            "shootType": "Spring Collection",
+            "deliveredAt": "2025-02-24",
+            "status": "Delivered",
+            "coverImage": "/images/hero2.svg"
+        },
+        {
+            "id": "gal-07",
+            "client": "Atlas Fitness",
+            "shootType": "Brand Campaign",
+            "deliveredAt": "2025-02-02",
+            "status": "Delivered",
+            "coverImage": "/images/hero.svg"
+        },
+        {
+            "id": "gal-08",
+            "client": "Harbor & Co",
+            "shootType": "Product Launch",
+            "deliveredAt": "2024-12-18",
+            "status": "Delivered",
+            "coverImage": "/images/abstract-background.svg"
+        },
+        {
+            "id": "gal-09",
+            "client": "Lumen Studio",
+            "shootType": "Agency Portfolio",
+            "deliveredAt": "2024-11-23",
+            "status": "Delivered",
+            "coverImage": "/images/background-grid.svg"
+        },
+        {
+            "id": "gal-10",
+            "client": "Beacon Realty",
+            "shootType": "Property Showcase",
+            "deliveredAt": "2024-10-12",
+            "status": "Delivered",
+            "coverImage": "/images/hero2.svg"
+        }
+    ]
+}
