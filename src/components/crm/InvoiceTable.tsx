@@ -2,6 +2,7 @@ import * as React from 'react';
 import dayjs from 'dayjs';
 
 import StatusPill, { StatusTone } from './StatusPill';
+import { CRM_BRAND_ACCENT_GLOW, CRM_BRAND_ACCENT_GLOW_SOFT } from './theme';
 
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue';
 
@@ -31,21 +32,36 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceRecord[] }) {
     return (
         <div className="space-y-4">
             {invoices.map((invoice) => (
-                <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div className="flex items-start justify-between gap-3">
+                <div
+                    key={invoice.id}
+                    className="relative overflow-hidden rounded-xl border border-white/30 bg-white/75 p-4 shadow-sm backdrop-blur-lg transition dark:border-white/10 dark:bg-[#0d1c33]/70"
+                >
+                    <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -right-20 -top-16 h-48 w-48 rounded-full blur-3xl"
+                        style={{ background: `radial-gradient(circle at center, ${CRM_BRAND_ACCENT_GLOW}, transparent 70%)` }}
+                    />
+                    <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -bottom-16 left-10 h-44 w-44 rounded-full blur-3xl"
+                        style={{ background: `radial-gradient(circle at center, ${CRM_BRAND_ACCENT_GLOW_SOFT}, transparent 75%)` }}
+                    />
+                    <div className="relative z-10 flex items-start justify-between gap-3">
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Invoice {invoice.id}</p>
-                            <h3 className="text-base font-semibold text-slate-900 dark:text-white">{invoice.client}</h3>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-[#0F766E] dark:text-[#5EEAD4]">Invoice {invoice.id}</p>
+                            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">{invoice.client}</h3>
                             <p className="text-sm text-slate-500 dark:text-slate-400">{invoice.project}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-lg font-semibold text-slate-900 dark:text-white">{formatCurrency(invoice.amount)}</p>
+                            <p className="text-lg font-semibold text-slate-900 dark:text-slate-50">{formatCurrency(invoice.amount)}</p>
                             <p className="text-sm text-slate-500 dark:text-slate-400">Due {formatDate(invoice.dueDate)}</p>
                         </div>
                     </div>
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="relative z-10 mt-4 flex flex-wrap items-center justify-between gap-3">
                         <StatusPill tone={statusToneMap[invoice.status]}>{invoice.status}</StatusPill>
-                        <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">View invoice</button>
+                        <button className="text-sm font-semibold text-[#0F766E] transition hover:text-[#0d8a80] dark:text-[#5EEAD4] dark:hover:text-[#7df7e0]">
+                            View invoice
+                        </button>
                     </div>
                 </div>
             ))}

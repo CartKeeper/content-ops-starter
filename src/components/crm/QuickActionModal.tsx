@@ -5,6 +5,7 @@ import {
     QuickActionModalType,
     useQuickActionSettings
 } from './quick-action-settings';
+import { CRM_BRAND_ACCENT_GLOW, CRM_BRAND_ACCENT_GLOW_SOFT } from './theme';
 
 type BaseFieldType =
     | 'text'
@@ -50,7 +51,7 @@ type QuickActionModalProps = {
 };
 
 const inputBaseStyles =
-    'w-full rounded-xl border border-white/50 bg-white/60 px-3 py-2 text-sm text-slate-800 shadow-sm backdrop-blur focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700/80 dark:bg-slate-900/60 dark:text-slate-100 dark:focus:border-indigo-400';
+    'w-full rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-sm text-slate-800 shadow-sm backdrop-blur focus:border-[#14B8A6] focus:outline-none focus:ring-2 focus:ring-[rgba(45,212,191,0.35)] dark:border-white/10 dark:bg-[#0d1c33]/70 dark:text-slate-100 dark:focus:border-[#2DD4BF] dark:focus:ring-[rgba(45,212,191,0.35)]';
 
 export function QuickActionModal({
     type,
@@ -185,32 +186,43 @@ export function QuickActionModal({
         <div
             ref={overlayRef}
             onClick={handleOverlayClick}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#030a16]/80 p-4 backdrop-blur-md"
+            style={{ backgroundImage: `radial-gradient(circle at top, ${CRM_BRAND_ACCENT_GLOW_SOFT}, transparent 55%)` }}
         >
             <div
                 role="dialog"
                 aria-modal="true"
-                className="relative w-full max-w-2xl rounded-3xl border border-white/20 bg-white/80 p-8 shadow-2xl backdrop-blur-xl transition dark:border-slate-700/60 dark:bg-slate-950/70"
+                className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-white/25 bg-white/85 p-8 shadow-2xl backdrop-blur-2xl transition dark:border-white/10 dark:bg-[#0b162c]/85"
                 onClick={(event) => event.stopPropagation()}
             >
+                <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -right-28 -top-24 h-72 w-72 rounded-full blur-3xl"
+                    style={{ background: `radial-gradient(circle at center, ${CRM_BRAND_ACCENT_GLOW}, transparent 65%)` }}
+                />
+                <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -bottom-24 left-8 h-64 w-64 rounded-full blur-3xl"
+                    style={{ background: `radial-gradient(circle at center, ${CRM_BRAND_ACCENT_GLOW_SOFT}, transparent 70%)` }}
+                />
                 <button
                     type="button"
                     onClick={onClose}
-                    className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-sm transition hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-900/60 dark:text-slate-300"
+                    className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-sm transition hover:text-[#0F766E] focus:outline-none focus:ring-2 focus:ring-[rgba(45,212,191,0.35)] dark:bg-[#0d1c33]/70 dark:text-slate-300 dark:hover:text-[#5EEAD4]"
                     aria-label="Close modal"
                 >
                     ×
                 </button>
-                <div className="mb-6 space-y-2">
-                    <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+                <div className="relative z-10 mb-6 space-y-2">
+                    <span className="inline-flex items-center rounded-full border border-[#2DD4BF]/30 bg-[#2DD4BF]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#0F766E] dark:border-[#2DD4BF]/40 dark:bg-[#2DD4BF]/20 dark:text-[#5EEAD4]">
                         {type === 'booking' && 'Schedule shoot'}
                         {type === 'invoice' && 'Create invoice'}
                         {type === 'gallery' && 'Upload gallery'}
                     </span>
-                    <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">{title}</h2>
+                    <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">{title}</h2>
                     <p className="text-sm text-slate-600 dark:text-slate-300">{subtitle}</p>
                 </div>
-                <form ref={formRef} className="space-y-4" onSubmit={handleSubmit}>
+                <form ref={formRef} className="relative z-10 space-y-4" onSubmit={handleSubmit}>
                     <div className="grid gap-4 md:grid-cols-2">
                         {fields.map((field) => (
                             <FieldInput
@@ -226,14 +238,14 @@ export function QuickActionModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                            className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-white/80 focus:outline-none focus:ring-2 focus:ring-[rgba(45,212,191,0.25)] dark:border-white/10 dark:bg-[#0d1c33]/70 dark:text-slate-200 dark:hover:bg-[#10213b]/70"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-400"
+                            className="inline-flex items-center justify-center rounded-full bg-[#0F766E] px-5 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-[#0d8a80] focus:outline-none focus:ring-2 focus:ring-[rgba(45,212,191,0.35)] disabled:cursor-not-allowed disabled:bg-[#0F766E]/60 dark:bg-[#2DD4BF] dark:text-slate-900 dark:hover:bg-[#34E0C7]"
                         >
                             {isSubmitting ? 'Saving…' : submitLabel}
                         </button>
@@ -326,7 +338,7 @@ function FieldInput({ field, value, onChange }: FieldInputProps) {
                         type="checkbox"
                         checked={Boolean(value)}
                         onChange={(event) => onChange(event.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
+                        className="h-4 w-4 rounded border-white/40 text-[#0F766E] focus:ring-[rgba(45,212,191,0.35)] dark:border-white/20 dark:bg-[#0d1c33]"
                     />
                     <span>{field.placeholder || 'Enabled'}</span>
                 </label>
