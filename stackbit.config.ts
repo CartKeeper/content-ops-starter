@@ -1,8 +1,8 @@
 import { defineStackbitConfig, DocumentStringLikeFieldNonLocalized, SiteMapEntry } from '@stackbit/types';
-import { GitContentSource } from '@stackbit/cms-git';
+import { LocalOnlyGitContentSource, type GitContentSourceOptions } from './sources/local/local-git-content-source';
 import { allModels } from 'sources/local/models';
 
-const gitContentSource = new GitContentSource({
+const gitContentSource = new LocalOnlyGitContentSource({
     rootPath: __dirname,
     contentDirs: ['content'],
     models: Object.values(allModels),
