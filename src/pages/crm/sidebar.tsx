@@ -4,6 +4,7 @@ import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { AnimatePresence, motion } from 'framer-motion';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { dayjsLocalizer, type CalendarProps, type Event as CalendarEventBase } from 'react-big-calendar';
@@ -161,62 +162,77 @@ export default function SidebarWorkspace({ bookings, invoices }: PhotographySide
                         </div>
                     </header>
                     <div className="flex flex-1 overflow-hidden">
-                        <aside className="hidden w-72 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:block">
-                            <nav className="flex flex-col gap-1 px-4 py-6">
+                        <aside className="flex w-20 flex-col border-r border-slate-200 bg-white px-2 py-6 transition-[width] duration-300 ease-out dark:border-slate-800 dark:bg-slate-900 sm:w-24 lg:w-72 lg:px-4">
+                            <nav className="flex flex-col gap-2">
                                 {modules.map((module) => {
                                     const isActive = module.id === currentModule.id;
                                     return (
-                                        <button
+                                        <motion.button
                                             key={module.id}
                                             type="button"
                                             onClick={() => setActiveModule(module.id)}
+                                            aria-label={module.label}
+                                            aria-pressed={isActive}
                                             className={[
-                                                'flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition',
+                                                'group relative flex w-full items-center justify-center gap-3 rounded-2xl px-2 py-3 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900',
+                                                'lg:justify-start lg:px-4',
                                                 isActive
-                                                    ? 'bg-indigo-600 text-white shadow-sm'
-                                                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 dark:shadow-indigo-900/40'
+                                                    : 'text-slate-600 hover:bg-slate-100 focus-visible:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 dark:focus-visible:bg-slate-800'
                                             ].join(' ')}
+                                            initial={false}
+                                            whileHover="hover"
+                                            whileTap="pressed"
                                         >
-                                            <module.icon className="h-5 w-5" />
-                                            <span>{module.label}</span>
-                                        </button>
+                                            <motion.span
+                                                className={[
+                                                    'flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-colors',
+                                                    isActive
+                                                        ? 'bg-white/20 text-white'
+                                                        : 'bg-indigo-100/70 text-indigo-600 group-hover:bg-indigo-200/90 dark:bg-slate-800 dark:text-indigo-300 dark:group-hover:bg-slate-700'
+                                                ].join(' ')}
+                                                variants={{
+                                                    rest: { scale: 1, rotate: 0 },
+                                                    hover: { scale: 1.1, rotate: 5 },
+                                                    pressed: { scale: 0.95 },
+                                                    active: { scale: 1.05 }
+                                                }}
+                                                animate={isActive ? 'active' : 'rest'}
+                                                transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                                            >
+                                                <module.icon className="h-5 w-5" />
+                                            </motion.span>
+                                            <span className="hidden lg:block">{module.label}</span>
+                                            <span className="pointer-events-none absolute left-[calc(100%+0.75rem)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 dark:bg-slate-700 lg:hidden">
+                                                {module.label}
+                                            </span>
+                                        </motion.button>
                                     );
                                 })}
                             </nav>
                         </aside>
-                        <main className="flex-1 overflow-y-auto bg-slate-50 px-6 py-10 dark:bg-slate-950">
-                            <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-                                <nav className="lg:hidden">
-                                    <div className="flex overflow-x-auto rounded-full border border-slate-200 bg-white p-1 text-xs font-medium shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                                        {modules.map((module) => {
-                                            const isActive = module.id === currentModule.id;
-                                            return (
-                                                <button
-                                                    key={module.id}
-                                                    type="button"
-                                                    onClick={() => setActiveModule(module.id)}
-                                                    className={[
-                                                        'whitespace-nowrap rounded-full px-3 py-1.5 transition',
-                                                        isActive
-                                                            ? 'bg-indigo-600 text-white'
-                                                            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-                                                    ].join(' ')}
-                                                >
-                                                    {module.label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </nav>
-                                <header className="space-y-2">
-                                    <div className="inline-flex items-center gap-2 rounded-full bg-indigo-100/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-                                        <currentModule.icon className="h-4 w-4" />
-                                        {currentModule.label}
-                                    </div>
-                                    <h2 className="text-3xl font-semibold text-slate-900 dark:text-white">{currentModule.label}</h2>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">{currentModule.description}</p>
-                                </header>
-                                {currentModule.render()}
+                        <main className="flex-1 overflow-y-auto bg-slate-50 px-4 py-10 dark:bg-slate-950 sm:px-6">
+                            <div className="mx-auto w-full max-w-5xl">
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={currentModule.id}
+                                        initial={{ opacity: 0, y: 24 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -16 }}
+                                        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                                        className="flex flex-col gap-8"
+                                    >
+                                        <header className="space-y-2">
+                                            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-100/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                                                <currentModule.icon className="h-4 w-4" />
+                                                {currentModule.label}
+                                            </div>
+                                            <h2 className="text-3xl font-semibold text-slate-900 dark:text-white">{currentModule.label}</h2>
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">{currentModule.description}</p>
+                                        </header>
+                                        {currentModule.render()}
+                                    </motion.div>
+                                </AnimatePresence>
                             </div>
                         </main>
                     </div>
