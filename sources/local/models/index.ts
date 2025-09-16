@@ -3,6 +3,7 @@ import { Badge } from './Badge';
 import { Button } from './Button';
 import { CarouselSection } from './CarouselSection';
 import { CheckboxFormControl } from './CheckboxFormControl';
+import { Client } from './Client';
 import { Config } from './Config';
 import { DividerSection } from './DividerSection';
 import { EmailFormControl } from './EmailFormControl';
@@ -23,6 +24,7 @@ import { Person } from './Person';
 import { PostFeedLayout } from './PostFeedLayout';
 import { PostFeedSection } from './PostFeedSection';
 import { PostLayout } from './PostLayout';
+import { Project } from './Project';
 import { PricingPlan } from './PricingPlan';
 import { PricingSection } from './PricingSection';
 import { RecentPostsSection } from './RecentPostsSection';
@@ -49,6 +51,7 @@ export const allModels = {
     Button,
     CarouselSection,
     CheckboxFormControl,
+    Client,
     Config,
     DividerSection,
     EmailFormControl,
@@ -69,6 +72,7 @@ export const allModels = {
     PostFeedLayout,
     PostFeedSection,
     PostLayout,
+    Project,
     PricingPlan,
     PricingSection,
     RecentPostsSection,
