@@ -12,6 +12,7 @@ Netlify starter that's made for customization with a flexible content model, com
 - [Develop with Netlify Visual Editor Locally](#develop-with-netlify-visual-editor-locally)
 - [Building for production](#building-for-production)
 - [Setting Up Algolia Search](#setting-up-algolia-search)
+- [Configuring Supabase Storage](#configuring-supabase-storage)
 - [Next Steps](#next-steps)
 - [Support](#support)
 
@@ -61,6 +62,19 @@ This starter includes Algolia search integration. To set it up:
    - `NEXT_PUBLIC_ALGOLIA_APP_ID` - Your Algolia application ID
    - `NEXT_PUBLIC_ALGOLIA_SEARCH_API_KEY` - Your Algolia search-only API key
    - `NEXT_PUBLIC_ALGOLIA_INDEX_NAME` - Your index name
+
+## Configuring Supabase Storage
+
+The CRM API routes under `src/pages/api/` rely on [Supabase](https://supabase.com/) for persistence. To connect your project:
+
+1. Create a Supabase project and note the project URL and service role key from the dashboard.
+2. Create `clients` and `projects` tables with the columns your application needs (for example: `id`, `name`, `email`, `notes`, timestamps, etc.).
+3. Add the following environment variables (for local development use `.env.local`):
+   - `SUPABASE_URL` – Your Supabase project URL.
+   - `SUPABASE_SERVICE_ROLE_KEY` – Service role key for server-side CRUD operations (alternatively use `SUPABASE_ANON_KEY` with adequate Row Level Security policies).
+4. Redeploy or restart the Next.js server so the API routes can pick up the new variables.
+
+These API routes return JSON responses for GET, POST, PUT, and DELETE requests, so they can be consumed directly from front-end forms or integrations.
 
 ## Next Steps
 
