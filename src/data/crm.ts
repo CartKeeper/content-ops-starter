@@ -13,6 +13,7 @@ export type GalleryRecord = {
     deliveredAt?: string;
     status: GalleryStatus;
     coverImage?: string;
+    customFields?: Record<string, string | boolean>;
 };
 
 export type ProjectMilestone = {

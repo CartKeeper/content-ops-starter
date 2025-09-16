@@ -16,6 +16,7 @@ import {
     type BookingRecord,
     type BookingStatus,
     type InvoiceRecord,
+    type InvoiceStatus,
     type ChartPoint
 } from '../../components/crm';
 import {
@@ -27,13 +28,15 @@ import {
     MoonIcon,
     SunIcon
 } from '../../components/crm/icons';
-import { clients, galleryCollection, tasks } from '../../data/crm';
+import { QuickActionModal, type QuickActionFormField, type QuickActionModalSubmitValues } from '../../components/crm/QuickActionModal';
+import type { QuickActionModalType } from '../../components/crm/quick-action-settings';
+import { clients, galleryCollection, tasks, type GalleryRecord, type GalleryStatus } from '../../data/crm';
 import { readCmsCollection } from '../../utils/read-cms-collection';
 
-const quickActions = [
-    { id: 'new-booking', label: 'Schedule shoot' },
-    { id: 'new-invoice', label: 'Create invoice' },
-    { id: 'upload-gallery', label: 'Upload gallery' }
+const quickActions: { id: string; label: string; modal: QuickActionModalType }[] = [
+    { id: 'new-booking', label: 'Schedule shoot', modal: 'booking' },
+    { id: 'new-invoice', label: 'Create invoice', modal: 'invoice' },
+    { id: 'upload-gallery', label: 'Upload gallery', modal: 'gallery' }
 ];
 
 const navigationItems = [
@@ -55,6 +58,14 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
     const [isDarkMode, setIsDarkMode] = React.useState<boolean | null>(null);
     const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
     const userMenuRef = React.useRef<HTMLDivElement | null>(null);
+    const [bookingList, setBookingList] = React.useState<BookingRecord[]>(() =>
+        Array.isArray(bookings) ? bookings : []
+    );
+    const [invoiceList, setInvoiceList] = React.useState<InvoiceRecord[]>(() =>
+        Array.isArray(invoices) ? invoices : []
+    );
+    const [galleryList, setGalleryList] = React.useState<GalleryRecord[]>(() => [...galleryCollection]);
+    const [activeModal, setActiveModal] = React.useState<QuickActionModalType | null>(null);
 
     React.useEffect(() => {
         if (typeof window === 'undefined') {
@@ -98,8 +109,284 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
         setIsDarkMode((previous) => (previous === null ? true : !previous));
     };
 
-    const bookingList = React.useMemo(() => (Array.isArray(bookings) ? bookings : []), [bookings]);
-    const invoiceList = React.useMemo(() => (Array.isArray(invoices) ? invoices : []), [invoices]);
+    const clientOptions = React.useMemo(
+        () => clients.map((client) => ({ value: client.name, label: client.name })),
+        []
+    );
+
+    const bookingFields = React.useMemo<QuickActionFormField[]>(
+        () => [
+            {
+                id: 'client',
+                label: 'Client',
+                inputType: 'select',
+                options: clientOptions,
+                defaultValue: clientOptions[0]?.value ?? '',
+                required: true
+            },
+            {
+                id: 'shootType',
+                label: 'Shoot type',
+                inputType: 'text',
+                placeholder: 'Editorial portraits',
+                required: true
+            },
+            {
+                id: 'date',
+                label: 'Shoot date',
+                inputType: 'date',
+                defaultValue: dayjs().format('YYYY-MM-DD'),
+                required: true
+            },
+            {
+                id: 'startTime',
+                label: 'Start time',
+                inputType: 'time',
+                defaultValue: '09:00',
+                required: true
+            },
+            {
+                id: 'endTime',
+                label: 'End time',
+                inputType: 'time',
+                defaultValue: '11:00'
+            },
+            {
+                id: 'location',
+                label: 'Location',
+                inputType: 'text',
+                placeholder: 'Studio or on-site address',
+                required: true
+            },
+            {
+                id: 'status',
+                label: 'Status',
+                inputType: 'select',
+                options: [
+                    { value: 'Pending', label: 'Pending' },
+                    { value: 'Confirmed', label: 'Confirmed' },
+                    { value: 'Editing', label: 'Editing' }
+                ],
+                defaultValue: 'Pending'
+            }
+        ],
+        [clientOptions]
+    );
+
+    const invoiceFields = React.useMemo<QuickActionFormField[]>(
+        () => [
+            {
+                id: 'client',
+                label: 'Client',
+                inputType: 'select',
+                options: clientOptions,
+                defaultValue: clientOptions[0]?.value ?? '',
+                required: true
+            },
+            {
+                id: 'project',
+                label: 'Project name',
+                inputType: 'text',
+                placeholder: 'Describe the deliverable',
+                required: true
+            },
+            {
+                id: 'amount',
+                label: 'Amount',
+                inputType: 'number',
+                placeholder: '0.00',
+                step: 50,
+                required: true
+            },
+            {
+                id: 'dueDate',
+                label: 'Due date',
+                inputType: 'date',
+                defaultValue: dayjs().add(30, 'day').format('YYYY-MM-DD'),
+                required: true
+            },
+            {
+                id: 'status',
+                label: 'Status',
+                inputType: 'select',
+                options: [
+                    { value: 'Draft', label: 'Draft' },
+                    { value: 'Sent', label: 'Sent' },
+                    { value: 'Paid', label: 'Paid' },
+                    { value: 'Overdue', label: 'Overdue' }
+                ],
+                defaultValue: 'Sent'
+            }
+        ],
+        [clientOptions]
+    );
+
+    const galleryFields = React.useMemo<QuickActionFormField[]>(
+        () => [
+            {
+                id: 'client',
+                label: 'Client',
+                inputType: 'select',
+                options: clientOptions,
+                defaultValue: clientOptions[0]?.value ?? '',
+                required: true
+            },
+            {
+                id: 'shootType',
+                label: 'Gallery title',
+                inputType: 'text',
+                placeholder: 'Collection name',
+                required: true
+            },
+            {
+                id: 'status',
+                label: 'Status',
+                inputType: 'select',
+                options: [
+                    { value: 'Pending', label: 'Pending' },
+                    { value: 'Delivered', label: 'Delivered' }
+                ],
+                defaultValue: 'Pending'
+            },
+            {
+                id: 'deliveryDueDate',
+                label: 'Delivery due date',
+                inputType: 'date',
+                defaultValue: dayjs().add(7, 'day').format('YYYY-MM-DD')
+            },
+            {
+                id: 'deliveredAt',
+                label: 'Delivered on',
+                inputType: 'date'
+            },
+            {
+                id: 'coverImage',
+                label: 'Cover image URL',
+                inputType: 'url',
+                placeholder: 'https://example.com/cover.jpg',
+                helperText: 'Optional hero image shown in the gallery card.'
+            }
+        ],
+        [clientOptions]
+    );
+
+    const closeModal = React.useCallback(() => {
+        setActiveModal(null);
+    }, []);
+
+    const createRecord = React.useCallback(
+        async <T,>(resource: 'bookings' | 'invoices' | 'galleries', payload: Record<string, unknown>) => {
+            const response = await fetch(`/api/crm/${resource}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            let result: { data?: T; error?: string } | null = null;
+            try {
+                result = await response.json();
+            } catch (error) {
+                // no-op; we'll handle below
+            }
+
+            if (!response.ok) {
+                const message = result?.error ?? 'Unable to save record. Please try again.';
+                throw new Error(message);
+            }
+
+            return (result?.data as T) ?? (payload as T);
+        },
+        []
+    );
+
+    const handleCreateBooking = React.useCallback(
+        async (values: QuickActionModalSubmitValues) => {
+            const clientName = (values.client as string) || clientOptions[0]?.value || 'New Client';
+            const shootType = (values.shootType as string) || 'Photography Session';
+            const shootDate = (values.date as string) || dayjs().format('YYYY-MM-DD');
+            const startTime = formatTimeLabel(values.startTime) ?? '9:00 AM';
+            const endTime = formatTimeLabel(values.endTime);
+            const location = (values.location as string) || 'Studio TBD';
+            const status = (values.status as BookingStatus) || 'Pending';
+
+            const recordPayload: Record<string, unknown> = {
+                client: clientName,
+                shootType,
+                date: shootDate,
+                startTime,
+                location,
+                status,
+                customFields: values.customFields
+            };
+
+            if (endTime) {
+                recordPayload.endTime = endTime;
+            }
+
+            const created = await createRecord<BookingRecord>('bookings', recordPayload);
+            setBookingList((previous) => [...previous, created]);
+        },
+        [clientOptions, createRecord]
+    );
+
+    const handleCreateInvoice = React.useCallback(
+        async (values: QuickActionModalSubmitValues) => {
+            const clientName = (values.client as string) || clientOptions[0]?.value || 'New Client';
+            const project = (values.project as string) || 'New Project';
+            const rawAmount = values.amount;
+            const amount = typeof rawAmount === 'number' ? rawAmount : Number(rawAmount);
+            const parsedAmount = Number.isFinite(amount) ? amount : 0;
+            const dueDate = (values.dueDate as string) || dayjs().add(30, 'day').format('YYYY-MM-DD');
+            const status = (values.status as InvoiceStatus) || 'Sent';
+
+            const recordPayload: Record<string, unknown> = {
+                client: clientName,
+                project,
+                amount: parsedAmount,
+                dueDate,
+                status,
+                customFields: values.customFields
+            };
+
+            const created = await createRecord<InvoiceRecord>('invoices', recordPayload);
+            setInvoiceList((previous) => [...previous, created]);
+        },
+        [clientOptions, createRecord]
+    );
+
+    const handleCreateGallery = React.useCallback(
+        async (values: QuickActionModalSubmitValues) => {
+            const clientName = (values.client as string) || clientOptions[0]?.value || 'New Client';
+            const shootType = (values.shootType as string) || 'New Collection';
+            const status = (values.status as GalleryStatus) || 'Pending';
+            const deliveryDueDate = values.deliveryDueDate as string | undefined;
+            const deliveredAt = values.deliveredAt as string | undefined;
+            const coverImage = values.coverImage as string | undefined;
+
+            const recordPayload: Record<string, unknown> = {
+                client: clientName,
+                shootType,
+                status,
+                customFields: values.customFields
+            };
+
+            if (deliveryDueDate) {
+                recordPayload.deliveryDueDate = deliveryDueDate;
+            }
+
+            if (status === 'Delivered') {
+                recordPayload.deliveredAt = deliveredAt || deliveryDueDate || dayjs().format('YYYY-MM-DD');
+            }
+
+            if (coverImage) {
+                recordPayload.coverImage = coverImage;
+            }
+
+            const created = await createRecord<GalleryRecord>('galleries', recordPayload);
+            setGalleryList((previous) => [...previous, created]);
+        },
+        [clientOptions, createRecord]
+    );
 
     const sortedInvoices = React.useMemo(
         () =>
@@ -189,12 +476,12 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
         [bookingList, currentMonth, invoiceList]
     );
 
-    const deliveredGalleries = galleryCollection.filter((gallery) => gallery.status === 'Delivered').length;
-    const pendingGalleries = galleryCollection.length - deliveredGalleries;
-    const galleryCompletion = galleryCollection.length
-        ? Math.round((deliveredGalleries / galleryCollection.length) * 100)
+    const deliveredGalleries = galleryList.filter((gallery) => gallery.status === 'Delivered').length;
+    const pendingGalleries = galleryList.length - deliveredGalleries;
+    const galleryCompletion = galleryList.length
+        ? Math.round((deliveredGalleries / galleryList.length) * 100)
         : 0;
-    const pendingGalleryClients = galleryCollection
+    const pendingGalleryClients = galleryList
         .filter((gallery) => gallery.status === 'Pending')
         .map((gallery) => gallery.client);
 
@@ -288,7 +575,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
         () => {
             const referenceDate = currentMonth.startOf('day');
 
-            return galleryCollection
+            return galleryList
                 .filter((gallery) => gallery.status === 'Pending' && gallery.deliveryDueDate)
                 .map((gallery) => {
                     const dueDate = dayjs(gallery.deliveryDueDate as string);
@@ -307,7 +594,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                         dayjs(second.deliveryDueDate as string).valueOf()
                 );
         },
-        [currentMonth]
+        [currentMonth, galleryList]
     );
 
     return (
@@ -423,6 +710,8 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                         {quickActions.map((action) => (
                                             <button
                                                 key={action.id}
+                                                type="button"
+                                                onClick={() => setActiveModal(action.modal)}
                                                 className="inline-flex items-center justify-center rounded-full border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-50 dark:border-indigo-500/40 dark:bg-slate-900/60 dark:text-indigo-300 dark:hover:bg-slate-800/60"
                                             >
                                                 {action.label}
@@ -696,9 +985,43 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                     </div>
                 </div>
             </div>
+            {activeModal === 'booking' ? (
+                <QuickActionModal
+                    type="booking"
+                    title="Schedule a new shoot"
+                    subtitle="Turn a client request into a confirmed production timeline with quick context fields."
+                    submitLabel="Save booking"
+                    onClose={closeModal}
+                    onSubmit={handleCreateBooking}
+                    baseFields={bookingFields}
+                />
+            ) : null}
+            {activeModal === 'invoice' ? (
+                <QuickActionModal
+                    type="invoice"
+                    title="Create client invoice"
+                    subtitle="Send professional billing in seconds—amounts, due dates, and payment notes stay aligned."
+                    submitLabel="Save invoice"
+                    onClose={closeModal}
+                    onSubmit={handleCreateInvoice}
+                    baseFields={invoiceFields}
+                />
+            ) : null}
+            {activeModal === 'gallery' ? (
+                <QuickActionModal
+                    type="gallery"
+                    title="Upload gallery details"
+                    subtitle="Log delivery milestones, passwords, and presentation assets before sharing with clients."
+                    submitLabel="Save gallery"
+                    onClose={closeModal}
+                    onSubmit={handleCreateGallery}
+                    baseFields={galleryFields}
+                />
+            ) : null}
         </>
     );
 }
+
 
 export const getStaticProps: GetStaticProps<PhotographyCrmDashboardProps> = async () => {
     const [bookings, invoices] = await Promise.all([
@@ -735,6 +1058,24 @@ function sumInvoicesForMonth(invoices: InvoiceRecord[], month: dayjs.Dayjs): num
     return invoices
         .filter((invoice) => dayjs(invoice.dueDate).isSame(month, 'month'))
         .reduce((total, invoice) => total + invoice.amount, 0);
+}
+
+function formatTimeLabel(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return undefined;
+    }
+
+    const parsed = dayjs(trimmed, ['HH:mm', 'H:mm', 'h:mm A', 'h:mmA'], true);
+    if (parsed.isValid()) {
+        return parsed.format('h:mm A');
+    }
+
+    return trimmed;
 }
 
 function startOfWeek(value: dayjs.Dayjs): dayjs.Dayjs {
