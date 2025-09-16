@@ -42,3 +42,4 @@ yarn-error.log*
 .idea
 
 tmp*
+tsconfig.tsbuildinfo
