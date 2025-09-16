@@ -1,12 +1,4 @@
 import * as React from 'react';
-import classNames from 'classnames';
-import {
-    CRM_BRAND_ACCENT,
-    CRM_BRAND_ACCENT_EMPHASIS,
-    CRM_BRAND_ACCENT_GLOW,
-    CRM_BRAND_ACCENT_GLOW_SOFT,
-    GLASS_PANEL_CLASSNAME
-} from './theme';
 import {
     Bar,
     CartesianGrid,
@@ -17,7 +9,6 @@ import {
     XAxis,
     YAxis
 } from 'recharts';
-import type { TooltipContentProps } from 'recharts';
 
 export type Timeframe = 'weekly' | 'monthly' | 'yearly';
 
@@ -29,7 +20,6 @@ export type ChartPoint = {
 
 type OverviewChartProps = {
     data: Record<Timeframe, ChartPoint[]>;
-    isDarkMode?: boolean;
 };
 
 const timeframeOptions: Array<{ id: Timeframe; label: string }> = [
@@ -54,14 +44,13 @@ const compactCurrencyFormatter = new Intl.NumberFormat('en-US', {
 const formatCurrency = (value: number) => currencyFormatter.format(value);
 const formatCurrencyCompact = (value: number) => compactCurrencyFormatter.format(value);
 
-type ChartValueType = number | string | Array<number | string>;
-type ChartNameType = string | number;
-
-type ChartTooltipProps = Partial<TooltipContentProps<ChartValueType, ChartNameType>> & {
-    isDarkMode?: boolean;
+type ChartTooltipProps = {
+    active?: boolean;
+    payload?: Array<{ value?: number; name?: string; dataKey?: string }>;
+    label?: string | number;
 };
 
-function ChartTooltip({ active, payload, label, isDarkMode }: ChartTooltipProps) {
+function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
     if (!active || !payload || payload.length === 0) {
         return null;
     }
@@ -69,44 +58,31 @@ function ChartTooltip({ active, payload, label, isDarkMode }: ChartTooltipProps)
     const shootsEntry = payload.find((entry) => entry.dataKey === 'shoots');
     const revenueEntry = payload.find((entry) => entry.dataKey === 'revenue');
 
-    const accentColor = isDarkMode ? CRM_BRAND_ACCENT : CRM_BRAND_ACCENT_EMPHASIS;
-    const surfaceClass = isDarkMode
-        ? 'border-white/10 bg-[#0b162c]/90 text-slate-200'
-        : 'border-white/40 bg-white/95 text-slate-600';
-
     return (
-        <div className={classNames('rounded-xl border p-3 text-sm shadow-xl backdrop-blur', surfaceClass)}>
-            <p
-                className="text-xs font-semibold uppercase tracking-[0.3em]"
-                style={{ color: accentColor }}
-            >
-                {label}
+        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
+                {label != null ? String(label) : ''}
             </p>
-            <div className="mt-2 space-y-1">
+            <div className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
                 {shootsEntry && (
                     <div className="flex items-center justify-between gap-6">
-                        <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                            <span
-                                className="inline-flex h-2.5 w-2.5 rounded-full"
-                                aria-hidden="true"
-                                style={{ backgroundColor: accentColor }}
-                            />
+                        <span className="flex items-center gap-2">
+                            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" aria-hidden="true" />
                             Shoots
                         </span>
-                        <span className="font-semibold text-slate-900 dark:text-slate-50">{shootsEntry.value}</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{shootsEntry.value}</span>
                     </div>
                 )}
                 {revenueEntry && (
                     <div className="flex items-center justify-between gap-6">
-                        <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                        <span className="flex items-center gap-2">
                             <span
-                                className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border-2"
+                                className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border-2 border-emerald-400"
                                 aria-hidden="true"
-                                style={{ borderColor: accentColor }}
                             />
                             Revenue
                         </span>
-                        <span className="font-semibold text-slate-900 dark:text-slate-50">
+                        <span className="font-semibold text-slate-900 dark:text-white">
                             {formatCurrency(Number(revenueEntry.value))}
                         </span>
                     </div>
@@ -116,7 +92,7 @@ function ChartTooltip({ active, payload, label, isDarkMode }: ChartTooltipProps)
     );
 }
 
-export function OverviewChart({ data, isDarkMode = false }: OverviewChartProps) {
+export function OverviewChart({ data }: OverviewChartProps) {
     const [timeframe, setTimeframe] = React.useState<Timeframe>('monthly');
     const [isMounted, setIsMounted] = React.useState(false);
 
@@ -129,59 +105,16 @@ export function OverviewChart({ data, isDarkMode = false }: OverviewChartProps) 
     const totalShoots = activeData.reduce((total, point) => total + point.shoots, 0);
     const totalRevenue = activeData.reduce((total, point) => total + point.revenue, 0);
 
-    const chartColors = React.useMemo(() => {
-        const accentTone = isDarkMode ? CRM_BRAND_ACCENT : CRM_BRAND_ACCENT_EMPHASIS;
-
-        return {
-            axis: isDarkMode ? 'rgba(203, 213, 225, 0.65)' : 'rgba(71, 85, 105, 0.65)',
-            grid: isDarkMode ? 'rgba(148, 163, 184, 0.22)' : 'rgba(100, 116, 139, 0.18)',
-            cursor: isDarkMode ? 'rgba(45, 212, 191, 0.12)' : 'rgba(45, 212, 191, 0.08)',
-            barStart: 'rgba(45, 212, 191, 0.55)',
-            barEnd: isDarkMode ? 'rgba(15, 118, 110, 0.25)' : 'rgba(45, 212, 191, 0.12)',
-            lineStroke: accentTone,
-            dotStroke: isDarkMode ? '#030a16' : '#ecfeff',
-            legendAccent: accentTone,
-            legendRing: isDarkMode ? 'rgba(45, 212, 191, 0.4)' : 'rgba(45, 212, 191, 0.35)',
-            legendTextClass: isDarkMode ? 'text-slate-400' : 'text-slate-500'
-        };
-    }, [isDarkMode]);
-
-    const activeToggleStyles = React.useMemo(
-        () =>
-            isDarkMode
-                ? {
-                      backgroundColor: 'rgba(45, 212, 191, 0.18)',
-                      color: CRM_BRAND_ACCENT,
-                      boxShadow: '0 0 0 1px rgba(45, 212, 191, 0.4)'
-                  }
-                : {
-                      backgroundColor: 'rgba(20, 184, 166, 0.18)',
-                      color: CRM_BRAND_ACCENT_EMPHASIS,
-                      boxShadow: '0 0 0 1px rgba(20, 184, 166, 0.3)'
-                  },
-        [isDarkMode]
-    );
-
     return (
-        <section className={classNames(GLASS_PANEL_CLASSNAME, 'p-6')}>
-            <span
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-28 -top-24 h-72 w-72 rounded-full blur-3xl"
-                style={{ background: `radial-gradient(circle at center, ${CRM_BRAND_ACCENT_GLOW}, transparent 65%)` }}
-            />
-            <span
-                aria-hidden="true"
-                className="pointer-events-none absolute -bottom-28 left-12 h-72 w-72 rounded-full blur-3xl"
-                style={{ background: `radial-gradient(circle at center, ${CRM_BRAND_ACCENT_GLOW_SOFT}, transparent 70%)` }}
-            />
-            <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Studio overview</h2>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Studio overview</h2>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                         Shoots scheduled and revenue performance across time horizons.
                     </p>
                 </div>
-                <div className="inline-flex shrink-0 rounded-full border border-white/30 bg-white/50 p-1 text-sm font-medium text-slate-600 backdrop-blur dark:border-white/10 dark:bg-[#0d1c33]/70 dark:text-slate-300">
+                <div className="inline-flex shrink-0 rounded-full border border-slate-200 bg-slate-50 p-1 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     {timeframeOptions.map((option) => {
                         const isActive = option.id === timeframe;
                         return (
@@ -190,11 +123,12 @@ export function OverviewChart({ data, isDarkMode = false }: OverviewChartProps) 
                                 type="button"
                                 onClick={() => setTimeframe(option.id)}
                                 aria-pressed={isActive}
-                                className={classNames(
-                                    'rounded-full px-3 py-1 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:ring-[rgba(45,212,191,0.35)]',
-                                    isActive ? 'shadow-sm' : 'hover:text-slate-900 dark:hover:text-slate-100'
-                                )}
-                                style={isActive ? activeToggleStyles : undefined}
+                                className={[
+                                    'rounded-full px-3 py-1 transition',
+                                    isActive
+                                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white'
+                                        : 'hover:text-slate-900 dark:hover:text-white'
+                                ].join(' ')}
                             >
                                 {option.label}
                             </button>
@@ -202,37 +136,24 @@ export function OverviewChart({ data, isDarkMode = false }: OverviewChartProps) 
                     })}
                 </div>
             </div>
-            <div className="relative z-10 mt-6 space-y-6">
-                <div
-                    className={classNames(
-                        'flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.3em]',
-                        chartColors.legendTextClass
-                    )}
-                >
+            <div className="mt-6 space-y-6">
+                <div className="flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
                     <div className="flex items-center gap-2">
-                        <span
-                            className="inline-flex h-2.5 w-2.5 rounded-full"
-                            aria-hidden="true"
-                            style={{ backgroundColor: chartColors.legendAccent }}
-                        />
+                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" aria-hidden="true" />
                         Shoots
                     </div>
                     <div className="flex items-center gap-2">
-                        <span
-                            className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border-2"
-                            aria-hidden="true"
-                            style={{ borderColor: chartColors.legendRing }}
-                        />
+                        <span className="inline-flex h-2.5 w-2.5 items-center justify-center rounded-full border-2 border-emerald-400" aria-hidden="true" />
                         Revenue
                     </div>
                 </div>
                 <div className="overflow-x-auto">
                     {!hasData ? (
-                        <p className="rounded-xl border border-white/30 bg-white/70 p-6 text-sm text-slate-600 backdrop-blur-md dark:border-white/10 dark:bg-[#0d1c33]/70 dark:text-slate-300">
+                        <p className="rounded-xl bg-slate-50 p-6 text-sm text-slate-500 dark:bg-slate-800/40 dark:text-slate-400">
                             No analytics available for this timeframe yet.
                         </p>
                     ) : (
-                        <div className="h-72 min-w-[560px]">
+                        <div className="h-72 min-w-[560px] text-slate-400 dark:text-slate-500">
                             {!isMounted ? (
                                 <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                                     Loading chart…
@@ -247,46 +168,46 @@ export function OverviewChart({ data, isDarkMode = false }: OverviewChartProps) 
                                     >
                                         <defs>
                                             <linearGradient id="shootsGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor={chartColors.barStart} />
-                                                <stop offset="100%" stopColor={chartColors.barEnd} />
+                                                <stop offset="0%" stopColor="rgba(99, 102, 241, 0.65)" />
+                                                <stop offset="100%" stopColor="rgba(99, 102, 241, 0.15)" />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid vertical={false} stroke={chartColors.grid} strokeDasharray="4 6" />
+                                        <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.12} strokeDasharray="4 6" />
                                         <XAxis
                                             dataKey="label"
-                                            axisLine={{ stroke: chartColors.axis }}
-                                            tickLine={{ stroke: chartColors.axis }}
-                                            tick={{ fill: chartColors.axis, fontSize: 12 }}
+                                            axisLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tickLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tick={{ fill: 'currentColor', fontSize: 12 }}
                                         />
                                         <YAxis
                                             yAxisId="shoots"
                                             allowDecimals={false}
-                                            axisLine={{ stroke: chartColors.axis }}
-                                            tickLine={{ stroke: chartColors.axis }}
-                                            tick={{ fill: chartColors.axis, fontSize: 12 }}
+                                            axisLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tickLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tick={{ fill: 'currentColor', fontSize: 12 }}
                                             domain={[0, (dataMax: number) => (dataMax ? Math.ceil(dataMax * 1.2) : 1)]}
                                         />
                                         <YAxis
                                             yAxisId="revenue"
                                             orientation="right"
-                                            axisLine={{ stroke: chartColors.axis }}
-                                            tickLine={{ stroke: chartColors.axis }}
-                                            tick={{ fill: chartColors.axis, fontSize: 12 }}
+                                            axisLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tickLine={{ stroke: 'currentColor', strokeOpacity: 0.18 }}
+                                            tick={{ fill: 'currentColor', fontSize: 12 }}
                                             tickFormatter={(value: number) => formatCurrencyCompact(value)}
                                             domain={[0, (dataMax: number) => (dataMax ? Math.ceil(dataMax * 1.15) : 1)]}
                                         />
                                         <Tooltip
-                                            content={(tooltipProps) => <ChartTooltip {...tooltipProps} isDarkMode={isDarkMode} />}
-                                            cursor={{ fill: chartColors.cursor }}
+                                            content={(tooltipProps) => <ChartTooltip {...tooltipProps} />}
+                                            cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }}
                                         />
                                         <Bar yAxisId="shoots" dataKey="shoots" fill="url(#shootsGradient)" radius={[10, 10, 0, 0]} maxBarSize={40} />
                                         <Line
                                             yAxisId="revenue"
                                             type="monotone"
                                             dataKey="revenue"
-                                            stroke={chartColors.lineStroke}
+                                            stroke="#10b981"
                                             strokeWidth={3}
-                                            dot={{ r: 5, strokeWidth: 2, stroke: chartColors.dotStroke, fill: chartColors.lineStroke }}
+                                            dot={{ r: 5, strokeWidth: 2, stroke: '#0f172a', fill: '#10b981' }}
                                             activeDot={{ r: 6 }}
                                         />
                                     </ComposedChart>
@@ -296,13 +217,13 @@ export function OverviewChart({ data, isDarkMode = false }: OverviewChartProps) 
                     )}
                 </div>
                 <dl className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-xl border border-white/30 bg-white/70 p-4 text-sm shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-[#0d1c33]/70">
-                        <dt className="font-medium text-slate-600 dark:text-slate-400">Total shoots</dt>
-                        <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{totalShoots}</dd>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/40">
+                        <dt className="font-medium text-slate-500 dark:text-slate-400">Total shoots</dt>
+                        <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{totalShoots}</dd>
                     </div>
-                    <div className="rounded-xl border border-white/30 bg-white/70 p-4 text-sm shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-[#0d1c33]/70">
-                        <dt className="font-medium text-slate-600 dark:text-slate-400">Revenue booked</dt>
-                        <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{formatCurrency(totalRevenue)}</dd>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/40">
+                        <dt className="font-medium text-slate-500 dark:text-slate-400">Revenue booked</dt>
+                        <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{formatCurrency(totalRevenue)}</dd>
                     </div>
                 </dl>
             </div>
