@@ -29,6 +29,7 @@ type GalleryRecord = {
     id: string;
     client: string;
     shootType: string;
+    deliveryDueDate?: string;
     deliveredAt?: string;
     status: GalleryStatus;
 };
@@ -112,12 +113,14 @@ const galleryCollection: GalleryRecord[] = [
         id: 'gal-01',
         client: 'Evelyn Sanders',
         shootType: 'Engagement Session',
+        deliveryDueDate: '2025-05-14',
         status: 'Pending'
     },
     {
         id: 'gal-02',
         client: 'Harrison & June',
         shootType: 'Wedding Weekend',
+        deliveryDueDate: '2025-05-27',
         status: 'Pending'
     },
     {
@@ -383,6 +386,100 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
         { id: 'invoices', label: 'Outstanding invoices', value: outstandingInvoiceCount.toString() }
     ];
 
+    const topClientsByRevenue = React.useMemo(
+        () => {
+            const revenueByClient = new Map<
+                string,
+                { total: number; projects: number; lastInvoiceDate?: string; statusLabel: string }
+            >();
+
+            invoiceList.forEach((invoice) => {
+                const existing = revenueByClient.get(invoice.client);
+                const clientDetails = clients.find((client) => client.name === invoice.client);
+
+                if (existing) {
+                    existing.total += invoice.amount;
+                    existing.projects += 1;
+
+                    if (!existing.lastInvoiceDate || dayjs(invoice.dueDate).isAfter(dayjs(existing.lastInvoiceDate))) {
+                        existing.lastInvoiceDate = invoice.dueDate;
+                    }
+                } else {
+                    revenueByClient.set(invoice.client, {
+                        total: invoice.amount,
+                        projects: 1,
+                        lastInvoiceDate: invoice.dueDate,
+                        statusLabel: clientDetails ? clientDetails.status : 'Past Client'
+                    });
+                }
+            });
+
+            return Array.from(revenueByClient.entries())
+                .map(([name, data]) => ({
+                    name,
+                    total: data.total,
+                    projects: data.projects,
+                    statusLabel: data.statusLabel,
+                    lastInvoiceLabel: data.lastInvoiceDate
+                        ? dayjs(data.lastInvoiceDate).format('MMM D, YYYY')
+                        : undefined
+                }))
+                .sort((first, second) => second.total - first.total)
+                .slice(0, 4);
+        },
+        [invoiceList]
+    );
+
+    const upcomingShootReminders = React.useMemo(
+        () => {
+            const referenceDate = currentMonth.startOf('day');
+
+            return bookingList
+                .filter((booking) => activeBookingStatuses.includes(booking.status))
+                .filter((booking) => {
+                    const bookingDate = dayjs(booking.date);
+                    return bookingDate.isSame(referenceDate, 'day') || bookingDate.isAfter(referenceDate);
+                })
+                .sort((first, second) => dayjs(first.date).valueOf() - dayjs(second.date).valueOf())
+                .slice(0, 4)
+                .map((booking) => {
+                    const bookingDate = dayjs(booking.date);
+                    return {
+                        ...booking,
+                        dateLabel: bookingDate.format('MMM D'),
+                        daysUntil: bookingDate.startOf('day').diff(referenceDate, 'day')
+                    };
+                });
+        },
+        [bookingList, currentMonth]
+    );
+
+    const galleryDeliveryDeadlines = React.useMemo(
+        () => {
+            const referenceDate = currentMonth.startOf('day');
+
+            return galleryCollection
+                .filter((gallery) => gallery.status === 'Pending' && gallery.deliveryDueDate)
+                .map((gallery) => {
+                    const dueDate = dayjs(gallery.deliveryDueDate as string);
+                    const daysRemaining = dueDate.startOf('day').diff(referenceDate, 'day');
+
+                    return {
+                        ...gallery,
+                        dueDateLabel: dueDate.format('MMM D'),
+                        daysRemaining,
+                        isOverdue: daysRemaining < 0
+                    };
+                })
+                .sort(
+                    (first, second) =>
+                        dayjs(first.deliveryDueDate as string).valueOf() -
+                        dayjs(second.deliveryDueDate as string).valueOf()
+                );
+        },
+        [currentMonth]
+    );
+
     return (
         <>
             <Head>
@@ -631,6 +728,139 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                         </SectionCard>
                                     </div>
                                 </div>
+
+                                <div className="grid gap-6 lg:grid-cols-3">
+                                    <SectionCard
+                                        title="Top Clients by Revenue"
+                                        description="Spot the relationships fueling your studio's growth."
+                                    >
+                                        {topClientsByRevenue.length > 0 ? (
+                                            <ul className="space-y-4">
+                                                {topClientsByRevenue.map((client) => (
+                                                    <li key={client.name} className="flex items-center justify-between gap-4">
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                {client.name}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                                {client.statusLabel} · {client.projects}{' '}
+                                                                {client.projects === 1 ? 'project' : 'projects'}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                {formatCurrency(client.total)}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                                {client.lastInvoiceLabel
+                                                                    ? `Last invoice ${client.lastInvoiceLabel}`
+                                                                    : 'No invoices yet'}
+                                                            </p>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">No invoice data yet.</p>
+                                        )}
+                                    </SectionCard>
+
+                                    <SectionCard
+                                        title="Upcoming Shoot Reminders"
+                                        description="Prep details for the next client milestones."
+                                    >
+                                        {upcomingShootReminders.length > 0 ? (
+                                            <ul className="space-y-4">
+                                                {upcomingShootReminders.map((reminder) => (
+                                                    <li
+                                                        key={reminder.id}
+                                                        className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                    {reminder.client}
+                                                                </p>
+                                                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                                    {reminder.shootType}
+                                                                </p>
+                                                            </div>
+                                                            <div className="text-right text-xs text-slate-500 dark:text-slate-400">
+                                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                    {reminder.dateLabel}
+                                                                </p>
+                                                                <p>{reminder.startTime}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                                            <span
+                                                                className={[
+                                                                    'inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold',
+                                                                    reminder.daysUntil <= 3
+                                                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                                                                        : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300'
+                                                                ].join(' ')}
+                                                            >
+                                                                {formatDaysUntil(reminder.daysUntil)}
+                                                            </span>
+                                                            <span className="text-slate-500 dark:text-slate-400">{reminder.location}</span>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                No upcoming shoots scheduled.
+                                            </p>
+                                        )}
+                                    </SectionCard>
+
+                                    <SectionCard
+                                        title="Gallery Delivery Deadlines"
+                                        description="Keep post-production commitments on schedule."
+                                    >
+                                        {galleryDeliveryDeadlines.length > 0 ? (
+                                            <ul className="space-y-4">
+                                                {galleryDeliveryDeadlines.map((gallery) => (
+                                                    <li
+                                                        key={gallery.id}
+                                                        className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-4">
+                                                            <div>
+                                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                    {gallery.client}
+                                                                </p>
+                                                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                                    {gallery.shootType}
+                                                                </p>
+                                                            </div>
+                                                            <div className="text-right text-xs">
+                                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                    {gallery.dueDateLabel}
+                                                                </p>
+                                                                <p
+                                                                    className={[
+                                                                        'font-semibold',
+                                                                        gallery.isOverdue
+                                                                            ? 'text-rose-600 dark:text-rose-400'
+                                                                            : 'text-emerald-600 dark:text-emerald-400'
+                                                                    ].join(' ')}
+                                                                >
+                                                                    {formatDeadline(gallery.daysRemaining)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                All galleries have been delivered.
+                                            </p>
+                                        )}
+                                    </SectionCard>
+                                </div>
                             </div>
                         </main>
                     </div>
@@ -803,6 +1033,35 @@ function buildYearlyAnalytics(
     }
 
     return result;
+}
+
+function formatDaysUntil(days: number): string {
+    if (days <= 0) {
+        return 'Today';
+    }
+
+    if (days === 1) {
+        return 'Tomorrow';
+    }
+
+    return `In ${days} days`;
+}
+
+function formatDeadline(daysRemaining: number): string {
+    if (daysRemaining < 0) {
+        const overdueBy = Math.abs(daysRemaining);
+        return `Overdue by ${overdueBy} day${overdueBy === 1 ? '' : 's'}`;
+    }
+
+    if (daysRemaining === 0) {
+        return 'Due today';
+    }
+
+    if (daysRemaining === 1) {
+        return 'Due tomorrow';
+    }
+
+    return `Due in ${daysRemaining} days`;
 }
 
 type EarningsProgressProps = {
