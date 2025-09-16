@@ -1,0 +1,86 @@
+{
+    "type": "CrmInvoices",
+    "items": [
+        {
+            "id": "1031",
+            "client": "Evelyn Sanders",
+            "project": "Engagement Session",
+            "amount": 1850,
+            "dueDate": "2025-05-06",
+            "status": "Sent"
+        },
+        {
+            "id": "1030",
+            "client": "Harrison & June",
+            "project": "Wedding Collection",
+            "amount": 5200,
+            "dueDate": "2025-05-18",
+            "status": "Overdue"
+        },
+        {
+            "id": "1029",
+            "client": "Sona Patel",
+            "project": "Brand Lifestyle Campaign",
+            "amount": 2400,
+            "dueDate": "2025-04-25",
+            "status": "Paid"
+        },
+        {
+            "id": "1028",
+            "client": "Fern & Pine Studio",
+            "project": "Lookbook Launch",
+            "amount": 1950,
+            "dueDate": "2025-04-08",
+            "status": "Paid"
+        },
+        {
+            "id": "1027",
+            "client": "Evergreen Architects",
+            "project": "Team Headshots",
+            "amount": 1650,
+            "dueDate": "2025-03-19",
+            "status": "Paid"
+        },
+        {
+            "id": "1026",
+            "client": "Violet & Thread",
+            "project": "Spring Collection",
+            "amount": 2100,
+            "dueDate": "2025-02-21",
+            "status": "Paid"
+        },
+        {
+            "id": "1025",
+            "client": "Atlas Fitness",
+            "project": "Brand Campaign",
+            "amount": 2850,
+            "dueDate": "2025-01-29",
+            "status": "Paid"
+        },
+        {
+            "id": "1024",
+            "client": "Harbor & Co",
+            "project": "Product Launch",
+            "amount": 2600,
+            "dueDate": "2024-12-12",
+            "status": "Paid"
+        },
+        {
+            "id": "1023",
+            "client": "Lumen Studio",
+            "project": "Agency Portfolio",
+            "amount": 3400,
+            "dueDate": "2024-11-16",
+            "status": "Paid"
+        },
+        {
+            "id": "1022",
+            "client": "Beacon Realty",
+            "project": "Property Showcase",
+            "amount": 1750,
+            "dueDate": "2024-10-05",
+            "status": "Paid"
+        }
+    ]
+}
+

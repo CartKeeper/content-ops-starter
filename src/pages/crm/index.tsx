@@ -1,4 +1,7 @@
 import * as React from 'react';
+import fs from 'fs/promises';
+import path from 'path';
+import type { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -30,128 +33,16 @@ type GalleryRecord = {
     status: GalleryStatus;
 };
 
-const bookingCollection: BookingRecord[] = [
-    {
-        id: 'bk-01',
-        client: 'Evelyn Sanders',
-        shootType: 'Engagement Session',
-        date: '2025-05-11',
-        startTime: '3:00 PM',
-        endTime: '5:00 PM',
-        location: 'Golden Gate Park',
-        status: 'Confirmed'
-    },
-    {
-        id: 'bk-02',
-        client: 'Harrison & June',
-        shootType: 'Wedding Weekend',
-        date: '2025-05-18',
-        startTime: '11:00 AM',
-        endTime: '8:00 PM',
-        location: 'Terranea Resort',
-        status: 'Pending'
-    },
-    {
-        id: 'bk-03',
-        client: 'Sona Patel',
-        shootType: 'Brand Lifestyle',
-        date: '2025-05-21',
-        startTime: '9:00 AM',
-        endTime: '12:00 PM',
-        location: 'Downtown Studio',
-        status: 'Editing'
-    },
-    {
-        id: 'bk-04',
-        client: 'Fern & Pine Studio',
-        shootType: 'Lookbook Launch',
-        date: '2025-06-08',
-        startTime: '10:00 AM',
-        endTime: '2:00 PM',
-        location: 'Mission District Loft',
-        status: 'Pending'
-    },
-    {
-        id: 'bk-05',
-        client: 'Evergreen Architects',
-        shootType: 'Team Headshots',
-        date: '2025-05-29',
-        startTime: '1:00 PM',
-        endTime: '4:00 PM',
-        location: 'Financial District HQ',
-        status: 'Confirmed'
-    },
-    {
-        id: 'bk-06',
-        client: 'Evergreen Architects',
-        shootType: 'Site Progress',
-        date: '2025-03-16',
-        startTime: '8:00 AM',
-        endTime: '11:00 AM',
-        location: 'Oakland Waterfront',
-        status: 'Confirmed'
-    },
-    {
-        id: 'bk-07',
-        client: 'Atlas Fitness',
-        shootType: 'Campaign Refresh',
-        date: '2025-02-19',
-        startTime: '7:00 AM',
-        endTime: '10:00 AM',
-        location: 'SOMA Studio',
-        status: 'Editing'
-    },
-    {
-        id: 'bk-08',
-        client: 'Violet & Thread',
-        shootType: 'Spring Collection',
-        date: '2025-01-27',
-        startTime: '9:00 AM',
-        endTime: '1:00 PM',
-        location: 'Dogpatch Warehouse',
-        status: 'Confirmed'
-    },
-    {
-        id: 'bk-09',
-        client: 'Harbor & Co',
-        shootType: 'Product Launch',
-        date: '2024-12-03',
-        startTime: '10:00 AM',
-        endTime: '12:00 PM',
-        location: 'Sausalito Studio',
-        status: 'Confirmed'
-    },
-    {
-        id: 'bk-10',
-        client: 'Lumen Studio',
-        shootType: 'Agency Portfolio',
-        date: '2024-11-18',
-        startTime: '1:00 PM',
-        endTime: '5:00 PM',
-        location: 'North Beach Loft',
-        status: 'Editing'
-    },
-    {
-        id: 'bk-11',
-        client: 'Beacon Realty',
-        shootType: 'Property Showcase',
-        date: '2024-10-09',
-        startTime: '9:30 AM',
-        endTime: '12:30 PM',
-        location: 'Pacific Heights Residence',
-        status: 'Confirmed'
-    },
-    {
-        id: 'bk-12',
-        client: 'Sona Patel',
-        shootType: 'Holiday Campaign',
-        date: '2024-09-14',
-        startTime: '2:00 PM',
-        endTime: '6:00 PM',
-        location: 'Marin Headlands',
-        status: 'Confirmed'
-    }
-];
+
+type CmsCollection<T> = {
+    items?: T[];
+};
+
+type PhotographyCrmDashboardProps = {
+    bookings: BookingRecord[];
+    invoices: InvoiceRecord[];
+};
+
 
 const clients: ClientRecord[] = [
     {
@@ -215,88 +106,6 @@ const clients: ClientRecord[] = [
     }
 ];
 
-const invoiceCollection: InvoiceRecord[] = [
-    {
-        id: '1031',
-        client: 'Evelyn Sanders',
-        project: 'Engagement Session',
-        amount: 1850,
-        dueDate: '2025-05-06',
-        status: 'Sent'
-    },
-    {
-        id: '1030',
-        client: 'Harrison & June',
-        project: 'Wedding Collection',
-        amount: 5200,
-        dueDate: '2025-05-18',
-        status: 'Overdue'
-    },
-    {
-        id: '1029',
-        client: 'Sona Patel',
-        project: 'Brand Lifestyle Campaign',
-        amount: 2400,
-        dueDate: '2025-04-25',
-        status: 'Paid'
-    },
-    {
-        id: '1028',
-        client: 'Fern & Pine Studio',
-        project: 'Lookbook Launch',
-        amount: 1950,
-        dueDate: '2025-04-08',
-        status: 'Paid'
-    },
-    {
-        id: '1027',
-        client: 'Evergreen Architects',
-        project: 'Team Headshots',
-        amount: 1650,
-        dueDate: '2025-03-19',
-        status: 'Paid'
-    },
-    {
-        id: '1026',
-        client: 'Violet & Thread',
-        project: 'Spring Collection',
-        amount: 2100,
-        dueDate: '2025-02-21',
-        status: 'Paid'
-    },
-    {
-        id: '1025',
-        client: 'Atlas Fitness',
-        project: 'Brand Campaign',
-        amount: 2850,
-        dueDate: '2025-01-29',
-        status: 'Paid'
-    },
-    {
-        id: '1024',
-        client: 'Harbor & Co',
-        project: 'Product Launch',
-        amount: 2600,
-        dueDate: '2024-12-12',
-        status: 'Paid'
-    },
-    {
-        id: '1023',
-        client: 'Lumen Studio',
-        project: 'Agency Portfolio',
-        amount: 3400,
-        dueDate: '2024-11-16',
-        status: 'Paid'
-    },
-    {
-        id: '1022',
-        client: 'Beacon Realty',
-        project: 'Property Showcase',
-        amount: 1750,
-        dueDate: '2024-10-05',
-        status: 'Paid'
-    }
-];
 
 const galleryCollection: GalleryRecord[] = [
     {
@@ -409,7 +218,7 @@ const navigationItems = [
     { id: 'settings', label: 'Settings', href: '#' }
 ];
 
-export default function PhotographyCrmDashboard() {
+export default function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboardProps) {
     const [isDarkMode, setIsDarkMode] = React.useState<boolean | null>(null);
     const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
     const userMenuRef = React.useRef<HTMLDivElement | null>(null);
@@ -456,12 +265,15 @@ export default function PhotographyCrmDashboard() {
         setIsDarkMode((previous) => (previous === null ? true : !previous));
     };
 
+    const bookingList = React.useMemo(() => (Array.isArray(bookings) ? bookings : []), [bookings]);
+    const invoiceList = React.useMemo(() => (Array.isArray(invoices) ? invoices : []), [invoices]);
+
     const sortedInvoices = React.useMemo(
         () =>
-            invoiceCollection
+            invoiceList
                 .slice()
                 .sort((first, second) => dayjs(first.dueDate).valueOf() - dayjs(second.dueDate).valueOf()),
-        []
+        [invoiceList]
     );
 
     const currentMonth = sortedInvoices.length
@@ -469,24 +281,24 @@ export default function PhotographyCrmDashboard() {
         : dayjs().startOf('month');
     const previousMonth = currentMonth.subtract(1, 'month');
 
-    const revenueThisMonth = sumInvoicesForMonth(invoiceCollection, currentMonth);
-    const revenuePreviousMonth = sumInvoicesForMonth(invoiceCollection, previousMonth);
+    const revenueThisMonth = sumInvoicesForMonth(invoiceList, currentMonth);
+    const revenuePreviousMonth = sumInvoicesForMonth(invoiceList, previousMonth);
     const revenueChange = calculatePercentChange(revenueThisMonth, revenuePreviousMonth);
 
     const activeBookingStatuses: BookingStatus[] = ['Confirmed', 'Pending'];
 
-    const upcomingShootsCurrent = bookingCollection.filter(
+    const upcomingShootsCurrent = bookingList.filter(
         (booking) => activeBookingStatuses.includes(booking.status) && dayjs(booking.date).isSame(currentMonth, 'month')
     ).length;
-    const upcomingShootsPrevious = bookingCollection.filter(
+    const upcomingShootsPrevious = bookingList.filter(
         (booking) => activeBookingStatuses.includes(booking.status) && dayjs(booking.date).isSame(previousMonth, 'month')
     ).length;
     const upcomingChange = calculatePercentChange(upcomingShootsCurrent, upcomingShootsPrevious);
 
-    const outstandingAmountCurrent = invoiceCollection
+    const outstandingAmountCurrent = invoiceList
         .filter((invoice) => invoice.status !== 'Paid' && dayjs(invoice.dueDate).isSame(currentMonth, 'month'))
         .reduce((total, invoice) => total + invoice.amount, 0);
-    const outstandingAmountPrevious = invoiceCollection
+    const outstandingAmountPrevious = invoiceList
         .filter((invoice) => invoice.status !== 'Paid' && dayjs(invoice.dueDate).isSame(previousMonth, 'month'))
         .reduce((total, invoice) => total + invoice.amount, 0);
     const outstandingChange = calculatePercentChange(outstandingAmountCurrent, outstandingAmountPrevious);
@@ -520,7 +332,7 @@ export default function PhotographyCrmDashboard() {
 
     const upcomingBookings = React.useMemo(
         () =>
-            bookingCollection
+            bookingList
                 .filter(
                     (booking) =>
                         activeBookingStatuses.includes(booking.status) &&
@@ -528,20 +340,20 @@ export default function PhotographyCrmDashboard() {
                 )
                 .sort((first, second) => dayjs(first.date).valueOf() - dayjs(second.date).valueOf())
                 .slice(0, 5),
-        [currentMonth]
+        [bookingList, currentMonth]
     );
 
     const openInvoices = React.useMemo(
         () =>
-            invoiceCollection
+            invoiceList
                 .filter((invoice) => invoice.status !== 'Paid')
                 .sort((first, second) => dayjs(first.dueDate).valueOf() - dayjs(second.dueDate).valueOf()),
-        []
+        [invoiceList]
     );
 
     const analyticsData = React.useMemo(
-        () => buildAnalytics(currentMonth, bookingCollection, invoiceCollection),
-        [currentMonth]
+        () => buildAnalytics(currentMonth, bookingList, invoiceList),
+        [bookingList, currentMonth, invoiceList]
     );
 
     const deliveredGalleries = galleryCollection.filter((gallery) => gallery.status === 'Delivered').length;
@@ -554,10 +366,10 @@ export default function PhotographyCrmDashboard() {
         .map((gallery) => gallery.client);
 
     const totalClients = clients.filter((client) => client.status !== 'Archived').length;
-    const shootsThisYear = bookingCollection.filter((booking) => dayjs(booking.date).year() === currentMonth.year()).length;
+    const shootsThisYear = bookingList.filter((booking) => dayjs(booking.date).year() === currentMonth.year()).length;
     const outstandingInvoiceCount = openInvoices.length;
 
-    const paidRevenue = invoiceCollection
+    const paidRevenue = invoiceList
         .filter((invoice) => invoice.status === 'Paid')
         .reduce((total, invoice) => total + invoice.amount, 0);
     const earningsGoal = 85000;
@@ -827,6 +639,44 @@ export default function PhotographyCrmDashboard() {
         </>
     );
 }
+
+async function readCmsCollection<T>(fileName: string): Promise<T[]> {
+    const filePath = path.join(process.cwd(), 'content', 'data', fileName);
+
+    try {
+        const raw = await fs.readFile(filePath, 'utf-8');
+        const parsed = JSON.parse(raw) as CmsCollection<T> | T[];
+
+        if (Array.isArray(parsed)) {
+            return parsed as T[];
+        }
+
+        if (parsed && typeof parsed === 'object') {
+            const items = (parsed as CmsCollection<T>).items;
+            if (Array.isArray(items)) {
+                return items as T[];
+            }
+        }
+    } catch (error) {
+        return [];
+    }
+
+    return [];
+}
+
+export const getStaticProps: GetStaticProps<PhotographyCrmDashboardProps> = async () => {
+    const [bookings, invoices] = await Promise.all([
+        readCmsCollection<BookingRecord>('crm-bookings.json'),
+        readCmsCollection<InvoiceRecord>('crm-invoices.json')
+    ]);
+
+    return {
+        props: {
+            bookings,
+            invoices
+        }
+    };
+};
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
