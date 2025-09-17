@@ -33,8 +33,16 @@ import {
 } from '../../components/crm/icons';
 import { QuickActionModal, type QuickActionFormField, type QuickActionModalSubmitValues } from '../../components/crm/QuickActionModal';
 import type { QuickActionModalType } from '../../components/crm/quick-action-settings';
-import { clients, galleryCollection, tasks, type GalleryRecord, type GalleryStatus } from '../../data/crm';
+import {
+    clients,
+    galleryCollection,
+    tasks,
+    type GalleryAsset,
+    type GalleryRecord,
+    type GalleryStatus
+} from '../../data/crm';
 import { readCmsCollection } from '../../utils/read-cms-collection';
+import { formatBytes } from '../../utils/format-bytes';
 
 const quickActions: { id: string; label: string; modal: QuickActionModalType }[] = [
     { id: 'new-booking', label: 'Schedule shoot', modal: 'booking' },
@@ -67,7 +75,23 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
     const [invoiceList, setInvoiceList] = React.useState<InvoiceRecord[]>(() =>
         Array.isArray(invoices) ? invoices : []
     );
-    const [galleryList, setGalleryList] = React.useState<GalleryRecord[]>(() => [...galleryCollection]);
+    const [galleryList, setGalleryList] = React.useState<GalleryRecord[]>(() =>
+        galleryCollection.map((gallery) => {
+            const totalBytes = gallery.totalStorageBytes ?? 0;
+            const formatted = gallery.totalStorageFormatted ?? formatBytes(totalBytes);
+            return {
+                ...gallery,
+                totalStorageBytes: totalBytes,
+                totalStorageFormatted: formatted,
+                storageSummary:
+                    gallery.storageSummary ?? {
+                        assetCount: gallery.assets?.length ?? 0,
+                        totalBytes,
+                        formattedTotal: formatted
+                    }
+            } satisfies GalleryRecord;
+        })
+    );
     const [activeModal, setActiveModal] = React.useState<QuickActionModalType | null>(null);
 
     React.useEffect(() => {
@@ -194,6 +218,13 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                 required: true
             },
             {
+                id: 'projectCode',
+                label: 'Project code',
+                inputType: 'text',
+                placeholder: 'harrison-june-2025',
+                helperText: 'Used to reconcile Dropbox uploads and avoid duplicates.'
+            },
+            {
                 id: 'status',
                 label: 'Status',
                 inputType: 'select',
@@ -215,11 +246,29 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                 inputType: 'date'
             },
             {
+                id: 'assets',
+                label: 'Gallery assets',
+                inputType: 'file-uploader',
+                helperText: 'Upload photos or videos directly to Supabase Storage.',
+                uploaderOptions: {
+                    variant: 'gallery-assets',
+                    accept: ['image/*', 'video/*'],
+                    maxFileSizeMb: 500
+                }
+            },
+            {
                 id: 'coverImage',
                 label: 'Cover image URL',
                 inputType: 'url',
-                placeholder: 'https://example.com/cover.jpg',
-                helperText: 'Optional hero image shown in the gallery card.'
+                placeholder: 'Optional override for gallery card imagery.',
+                helperText: 'Defaults to the first uploaded asset.'
+            },
+            {
+                id: 'dropboxSyncCursor',
+                label: 'Dropbox sync cursor',
+                inputType: 'text',
+                placeholder: 'Cursor or checkpoint for Dropbox automation',
+                helperText: 'Stored with the gallery to deduplicate future webhook batches.'
             }
         ],
         [clientOptions]
@@ -358,15 +407,43 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
             const clientName = (values.client as string) || clientOptions[0]?.value || 'New Client';
             const shootType = (values.shootType as string) || 'New Collection';
             const status = (values.status as GalleryStatus) || 'Pending';
+            const projectCode = typeof values.projectCode === 'string' ? values.projectCode.trim() : undefined;
             const deliveryDueDate = values.deliveryDueDate as string | undefined;
             const deliveredAt = values.deliveredAt as string | undefined;
-            const coverImage = values.coverImage as string | undefined;
+            const dropboxSyncCursor =
+                typeof values.dropboxSyncCursor === 'string' ? values.dropboxSyncCursor.trim() || null : null;
+
+            const uploadedAssets = Array.isArray(values.assets) ? (values.assets as GalleryAsset[]) : [];
+
+            if (uploadedAssets.length === 0) {
+                throw new Error('Upload at least one asset to create a gallery.');
+            }
+
+            const totalStorageBytes = uploadedAssets.reduce((total, asset) => {
+                return total + (typeof asset.size === 'number' ? Math.max(0, asset.size) : 0);
+            }, 0);
+            const totalStorageFormatted = formatBytes(totalStorageBytes);
+
+            const coverImageOverride =
+                typeof values.coverImage === 'string' && values.coverImage.trim() ? values.coverImage.trim() : undefined;
+            const primaryCover = coverImageOverride || uploadedAssets[0]?.publicUrl;
 
             const recordPayload: Record<string, unknown> = {
                 client: clientName,
                 shootType,
                 status,
-                customFields: values.customFields
+                projectCode,
+                assets: uploadedAssets,
+                totalStorageBytes,
+                totalStorageFormatted,
+                dropboxSyncCursor,
+                coverImage: primaryCover,
+                customFields: values.customFields,
+                storageSummary: {
+                    assetCount: uploadedAssets.length,
+                    totalBytes: totalStorageBytes,
+                    formattedTotal: totalStorageFormatted
+                }
             };
 
             if (deliveryDueDate) {
@@ -375,14 +452,29 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
 
             if (status === 'Delivered') {
                 recordPayload.deliveredAt = deliveredAt || deliveryDueDate || dayjs().format('YYYY-MM-DD');
-            }
-
-            if (coverImage) {
-                recordPayload.coverImage = coverImage;
+            } else if (deliveredAt) {
+                recordPayload.deliveredAt = deliveredAt;
             }
 
             const created = await createRecord<GalleryRecord>('galleries', recordPayload);
-            setGalleryList((previous) => [...previous, created]);
+            const normalizedTotal = created.totalStorageBytes ?? totalStorageBytes;
+            const normalizedFormatted = created.totalStorageFormatted ?? formatBytes(normalizedTotal);
+            const normalizedSummary =
+                created.storageSummary ?? {
+                    assetCount: created.assets?.length ?? uploadedAssets.length,
+                    totalBytes: normalizedTotal,
+                    formattedTotal: normalizedFormatted
+                };
+
+            setGalleryList((previous) => [
+                ...previous,
+                {
+                    ...created,
+                    totalStorageBytes: normalizedTotal,
+                    totalStorageFormatted: normalizedFormatted,
+                    storageSummary: normalizedSummary
+                }
+            ]);
         },
         [clientOptions, createRecord]
     );

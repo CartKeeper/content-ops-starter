@@ -32,6 +32,7 @@ import {
 import { galleryCollection, clients, projectPipeline } from '../../data/crm';
 import { readCmsCollection } from '../../utils/read-cms-collection';
 import { useQuickActionSettings } from '../../components/crm/quick-action-settings';
+import { formatBytes } from '../../utils/format-bytes';
 
 import type { ProjectRecord, ProjectMilestone, GalleryRecord } from '../../data/crm';
 
@@ -648,6 +649,12 @@ function GalleriesModule({ galleries }: GalleriesModuleProps) {
     const delivered = galleries.filter((gallery) => gallery.status === 'Delivered').length;
     const pending = galleries.filter((gallery) => gallery.status === 'Pending').length;
     const completion = galleries.length ? Math.round((delivered / galleries.length) * 100) : 0;
+    const totalStorageBytes = galleries.reduce((total, gallery) => total + (gallery.totalStorageBytes ?? 0), 0);
+    const totalAssets = galleries.reduce(
+        (total, gallery) => total + (gallery.storageSummary?.assetCount ?? gallery.assets?.length ?? 0),
+        0
+    );
+    const formattedStorage = formatBytes(totalStorageBytes);
 
     return (
         <section className="relative space-y-6 pb-20">
@@ -668,6 +675,9 @@ function GalleriesModule({ galleries }: GalleriesModuleProps) {
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-indigo-200/70 px-3 py-1 font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200">
                             {completion}% complete
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-200/70 px-3 py-1 font-semibold text-slate-600 dark:bg-slate-800/50 dark:text-slate-200">
+                            {totalAssets} assets · {formattedStorage}
                         </span>
                     </div>
                 </div>
@@ -693,6 +703,10 @@ function GalleriesModule({ galleries }: GalleriesModuleProps) {
                                     {gallery.status === 'Delivered'
                                         ? `Delivered ${dayjs(gallery.deliveredAt).format('MMM D, YYYY')}`
                                         : `Due ${dayjs(gallery.deliveryDueDate).format('MMM D, YYYY')}`}
+                                </p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500">
+                                    {gallery.storageSummary?.assetCount ?? gallery.assets?.length ?? 0} assets ·{' '}
+                                    {gallery.storageSummary?.formattedTotal ?? formatBytes(gallery.totalStorageBytes ?? 0)}
                                 </p>
                             </div>
                         </article>

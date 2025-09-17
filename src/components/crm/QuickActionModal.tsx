@@ -7,6 +7,8 @@ import {
     QuickActionModalType,
     useQuickActionSettings
 } from './quick-action-settings';
+import { GalleryUploader } from './GalleryUploader';
+import type { GalleryAsset } from '../../data/crm';
 
 type BaseFieldType =
     | 'text'
@@ -16,18 +18,24 @@ type BaseFieldType =
     | 'time'
     | 'number'
     | 'url'
-    | 'checkbox';
+    | 'checkbox'
+    | 'file-uploader';
 
 export type QuickActionFormField = {
     id: string;
     label: string;
     inputType: BaseFieldType;
     placeholder?: string;
-    defaultValue?: string | number | boolean;
+    defaultValue?: unknown;
     helperText?: string;
     required?: boolean;
     options?: { value: string; label: string }[];
     step?: number;
+    uploaderOptions?: {
+        variant: 'gallery-assets' | 'generic';
+        accept?: string[];
+        maxFileSizeMb?: number;
+    };
 };
 
 type InternalField = QuickActionFormField & {
@@ -38,7 +46,7 @@ type InternalField = QuickActionFormField & {
 
 export type QuickActionModalSubmitValues = {
     customFields: Record<string, string | boolean>;
-    [key: string]: string | number | boolean | undefined | Record<string, string | boolean>;
+    [key: string]: unknown;
 };
 
 type QuickActionModalProps = {
@@ -90,9 +98,7 @@ export function QuickActionModal({
         return [...mappedBase, ...mappedDynamic];
     }, [baseFields, dynamicFields]);
 
-    const [formValues, setFormValues] = React.useState<Record<string, string | number | boolean>>(() =>
-        initializeValues(fields)
-    );
+    const [formValues, setFormValues] = React.useState<Record<string, unknown>>(() => initializeValues(fields));
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
 
@@ -126,7 +132,7 @@ export function QuickActionModal({
         focusInitialField();
     }, [focusInitialField, fields]);
 
-    const handleChange = (field: InternalField, value: string | number | boolean) => {
+    const handleChange = (field: InternalField, value: unknown) => {
         setFormValues((previous) => ({ ...previous, [field.fieldKey]: value }));
     };
 
@@ -144,11 +150,13 @@ export function QuickActionModal({
                 if (field.dynamic) {
                     if (field.originalDynamicField) {
                         const dynamicId = field.originalDynamicField.id;
-                        if (
-                            typeof currentValue === 'boolean' ||
-                            (currentValue !== '' && currentValue !== undefined && currentValue !== null)
-                        ) {
-                            submitValues.customFields[dynamicId] = currentValue as string | boolean;
+                        if (typeof currentValue === 'boolean') {
+                            submitValues.customFields[dynamicId] = currentValue;
+                        } else if (typeof currentValue === 'string') {
+                            const trimmed = currentValue.trim();
+                            if (trimmed) {
+                                submitValues.customFields[dynamicId] = trimmed;
+                            }
                         }
                     }
                 } else {
@@ -222,6 +230,7 @@ export function QuickActionModal({
                                         key={field.fieldKey}
                                         field={field}
                                         value={formValues[field.fieldKey]}
+                                        allValues={formValues}
                                         onChange={(value) => handleChange(field, value)}
                                     />
                                 ))}
@@ -254,11 +263,12 @@ export function QuickActionModal({
 
 type FieldInputProps = {
     field: InternalField;
-    value: string | number | boolean;
-    onChange: (value: string | number | boolean) => void;
+    value: unknown;
+    allValues: Record<string, unknown>;
+    onChange: (value: unknown) => void;
 };
 
-function FieldInput({ field, value, onChange }: FieldInputProps) {
+function FieldInput({ field, value, allValues, onChange }: FieldInputProps) {
     const inputId = `field-${field.fieldKey}`;
     const helperId = `${inputId}-helper`;
 
@@ -340,6 +350,30 @@ function FieldInput({ field, value, onChange }: FieldInputProps) {
                 </label>
             );
             break;
+        case 'file-uploader':
+            if (field.uploaderOptions?.variant === 'gallery-assets') {
+                control = (
+                    <GalleryUploader
+                        value={Array.isArray(value) ? (value as GalleryAsset[]) : []}
+                        onChange={(assets) => onChange(assets)}
+                        context={{
+                            client: typeof allValues.client === 'string' ? allValues.client : undefined,
+                            projectCode: typeof allValues.projectCode === 'string' ? allValues.projectCode : undefined,
+                            shootType: typeof allValues.shootType === 'string' ? allValues.shootType : undefined
+                        }}
+                        helperText={field.helperText}
+                        accept={field.uploaderOptions.accept}
+                        maxFileSizeMb={field.uploaderOptions.maxFileSizeMb}
+                    />
+                );
+            } else {
+                control = (
+                    <p className="rounded-xl border border-dashed border-slate-300 bg-white/60 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                        File uploader variant not configured.
+                    </p>
+                );
+            }
+            break;
         default:
             control = (
                 <input
@@ -373,9 +407,9 @@ function FieldInput({ field, value, onChange }: FieldInputProps) {
 }
 
 function initializeValues(fields: InternalField[]) {
-    return fields.reduce<Record<string, string | number | boolean>>((accumulator, field) => {
+    return fields.reduce<Record<string, unknown>>((accumulator, field) => {
         if (field.defaultValue !== undefined) {
-            accumulator[field.fieldKey] = field.defaultValue as string | number | boolean;
+            accumulator[field.fieldKey] = field.defaultValue;
         } else if (field.inputType === 'checkbox') {
             accumulator[field.fieldKey] = false;
         } else {
@@ -386,16 +420,16 @@ function initializeValues(fields: InternalField[]) {
 }
 
 function synchronizeValues(
-    previous: Record<string, string | number | boolean>,
+    previous: Record<string, unknown>,
     fields: InternalField[]
-): Record<string, string | number | boolean> {
-    const next: Record<string, string | number | boolean> = {};
+): Record<string, unknown> {
+    const next: Record<string, unknown> = {};
 
     fields.forEach((field) => {
         if (Object.prototype.hasOwnProperty.call(previous, field.fieldKey)) {
             next[field.fieldKey] = previous[field.fieldKey];
         } else if (field.defaultValue !== undefined) {
-            next[field.fieldKey] = field.defaultValue as string | number | boolean;
+            next[field.fieldKey] = field.defaultValue;
         } else if (field.inputType === 'checkbox') {
             next[field.fieldKey] = false;
         } else {

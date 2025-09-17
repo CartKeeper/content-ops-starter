@@ -5,14 +5,45 @@ import type { TaskRecord } from '../components/crm/TaskList';
 
 export type GalleryStatus = 'Delivered' | 'Pending';
 
+export type GalleryAsset = {
+    id: string;
+    fileName: string;
+    contentType: string;
+    size: number;
+    storageBucket: string;
+    storagePath: string;
+    publicUrl: string;
+    checksum?: string | null;
+    uploadedAt?: string;
+    duplicateOf?: string | null;
+    isDuplicate?: boolean;
+    clientId?: string | null;
+    projectCode?: string | null;
+    dropboxFileId?: string | null;
+    dropboxRevision?: string | null;
+};
+
+export type GalleryStorageSummary = {
+    assetCount: number;
+    totalBytes: number;
+    formattedTotal: string;
+};
+
 export type GalleryRecord = {
     id: string;
     client: string;
     shootType: string;
+    projectCode?: string | null;
     deliveryDueDate?: string;
     deliveredAt?: string;
     status: GalleryStatus;
     coverImage?: string;
+    assets?: GalleryAsset[];
+    totalStorageBytes?: number;
+    totalStorageFormatted?: string;
+    storageSummary?: GalleryStorageSummary;
+    dropboxSyncCursor?: string | null;
+    dropboxFiles?: string[];
     customFields?: Record<string, string | boolean>;
 };
 
@@ -113,7 +144,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Engagement Session',
         deliveryDueDate: '2025-05-14',
         status: 'Pending',
-        coverImage: '/images/main-hero.jpg'
+        coverImage: '/images/main-hero.jpg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-02',
@@ -121,7 +156,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Wedding Weekend',
         deliveryDueDate: '2025-05-27',
         status: 'Pending',
-        coverImage: '/images/hero3.svg'
+        coverImage: '/images/hero3.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-03',
@@ -129,7 +168,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Brand Lifestyle Campaign',
         deliveredAt: '2025-04-28',
         status: 'Delivered',
-        coverImage: '/images/abstract-feature1.svg'
+        coverImage: '/images/abstract-feature1.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-04',
@@ -137,7 +180,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Lookbook Launch',
         deliveredAt: '2025-04-10',
         status: 'Delivered',
-        coverImage: '/images/abstract-feature2.svg'
+        coverImage: '/images/abstract-feature2.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-05',
@@ -145,7 +192,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Team Headshots',
         deliveredAt: '2025-03-23',
         status: 'Delivered',
-        coverImage: '/images/abstract-feature3.svg'
+        coverImage: '/images/abstract-feature3.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-06',
@@ -153,7 +204,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Spring Collection',
         deliveredAt: '2025-02-24',
         status: 'Delivered',
-        coverImage: '/images/hero2.svg'
+        coverImage: '/images/hero2.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-07',
@@ -161,7 +216,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Brand Campaign',
         deliveredAt: '2025-02-02',
         status: 'Delivered',
-        coverImage: '/images/hero.svg'
+        coverImage: '/images/hero.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-08',
@@ -169,7 +228,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Product Launch',
         deliveredAt: '2024-12-18',
         status: 'Delivered',
-        coverImage: '/images/abstract-background.svg'
+        coverImage: '/images/abstract-background.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-09',
@@ -177,7 +240,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Agency Portfolio',
         deliveredAt: '2024-11-23',
         status: 'Delivered',
-        coverImage: '/images/background-grid.svg'
+        coverImage: '/images/background-grid.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-10',
@@ -185,7 +252,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Property Showcase',
         deliveredAt: '2024-10-12',
         status: 'Delivered',
-        coverImage: '/images/hero2.svg'
+        coverImage: '/images/hero2.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     }
 ];
 

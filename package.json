@@ -17,6 +17,7 @@
         "algoliasearch": "^4.24.0",
         "classnames": "^2.5.1",
         "dayjs": "^1.11.11",
+        "formidable": "^3.5.4",
         "framer-motion": "^12.23.13",
         "front-matter": "^4.0.2",
         "glob": "^10.4.2",
