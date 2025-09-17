@@ -12,9 +12,12 @@ import {
     type GalleryRecord
 } from '../../data/crm';
 import { CarouselGallery, LightboxGallery, PinterestMasonryGrid } from '../../components/gallery';
+import type { InvoiceRecord, InvoiceStatus } from '../../types/invoice';
+import { readCmsCollection } from '../../utils/read-cms-collection';
 
 type GalleryPortalPageProps = {
     gallery: GalleryRecord;
+    invoices: InvoiceRecord[];
 };
 
 type AuthFormElements = HTMLFormElement & {
@@ -65,7 +68,22 @@ const formatDate = (value?: string) => {
     return parsed.isValid() ? parsed.format('MMM D, YYYY') : value;
 };
 
-const GalleryPortalPage: NextPage<InferGetStaticPropsType<typeof getStaticProps>> = ({ gallery }) => {
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2
+});
+
+const statusBadgeStyles: Record<InvoiceStatus, string> = {
+    Draft: 'bg-slate-200 text-slate-700',
+    Sent: 'bg-indigo-100 text-indigo-700',
+    Paid: 'bg-emerald-100 text-emerald-700',
+    Overdue: 'bg-rose-100 text-rose-700'
+};
+
+const getInvoiceTotal = (invoice: InvoiceRecord) => invoice.amount ?? invoice.totals?.total ?? 0;
+
+const GalleryPortalPage: NextPage<InferGetStaticPropsType<typeof getStaticProps>> = ({ gallery, invoices }) => {
     const router = useRouter();
 
     const assets: GalleryAsset[] = React.useMemo(() => gallery.assets ?? [], [gallery.assets]);
@@ -145,6 +163,10 @@ const GalleryPortalPage: NextPage<InferGetStaticPropsType<typeof getStaticProps>
 
     const heroImage = gallery.coverImage ?? '/images/main-hero.jpg';
     const welcomeMessage = gallery.portalSettings?.welcomeMessage;
+    const hasInvoices = invoices.length > 0;
+    const outstandingTotal = invoices
+        .filter((invoice) => invoice.status !== 'Paid')
+        .reduce((total, invoice) => total + getInvoiceTotal(invoice), 0);
 
     const statusItems = [
         { label: 'Shoot type', value: gallery.shootType },
@@ -268,6 +290,87 @@ const GalleryPortalPage: NextPage<InferGetStaticPropsType<typeof getStaticProps>
                             </div>
                         </div>
                     </section>
+
+                    <section className="px-6 pb-24 sm:px-10">
+                        <div className="mx-auto max-w-6xl rounded-3xl border border-white/5 bg-white/95 p-8 text-slate-900 shadow-2xl">
+                            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Billing &amp; payments</p>
+                                    <h2 className="mt-2 text-2xl font-semibold text-slate-900">Invoices &amp; receipts</h2>
+                                    <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                                        Download your studio invoices, review payment status, and complete any open balances with a
+                                        single click.
+                                    </p>
+                                </div>
+                                {outstandingTotal > 0 ? (
+                                    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-right shadow-sm">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
+                                            Outstanding
+                                        </p>
+                                        <p className="mt-2 text-xl font-semibold text-slate-900">
+                                            {currencyFormatter.format(outstandingTotal)}
+                                        </p>
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            {hasInvoices ? (
+                                <ul className="mt-8 space-y-4">
+                                    {invoices.map((invoice, index) => {
+                                        const key = invoice.id ?? `invoice-${index}`;
+                                        const totalLabel = currencyFormatter.format(getInvoiceTotal(invoice));
+                                        const paymentLink = invoice.paymentLink;
+                                        const pdfUrl = invoice.pdfUrl;
+                                        const statusClass = statusBadgeStyles[invoice.status];
+                                        const invoiceLabel = invoice.id ? `Invoice ${invoice.id}` : `Invoice #${index + 1}`;
+                                        return (
+                                            <li
+                                                key={key}
+                                                className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
+                                            >
+                                                <div>
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
+                                                        {invoiceLabel}
+                                                    </p>
+                                                    <p className="mt-2 text-lg font-semibold text-slate-900">{totalLabel}</p>
+                                                    <p className="text-sm text-slate-500">Due {formatDate(invoice.dueDate)}</p>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
+                                                        {invoice.status}
+                                                    </span>
+                                                    {pdfUrl ? (
+                                                        <a
+                                                            href={pdfUrl}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="rounded-full border border-slate-200 px-3 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                                                        >
+                                                            Download PDF
+                                                        </a>
+                                                    ) : null}
+                                                    {paymentLink ? (
+                                                        <a
+                                                            href={paymentLink}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-100"
+                                                        >
+                                                            Pay online
+                                                        </a>
+                                                    ) : null}
+                                                </div>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            ) : (
+                                <p className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-sm text-slate-500">
+                                    No invoices available yet. Check back after your studio sends billing details.
+                                </p>
+                            )}
+                        </div>
+                    </section>
                 </main>
             )}
         </>
@@ -292,9 +395,13 @@ export const getStaticProps: GetStaticProps<GalleryPortalPageProps> = async ({ p
         };
     }
 
+    const allInvoices = await readCmsCollection<InvoiceRecord>('crm-invoices.json');
+    const clientInvoices = allInvoices.filter((invoice) => invoice.client?.trim() === gallery.client.trim());
+
     return {
         props: {
-            gallery
+            gallery,
+            invoices: clientInvoices
         }
     };
 };

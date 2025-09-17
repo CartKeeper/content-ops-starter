@@ -41,6 +41,8 @@ type InvoiceBuilderModalProps = {
     clients: ClientOption[];
     onClose: () => void;
     onSubmit: (values: InvoiceBuilderSubmitValues) => Promise<void>;
+    initialClientId?: string;
+    initialProjectName?: string;
 };
 
 const inputBaseStyles =
@@ -67,17 +69,33 @@ function createLineItem(): InvoiceLineItemInput {
     };
 }
 
-export function InvoiceBuilderModal({ clients, onClose, onSubmit }: InvoiceBuilderModalProps) {
-    const initialClient = clients[0];
+export function InvoiceBuilderModal({
+    clients,
+    onClose,
+    onSubmit,
+    initialClientId,
+    initialProjectName
+}: InvoiceBuilderModalProps) {
     const today = dayjs().format('YYYY-MM-DD');
     const defaultDue = dayjs().add(30, 'day').format('YYYY-MM-DD');
     const { getActiveFieldsForModal } = useQuickActionSettings();
     const dynamicFields = getActiveFieldsForModal('invoice');
 
-    const [selectedClientId, setSelectedClientId] = React.useState<string>(initialClient?.id ?? '');
-    const [clientEmail, setClientEmail] = React.useState<string>(initialClient?.email ?? '');
-    const [clientAddress, setClientAddress] = React.useState<string>(initialClient?.address ?? '');
-    const [project, setProject] = React.useState('New project invoice');
+    const resolvedInitialClientId = React.useMemo(() => {
+        if (initialClientId && clients.some((client) => client.id === initialClientId)) {
+            return initialClientId;
+        }
+        return clients[0]?.id ?? '';
+    }, [clients, initialClientId]);
+
+    const [selectedClientId, setSelectedClientId] = React.useState<string>(resolvedInitialClientId);
+    const selectedClient = React.useMemo(
+        () => clients.find((client) => client.id === selectedClientId),
+        [clients, selectedClientId]
+    );
+    const [clientEmail, setClientEmail] = React.useState<string>(selectedClient?.email ?? '');
+    const [clientAddress, setClientAddress] = React.useState<string>(selectedClient?.address ?? '');
+    const [project, setProject] = React.useState(initialProjectName ?? 'New project invoice');
     const [issueDate, setIssueDate] = React.useState(today);
     const [dueDate, setDueDate] = React.useState(defaultDue);
     const [taxRatePercent, setTaxRatePercent] = React.useState<number>(7.5);
@@ -90,10 +108,9 @@ export function InvoiceBuilderModal({ clients, onClose, onSubmit }: InvoiceBuild
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
 
-    const selectedClient = React.useMemo(() => clients.find((client) => client.id === selectedClientId), [
-        clients,
-        selectedClientId
-    ]);
+    React.useEffect(() => {
+        setSelectedClientId(resolvedInitialClientId);
+    }, [resolvedInitialClientId]);
 
     React.useEffect(() => {
         if (selectedClient) {
@@ -113,6 +130,14 @@ export function InvoiceBuilderModal({ clients, onClose, onSubmit }: InvoiceBuild
             return next;
         });
     }, [dynamicFields]);
+
+    React.useEffect(() => {
+        if (initialProjectName) {
+            setProject(initialProjectName);
+        } else {
+            setProject('New project invoice');
+        }
+    }, [initialProjectName]);
 
     const subtotal = React.useMemo(
         () =>
