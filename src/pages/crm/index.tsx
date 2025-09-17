@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
 import dayjs from 'dayjs';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import {
     BookingList,
@@ -22,6 +22,7 @@ import {
     type InvoiceStatus,
     type ChartPoint
 } from '../../components/crm';
+import { useNetlifyIdentity } from '../../components/auth';
 import { InvoiceBuilderModal, type InvoiceBuilderSubmitValues } from '../../components/crm/InvoiceBuilderModal';
 import {
     BellIcon,
@@ -58,6 +59,12 @@ type PhotographyCrmDashboardProps = {
     invoices: InvoiceRecord[];
 };
 
+type FeedbackNotice = {
+    id: string;
+    type: 'success' | 'error';
+    message: string;
+};
+
 function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboardProps) {
     const [isDarkMode, setIsDarkMode] = React.useState<boolean | null>(null);
     const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
@@ -70,6 +77,19 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
     );
     const [galleryList, setGalleryList] = React.useState<GalleryRecord[]>(() => [...galleryCollection]);
     const [activeModal, setActiveModal] = React.useState<QuickActionModalType | null>(null);
+    const [pdfInvoiceId, setPdfInvoiceId] = React.useState<string | null>(null);
+    const [checkoutInvoiceId, setCheckoutInvoiceId] = React.useState<string | null>(null);
+    const [feedback, setFeedback] = React.useState<FeedbackNotice | null>(null);
+    const identity = useNetlifyIdentity();
+
+    React.useEffect(() => {
+        if (!feedback || typeof window === 'undefined') {
+            return;
+        }
+
+        const timeout = window.setTimeout(() => setFeedback(null), 8000);
+        return () => window.clearTimeout(timeout);
+    }, [feedback]);
 
     React.useEffect(() => {
         if (typeof window === 'undefined') {
@@ -230,6 +250,10 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
         setActiveModal(null);
     }, []);
 
+    const notify = React.useCallback((type: 'success' | 'error', message: string) => {
+        setFeedback({ id: `${Date.now()}`, type, message });
+    }, []);
+
     const createRecord = React.useCallback(
         async <T,>(resource: 'bookings' | 'invoices' | 'galleries', payload: Record<string, unknown>) => {
             const response = await fetch(`/api/crm/${resource}`, {
@@ -352,6 +376,123 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
             }
         },
         [invoiceList]
+    );
+
+    const handleGenerateInvoicePdf = React.useCallback(
+        async (invoice: InvoiceRecord) => {
+            if (!invoice) {
+                return;
+            }
+
+            setPdfInvoiceId(invoice.id);
+
+            try {
+                const token = await identity.getToken();
+                if (!token) {
+                    throw new Error('Authentication expired. Sign in again to generate invoices.');
+                }
+
+                const response = await fetch('/.netlify/functions/generate-invoice-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        invoice,
+                        studio: {
+                            name: 'Codex Studio',
+                            email: 'billing@codex.studio',
+                            phone: '+1 (555) 123-4567',
+                            website: 'https://codex.studio'
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const payload = await readJsonSafely<{ error?: string }>(response);
+                    throw new Error(payload?.error ?? 'Failed to generate the invoice PDF.');
+                }
+
+                if (typeof window !== 'undefined') {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = window.document.createElement('a');
+                    link.href = url;
+                    link.download = `invoice-${invoice.id}.pdf`;
+                    window.document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    window.URL.revokeObjectURL(url);
+                }
+
+                notify('success', `Invoice ${invoice.id} PDF generated.`);
+            } catch (error) {
+                console.error('Invoice PDF generation failed', error);
+                notify('error', error instanceof Error ? error.message : 'Unable to generate the PDF invoice.');
+            } finally {
+                setPdfInvoiceId(null);
+            }
+        },
+        [identity, notify]
+    );
+
+    const handleCreateCheckoutSession = React.useCallback(
+        async (invoice: InvoiceRecord) => {
+            if (!invoice) {
+                return;
+            }
+
+            setCheckoutInvoiceId(invoice.id);
+
+            try {
+                const token = await identity.getToken();
+                if (!token) {
+                    throw new Error('Authentication expired. Sign in again to create payment links.');
+                }
+
+                const origin = typeof window !== 'undefined' ? window.location.origin : 'https://codex.studio';
+                const response = await fetch('/.netlify/functions/create-checkout-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        invoice,
+                        successUrl: `${origin}/crm?checkout=success`,
+                        cancelUrl: `${origin}/crm?checkout=cancel`
+                    })
+                });
+
+                const payload = await readJsonSafely<{ url?: string; error?: string }>(response);
+
+                if (!response.ok) {
+                    throw new Error(payload?.error ?? 'Unable to start a Stripe checkout session.');
+                }
+
+                const checkoutUrl = payload?.url;
+                if (!checkoutUrl) {
+                    throw new Error('Stripe did not return a checkout URL.');
+                }
+
+                if (typeof window !== 'undefined') {
+                    window.open(checkoutUrl, '_blank', 'noopener');
+                }
+
+                setInvoiceList((previous) =>
+                    previous.map((record) => (record.id === invoice.id ? { ...record, paymentLink: checkoutUrl } : record))
+                );
+
+                notify('success', `Payment link created for invoice ${invoice.id}.`);
+            } catch (error) {
+                console.error('Stripe checkout session failed', error);
+                notify('error', error instanceof Error ? error.message : 'Unable to start a Stripe checkout session.');
+            } finally {
+                setCheckoutInvoiceId(null);
+            }
+        },
+        [identity, notify]
     );
 
     const handleCreateGallery = React.useCallback(
@@ -783,7 +924,13 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                             <button className="block w-full px-4 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
                                                 Profile
                                             </button>
-                                            <button className="block w-full px-4 py-2 text-left text-sm font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10">
+                                            <button
+                                                onClick={() => {
+                                                    identity.logout();
+                                                    setIsUserMenuOpen(false);
+                                                }}
+                                                className="block w-full px-4 py-2 text-left text-sm font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                            >
                                                 Logout
                                             </button>
                                         </div>
@@ -819,6 +966,46 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                         ))}
                                     </div>
                                 </header>
+
+                                <AnimatePresence>
+                                    {feedback ? (
+                                        <motion.div
+                                            key={feedback.id}
+                                            initial={{ opacity: 0, y: -8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -8 }}
+                                            className={`flex items-start gap-3 rounded-2xl border px-4 py-4 text-sm shadow-sm transition-all ${
+                                                feedback.type === 'success'
+                                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
+                                                    : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full text-base font-semibold ${
+                                                    feedback.type === 'success'
+                                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-200'
+                                                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-200'
+                                                }`}
+                                                aria-hidden="true"
+                                            >
+                                                {feedback.type === 'success' ? '✓' : '!'}
+                                            </span>
+                                            <div className="flex-1">
+                                                <p className="font-semibold">
+                                                    {feedback.type === 'success' ? 'Action complete' : 'Action required'}
+                                                </p>
+                                                <p className="mt-1 leading-relaxed">{feedback.message}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFeedback(null)}
+                                                className="ml-3 text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                            >
+                                                Close
+                                            </button>
+                                        </motion.div>
+                                    ) : null}
+                                </AnimatePresence>
 
                                 <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                                     {statCards.map((card) => (
@@ -931,7 +1118,14 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                             title="Open Invoices"
                                             description="Collect payments faster with a focused list of outstanding balances."
                                         >
-                                            <InvoiceTable invoices={openInvoices} onUpdateStatus={handleUpdateInvoiceStatus} />
+                                            <InvoiceTable
+                                                invoices={openInvoices}
+                                                onUpdateStatus={handleUpdateInvoiceStatus}
+                                                onGeneratePdf={handleGenerateInvoicePdf}
+                                                onCreateCheckout={handleCreateCheckoutSession}
+                                                generatingInvoiceId={pdfInvoiceId}
+                                                checkoutInvoiceId={checkoutInvoiceId}
+                                            />
                                         </SectionCard>
 
                                         <SectionCard
@@ -1162,6 +1356,19 @@ export const getStaticProps: GetStaticProps<PhotographyCrmDashboardProps> = asyn
         }
     };
 };
+
+async function readJsonSafely<T>(response: Response): Promise<T | null> {
+    try {
+        const raw = await response.text();
+        if (!raw) {
+            return null;
+        }
+        return JSON.parse(raw) as T;
+    } catch (error) {
+        console.warn('Unable to parse JSON response payload', error);
+        return null;
+    }
+}
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
     style: 'currency',

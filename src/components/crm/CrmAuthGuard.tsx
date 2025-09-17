@@ -1,5 +1,6 @@
 import * as React from 'react';
 
+import { useNetlifyIdentity } from '../auth';
 import { ApertureMark } from './ApertureMark';
 
 const STORAGE_KEY = 'crm-auth-access-token';
@@ -31,13 +32,112 @@ type CrmAuthGuardProps = {
 };
 
 export function CrmAuthGuard({ children, title, description }: CrmAuthGuardProps) {
-    const [isAuthenticated, setIsAuthenticated] = React.useState<boolean>(!guardIsEnabled);
-    const [isReady, setIsReady] = React.useState<boolean>(!guardIsEnabled);
+    const identity = useNetlifyIdentity();
+    const identityGuardEnabled = identity.hasWidget;
+    const passcodeGuardEnabled = guardIsEnabled && !identityGuardEnabled;
+
+    const [isAuthenticated, setIsAuthenticated] = React.useState<boolean>(!passcodeGuardEnabled);
+    const [isReady, setIsReady] = React.useState<boolean>(!passcodeGuardEnabled);
     const [accessCode, setAccessCode] = React.useState('');
     const [error, setError] = React.useState<string | null>(null);
 
+    const identityContextValue = React.useMemo<CrmAuthContextValue>(
+        () => ({
+            isAuthenticated: identity.isAuthenticated && identity.isPhotographer,
+            guardEnabled: true,
+            signOut: identity.logout
+        }),
+        [identity.isAuthenticated, identity.isPhotographer, identity.logout]
+    );
+
+    if (identityGuardEnabled) {
+        if (!identity.isReady) {
+            return (
+                <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-16 text-slate-300">
+                    <div className="flex flex-col items-center gap-4">
+                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-800/70 ring-1 ring-white/10">
+                            <ApertureMark className="h-8 w-8 text-[#4DE5FF]" />
+                        </span>
+                        <p className="text-sm font-medium tracking-wide text-slate-400">
+                            Connecting to secure studio identity…
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
+        if (identity.isAuthenticated && identity.isPhotographer) {
+            return <CrmAuthContext.Provider value={identityContextValue}>{children}</CrmAuthContext.Provider>;
+        }
+
+        const identityCardTitle = identity.isAuthenticated
+            ? 'Photographer access required'
+            : title ?? 'Sign in to the studio workspace';
+        const identityCardDescription = identity.isAuthenticated
+            ? 'Your account is missing the photographer role. Ask the studio admin to grant access or sign in with a different profile.'
+            : description ?? 'Use your studio-issued Netlify Identity account to access private CRM tools.';
+
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-16 text-white">
+                <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/80 p-10 shadow-2xl backdrop-blur">
+                    <div className="flex flex-col items-center gap-5 text-center">
+                        <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-800/70 ring-1 ring-white/10">
+                            <ApertureMark className="h-8 w-8 text-[#4DE5FF]" />
+                        </span>
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.48em] text-[#4DE5FF]">Secure access</p>
+                            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">{identityCardTitle}</h1>
+                            <p className="mt-2 text-sm text-slate-300">{identityCardDescription}</p>
+                            {identity.isAuthenticated && identity.user?.email ? (
+                                <p className="mt-3 text-xs text-slate-500">
+                                    Signed in as{' '}
+                                    <span className="font-semibold text-slate-200">{identity.user.email}</span>
+                                </p>
+                            ) : null}
+                        </div>
+                    </div>
+                    <div className="mt-8 space-y-4">
+                        {identity.error ? (
+                            <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                                {identity.error}
+                            </div>
+                        ) : null}
+                        {identity.isAuthenticated ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    identity.clearError();
+                                    identity.logout();
+                                }}
+                                className="w-full rounded-full border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold uppercase tracking-[0.28em] text-slate-200 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] focus:ring-offset-2 focus:ring-offset-slate-900"
+                            >
+                                Switch account
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    identity.clearError();
+                                    identity.open('login');
+                                }}
+                                className="w-full rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] px-4 py-3 text-sm font-semibold uppercase tracking-[0.28em] text-white shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4DE5FF] focus:ring-offset-slate-900"
+                            >
+                                Sign in as photographer
+                            </button>
+                        )}
+                        <p className="text-center text-xs text-slate-500">
+                            Need access? Ask the studio admin to invite you in Netlify Identity and assign the photographer role.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     React.useEffect(() => {
-        if (!guardIsEnabled) {
+        if (!passcodeGuardEnabled) {
+            setIsReady(true);
+            setIsAuthenticated(true);
             return;
         }
 
@@ -56,13 +156,13 @@ export function CrmAuthGuard({ children, title, description }: CrmAuthGuardProps
         } finally {
             setIsReady(true);
         }
-    }, []);
+    }, [passcodeGuardEnabled]);
 
     const handleSubmit = React.useCallback(
         (event: React.FormEvent<HTMLFormElement>) => {
             event.preventDefault();
 
-            if (!guardIsEnabled) {
+            if (!passcodeGuardEnabled) {
                 setIsAuthenticated(true);
                 return;
             }
@@ -89,7 +189,7 @@ export function CrmAuthGuard({ children, title, description }: CrmAuthGuardProps
     );
 
     const handleSignOut = React.useCallback(() => {
-        if (!guardIsEnabled) {
+        if (!passcodeGuardEnabled) {
             return;
         }
 
@@ -108,14 +208,14 @@ export function CrmAuthGuard({ children, title, description }: CrmAuthGuardProps
 
     const contextValue = React.useMemo<CrmAuthContextValue>(
         () => ({
-            isAuthenticated: guardIsEnabled ? isAuthenticated : true,
-            guardEnabled: guardIsEnabled,
+            isAuthenticated: passcodeGuardEnabled ? isAuthenticated : true,
+            guardEnabled: passcodeGuardEnabled,
             signOut: handleSignOut
         }),
-        [handleSignOut, isAuthenticated]
+        [handleSignOut, isAuthenticated, passcodeGuardEnabled]
     );
 
-    if (!guardIsEnabled) {
+    if (!passcodeGuardEnabled) {
         return <CrmAuthContext.Provider value={contextValue}>{children}</CrmAuthContext.Provider>;
     }
 

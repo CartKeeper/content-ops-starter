@@ -19,9 +19,20 @@ const formatDate = (value: string) => dayjs(value).format('MMM D, YYYY');
 type InvoiceTableProps = {
     invoices: InvoiceRecord[];
     onUpdateStatus?: (id: string, status: InvoiceStatus) => void;
+    onGeneratePdf?: (invoice: InvoiceRecord) => void;
+    onCreateCheckout?: (invoice: InvoiceRecord) => void;
+    generatingInvoiceId?: string | null;
+    checkoutInvoiceId?: string | null;
 };
 
-export function InvoiceTable({ invoices, onUpdateStatus }: InvoiceTableProps) {
+export function InvoiceTable({
+    invoices,
+    onUpdateStatus,
+    onGeneratePdf,
+    onCreateCheckout,
+    generatingInvoiceId,
+    checkoutInvoiceId
+}: InvoiceTableProps) {
     return (
         <div className="space-y-4">
             {invoices.map((invoice) => (
@@ -70,6 +81,30 @@ export function InvoiceTable({ invoices, onUpdateStatus }: InvoiceTableProps) {
                                 >
                                     Download PDF
                                 </a>
+                            ) : null}
+                            {onGeneratePdf ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onGeneratePdf(invoice)}
+                                    disabled={generatingInvoiceId === invoice.id}
+                                    className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                >
+                                    {generatingInvoiceId === invoice.id
+                                        ? 'Preparing…'
+                                        : invoice.pdfUrl
+                                          ? 'Regenerate PDF'
+                                          : 'Generate PDF'}
+                                </button>
+                            ) : null}
+                            {onCreateCheckout && invoice.status !== 'Paid' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onCreateCheckout(invoice)}
+                                    disabled={checkoutInvoiceId === invoice.id}
+                                    className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-indigo-600 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200 dark:hover:bg-indigo-500/20"
+                                >
+                                    {checkoutInvoiceId === invoice.id ? 'Starting checkout…' : 'Send payment link'}
+                                </button>
                             ) : null}
                             <button className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
                                 View details
