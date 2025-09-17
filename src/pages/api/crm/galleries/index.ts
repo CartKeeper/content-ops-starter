@@ -25,6 +25,16 @@ function normalizeAsset(value: unknown): GalleryAsset | null {
 
     const sizeRaw = value.size ?? value.size_bytes ?? value.sizeBytes;
     const size = typeof sizeRaw === 'number' && Number.isFinite(sizeRaw) ? sizeRaw : 0;
+    const projectIdentifier =
+        typeof value.projectId === 'string'
+            ? value.projectId
+            : typeof value.project_id === 'string'
+              ? value.project_id
+              : typeof value.projectCode === 'string'
+                ? value.projectCode
+                : typeof value.project_code === 'string'
+                  ? value.project_code
+                  : null;
 
     return {
         id: typeof value.id === 'string' ? value.id : randomUUID(),
@@ -74,12 +84,8 @@ function normalizeAsset(value: unknown): GalleryAsset | null {
                 : typeof value.client_id === 'string'
                   ? value.client_id
                   : null,
-        projectCode:
-            typeof value.projectCode === 'string'
-                ? value.projectCode
-                : typeof value.project_code === 'string'
-                  ? value.project_code
-                  : null,
+        projectId: projectIdentifier,
+        projectCode: projectIdentifier,
         dropboxFileId:
             typeof value.dropboxFileId === 'string'
                 ? value.dropboxFileId
@@ -118,12 +124,26 @@ function normalizeGallery(record: RawGalleryRecord): GalleryRecord {
                 : typeof record.shootType === 'string'
                   ? record.shootType
                   : 'New collection',
+        projectId:
+            typeof record.project_id === 'string'
+                ? record.project_id
+                : typeof record.projectId === 'string'
+                  ? record.projectId
+                  : typeof record.project_code === 'string'
+                    ? record.project_code
+                    : typeof record.projectCode === 'string'
+                      ? record.projectCode
+                      : undefined,
         projectCode:
             typeof record.project_code === 'string'
                 ? record.project_code
                 : typeof record.projectCode === 'string'
                   ? record.projectCode
-                  : null,
+                  : typeof record.project_id === 'string'
+                    ? record.project_id
+                    : typeof record.projectId === 'string'
+                      ? record.projectId
+                      : null,
         deliveryDueDate:
             typeof record.delivery_due_date === 'string'
                 ? record.delivery_due_date
@@ -153,7 +173,15 @@ function normalizeGallery(record: RawGalleryRecord): GalleryRecord {
                   ? record.dropboxSyncCursor
                   : null,
         dropboxFiles: Array.isArray(record.dropbox_files) ? (record.dropbox_files as string[]) : undefined,
-        customFields: isPlainObject(record.custom_fields) ? (record.custom_fields as Record<string, string | boolean>) : undefined
+        customFields: isPlainObject(record.custom_fields)
+            ? (record.custom_fields as Record<string, string | boolean>)
+            : undefined,
+        reminderSentAt:
+            typeof record.reminder_sent_at === 'string'
+                ? record.reminder_sent_at
+                : typeof record.reminderSentAt === 'string'
+                  ? record.reminderSentAt
+                  : undefined
     } satisfies GalleryRecord;
 }
 
@@ -199,7 +227,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse<GalleriesRes
     const clientName = typeof body.client === 'string' && body.client.trim() ? body.client.trim() : 'New client';
     const shootType = typeof body.shootType === 'string' && body.shootType.trim() ? body.shootType.trim() : 'Untitled gallery';
     const status = typeof body.status === 'string' ? body.status : 'Pending';
-    const projectCode = typeof body.projectCode === 'string' ? body.projectCode.trim() || null : null;
+    const projectId =
+        typeof body.projectId === 'string' && body.projectId.trim() ? body.projectId.trim() : null;
+    const projectCodeInput =
+        typeof body.projectCode === 'string' && body.projectCode.trim() ? body.projectCode.trim() : null;
+    const projectCode = projectCodeInput ?? projectId;
 
     const assetsInput = Array.isArray(body.assets) ? body.assets : [];
     const assets = assetsInput.map((asset) => normalizeAsset(asset)).filter((asset): asset is GalleryAsset => Boolean(asset));
@@ -213,6 +245,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse<GalleriesRes
     const deliveryDueDate = typeof body.deliveryDueDate === 'string' ? body.deliveryDueDate : undefined;
     const deliveredAt = typeof body.deliveredAt === 'string' ? body.deliveredAt : undefined;
     const dropboxSyncCursor = typeof body.dropboxSyncCursor === 'string' ? body.dropboxSyncCursor : null;
+    const reminderSentAt = typeof body.reminderSentAt === 'string' ? body.reminderSentAt : undefined;
     const customFields = isPlainObject(body.customFields) ? body.customFields : null;
 
     const totalBytes = sumBytes(assets.map((asset) => asset.size));
@@ -226,6 +259,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse<GalleriesRes
         shoot_type: shootType,
         status,
         project_code: projectCode,
+        project_id: projectId ?? null,
         delivery_due_date: deliveryDueDate ?? null,
         delivered_at: deliveredAt ?? null,
         cover_image: coverImage,
@@ -234,6 +268,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse<GalleriesRes
         dropbox_sync_cursor: dropboxSyncCursor,
         custom_fields: customFields,
         assets,
+        reminder_sent_at: reminderSentAt ?? null,
         created_at: now,
         updated_at: now
     };
@@ -241,10 +276,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse<GalleriesRes
     const supabase = getSupabaseClient();
     let insertResponse = await supabase.from('crm_galleries').insert([supabasePayload]).select().single();
 
-    if (insertResponse.error && /column\s+asset_count/i.test(insertResponse.error.message ?? '')) {
-        const fallbackPayload = { ...supabasePayload };
-        delete fallbackPayload.asset_count;
-        insertResponse = await supabase.from('crm_galleries').insert([fallbackPayload]).select().single();
+    if (insertResponse.error) {
+        const message = insertResponse.error.message ?? '';
+        if (/column\s+(asset_count|project_id|reminder_sent_at)/i.test(message)) {
+            const fallbackPayload = { ...supabasePayload };
+            if (/column\s+asset_count/i.test(message)) {
+                delete fallbackPayload.asset_count;
+            }
+            if (/column\s+project_id/i.test(message)) {
+                delete fallbackPayload.project_id;
+            }
+            if (/column\s+reminder_sent_at/i.test(message)) {
+                delete fallbackPayload.reminder_sent_at;
+            }
+
+            insertResponse = await supabase.from('crm_galleries').insert([fallbackPayload]).select().single();
+        }
     }
 
     if (insertResponse.error) {

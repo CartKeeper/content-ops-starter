@@ -12,11 +12,13 @@ type DropboxWebhookFile = {
     rev?: string;
     revision?: string;
     clientId?: string;
+    projectId?: string;
     projectCode?: string;
 };
 
 type DropboxWebhookPayload = {
     clientId?: string;
+    projectId?: string;
     projectCode?: string;
     files?: DropboxWebhookFile[];
     secret?: string;
@@ -121,6 +123,7 @@ export default async function dropboxWebhookHandler(
         try {
             const { buffer, contentType } = await downloadFile(file);
             const clientId = file.clientId || payload.clientId || null;
+            const projectId = file.projectId || payload.projectId || null;
             const projectCode = file.projectCode || payload.projectCode || null;
             const { asset, duplicate } = await storeGalleryAsset({
                 supabase,
@@ -129,6 +132,7 @@ export default async function dropboxWebhookHandler(
                 contentType,
                 size: file.size ?? buffer.byteLength,
                 clientId,
+                projectId,
                 projectCode,
                 dropboxFileId: file.id ?? null,
                 dropboxRevision: file.rev ?? file.revision ?? null,

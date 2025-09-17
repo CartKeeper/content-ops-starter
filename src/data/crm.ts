@@ -18,6 +18,7 @@ export type GalleryAsset = {
     duplicateOf?: string | null;
     isDuplicate?: boolean;
     clientId?: string | null;
+    projectId?: string | null;
     projectCode?: string | null;
     dropboxFileId?: string | null;
     dropboxRevision?: string | null;
@@ -33,6 +34,7 @@ export type GalleryRecord = {
     id: string;
     client: string;
     shootType: string;
+    projectId?: string;
     projectCode?: string | null;
     deliveryDueDate?: string;
     deliveredAt?: string;
@@ -45,6 +47,7 @@ export type GalleryRecord = {
     dropboxSyncCursor?: string | null;
     dropboxFiles?: string[];
     customFields?: Record<string, string | boolean>;
+    reminderSentAt?: string;
 };
 
 export type ProjectMilestone = {
@@ -156,11 +159,15 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Wedding Weekend',
         deliveryDueDate: '2025-05-27',
         status: 'Pending',
+        projectId: 'proj-02',
         coverImage: '/images/hero3.svg',
         assets: [],
         totalStorageBytes: 0,
         totalStorageFormatted: '0 B',
-        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
+        customFields: {
+            deliveryEmail: 'hello@harrisonandjune.com'
+        }
     },
     {
         id: 'gal-03',
@@ -168,11 +175,15 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Brand Lifestyle Campaign',
         deliveredAt: '2025-04-28',
         status: 'Delivered',
+        projectId: 'proj-03',
         coverImage: '/images/abstract-feature1.svg',
         assets: [],
         totalStorageBytes: 0,
         totalStorageFormatted: '0 B',
-        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
+        customFields: {
+            deliveryEmail: 'sona@patelcreative.co'
+        }
     },
     {
         id: 'gal-04',
@@ -192,11 +203,15 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Team Headshots',
         deliveredAt: '2025-03-23',
         status: 'Delivered',
+        projectId: 'proj-01',
         coverImage: '/images/abstract-feature3.svg',
         assets: [],
         totalStorageBytes: 0,
         totalStorageFormatted: '0 B',
-        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
+        customFields: {
+            deliveryEmail: 'team@evergreenarchitects.com'
+        }
     },
     {
         id: 'gal-06',
@@ -232,7 +247,11 @@ export const galleryCollection: GalleryRecord[] = [
         assets: [],
         totalStorageBytes: 0,
         totalStorageFormatted: '0 B',
-        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
+        customFields: {
+            deliveryEmail: 'projects@harborandco.com'
+        },
+        reminderSentAt: '2025-11-18T09:15:00.000Z'
     },
     {
         id: 'gal-09',
@@ -244,7 +263,10 @@ export const galleryCollection: GalleryRecord[] = [
         assets: [],
         totalStorageBytes: 0,
         totalStorageFormatted: '0 B',
-        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
+        customFields: {
+            deliveryEmail: 'hello@lumen.studio'
+        }
     },
     {
         id: 'gal-10',
@@ -256,7 +278,8 @@ export const galleryCollection: GalleryRecord[] = [
         assets: [],
         totalStorageBytes: 0,
         totalStorageFormatted: '0 B',
-        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
+        reminderSentAt: '2025-09-12T18:00:00.000Z'
     }
 ];
 

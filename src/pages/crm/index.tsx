@@ -408,6 +408,7 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
             const shootType = (values.shootType as string) || 'New Collection';
             const status = (values.status as GalleryStatus) || 'Pending';
             const projectCode = typeof values.projectCode === 'string' ? values.projectCode.trim() : undefined;
+            const projectId = projectCode;
             const deliveryDueDate = values.deliveryDueDate as string | undefined;
             const deliveredAt = values.deliveredAt as string | undefined;
             const dropboxSyncCursor =
@@ -445,6 +446,14 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                     formattedTotal: totalStorageFormatted
                 }
             };
+
+            if (projectId) {
+                recordPayload.projectId = projectId;
+            }
+
+            if (typeof values.reminderSentAt === 'string' && values.reminderSentAt.trim()) {
+                recordPayload.reminderSentAt = values.reminderSentAt;
+            }
 
             if (deliveryDueDate) {
                 recordPayload.deliveryDueDate = deliveryDueDate;

@@ -13,6 +13,7 @@ type StoreGalleryAssetParams = {
     contentType?: string | null;
     size?: number | null;
     clientId?: string | null;
+    projectId?: string | null;
     projectCode?: string | null;
     dropboxFileId?: string | null;
     dropboxRevision?: string | null;
@@ -96,6 +97,7 @@ function normalizeAssetRecord(record: SupabaseAssetRecord, bucketFallback: strin
     const size = Number(record.size_bytes ?? 0);
     const bucketId = record.storage_bucket || bucketFallback;
     const publicUrl = record.public_url ?? '';
+    const projectIdentifier = record.project_code ?? null;
 
     return {
         id: record.id,
@@ -110,7 +112,8 @@ function normalizeAssetRecord(record: SupabaseAssetRecord, bucketFallback: strin
         duplicateOf: record.duplicate_of ?? null,
         isDuplicate: Boolean(record.duplicate_of),
         clientId: record.client_id ?? null,
-        projectCode: record.project_code ?? null,
+        projectId: projectIdentifier,
+        projectCode: projectIdentifier,
         dropboxFileId: record.dropbox_file_id ?? null,
         dropboxRevision: record.dropbox_revision ?? null
     };
@@ -120,12 +123,12 @@ async function findDuplicate(
     supabase: SupabaseClient,
     checksum: string,
     clientId: string | null | undefined,
-    projectCode: string | null | undefined
+    projectIdentifier: string | null | undefined
 ): Promise<SupabaseAssetRecord | null> {
     let query = supabase.from('crm_gallery_assets').select('*').eq('checksum', checksum).limit(1);
 
     query = clientId ? query.eq('client_id', clientId) : query.is('client_id', null);
-    query = projectCode ? query.eq('project_code', projectCode) : query.is('project_code', null);
+    query = projectIdentifier ? query.eq('project_code', projectIdentifier) : query.is('project_code', null);
 
     const { data, error } = await query.maybeSingle();
 
@@ -143,6 +146,7 @@ export async function storeGalleryAsset({
     contentType,
     size,
     clientId,
+    projectId,
     projectCode,
     dropboxFileId,
     dropboxRevision,
@@ -154,7 +158,8 @@ export async function storeGalleryAsset({
     const actualSize = typeof size === 'number' && Number.isFinite(size) ? size : buffer.byteLength;
     const checksumInput = buffer as unknown as BinaryLike;
     const checksum = createHash('sha1').update(checksumInput).digest('hex');
-    const duplicate = await findDuplicate(supabase, checksum, clientId ?? null, projectCode ?? null);
+    const projectIdentifier = projectId ?? projectCode ?? null;
+    const duplicate = await findDuplicate(supabase, checksum, clientId ?? null, projectIdentifier);
 
     if (duplicate) {
         const normalized = normalizeAssetRecord(duplicate, bucketId);
@@ -163,6 +168,8 @@ export async function storeGalleryAsset({
         }
         normalized.isDuplicate = true;
         normalized.duplicateOf = duplicate.duplicate_of ?? duplicate.id;
+        normalized.projectId = normalized.projectId ?? projectIdentifier;
+        normalized.projectCode = normalized.projectCode ?? projectIdentifier;
 
         await supabase
             .from('crm_gallery_assets')
@@ -176,7 +183,7 @@ export async function storeGalleryAsset({
     }
 
     const folderClient = slugify(clientId);
-    const folderProject = slugify(projectCode);
+    const folderProject = slugify(projectIdentifier);
     const cleanedName = sanitizeFileName(fileName);
     const uniqueName = `${Date.now()}-${randomUUID()}-${cleanedName}`;
     const storagePath = [folderClient, folderProject, uniqueName].filter(Boolean).join('/');
@@ -197,7 +204,7 @@ export async function storeGalleryAsset({
     const payload = {
         id: assetId,
         client_id: clientId ?? null,
-        project_code: projectCode ?? null,
+        project_code: projectIdentifier ?? null,
         file_name: fileName,
         content_type: uploadContentType,
         size_bytes: actualSize,
@@ -239,6 +246,8 @@ export async function storeGalleryAsset({
                 bucketId
             );
             normalizedRetry.publicUrl = normalizedRetry.publicUrl || publicUrl;
+            normalizedRetry.projectId = normalizedRetry.projectId ?? projectIdentifier;
+            normalizedRetry.projectCode = normalizedRetry.projectCode ?? projectIdentifier;
             return { asset: normalizedRetry, duplicate: false };
         }
 
@@ -247,6 +256,8 @@ export async function storeGalleryAsset({
 
     const normalized = normalizeAssetRecord(data as unknown as SupabaseAssetRecord, bucketId);
     normalized.publicUrl = normalized.publicUrl || publicUrl;
+    normalized.projectId = normalized.projectId ?? projectIdentifier;
+    normalized.projectCode = normalized.projectCode ?? projectIdentifier;
 
     return { asset: normalized, duplicate: false };
 }

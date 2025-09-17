@@ -18,9 +18,14 @@ type UploadResponse = {
 
 const formParser = formidable({ multiples: false, keepExtensions: true });
 
-function parseField(value: Fields[keyof Fields] | undefined): string | undefined {
+function parseField(value: string | string[] | undefined): string | undefined {
     if (Array.isArray(value)) {
-        return parseField(value[0]);
+        for (const entry of value) {
+            if (typeof entry === 'string' && entry.trim()) {
+                return entry.trim();
+            }
+        }
+        return undefined;
     }
 
     if (typeof value === 'string') {
@@ -91,7 +96,8 @@ export default async function uploadGalleryAsset(
         const buffer = await fs.readFile(file.filepath);
 
         const clientId = parseField(fields.clientId) ?? parseField(fields.client);
-        const projectCode = parseField(fields.projectCode) ?? parseField(fields.project);
+        const projectId = parseField(fields.projectId) ?? parseField(fields.project);
+        const projectCode = parseField(fields.projectCode);
         const dropboxFileId = parseField(fields.dropboxFileId);
         const dropboxRevision = parseField(fields.dropboxRevision);
 
@@ -102,6 +108,7 @@ export default async function uploadGalleryAsset(
             contentType: file.mimetype || 'application/octet-stream',
             size: typeof file.size === 'number' ? file.size : undefined,
             clientId: clientId ?? null,
+            projectId: projectId ?? null,
             projectCode: projectCode ?? null,
             dropboxFileId: dropboxFileId ?? null,
             dropboxRevision: dropboxRevision ?? null,

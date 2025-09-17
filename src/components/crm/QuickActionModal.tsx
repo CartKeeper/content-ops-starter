@@ -358,6 +358,7 @@ function FieldInput({ field, value, allValues, onChange }: FieldInputProps) {
                         onChange={(assets) => onChange(assets)}
                         context={{
                             client: typeof allValues.client === 'string' ? allValues.client : undefined,
+                            projectId: typeof allValues.projectCode === 'string' ? allValues.projectCode : undefined,
                             projectCode: typeof allValues.projectCode === 'string' ? allValues.projectCode : undefined,
                             shootType: typeof allValues.shootType === 'string' ? allValues.shootType : undefined
                         }}

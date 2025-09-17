@@ -16,6 +16,7 @@ type UploadTask = {
 
 type GalleryUploaderContext = {
     client?: string;
+    projectId?: string;
     projectCode?: string;
     shootType?: string;
 };
@@ -338,7 +339,12 @@ function uploadFile(
             formData.append('clientId', context.client);
         }
 
-        const projectCode = context?.projectCode || context?.shootType;
+        const projectIdentifier = context?.projectId || context?.projectCode || context?.shootType;
+        if (projectIdentifier) {
+            formData.append('projectId', projectIdentifier);
+        }
+
+        const projectCode = context?.projectCode || projectIdentifier;
         if (projectCode) {
             formData.append('projectCode', projectCode);
         }
