@@ -7,8 +7,10 @@ import dynamic from 'next/dynamic';
 import { AnimatePresence, motion } from 'framer-motion';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
-import { dayjsLocalizer, type CalendarProps, type Event as CalendarEventBase } from 'react-big-calendar';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
+import type { EventContentArg, EventInput, EventMountArg } from '@fullcalendar/core';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import listPlugin from '@fullcalendar/list';
+import timeGridPlugin from '@fullcalendar/timegrid';
 
 import {
     ClientTable,
@@ -35,14 +37,12 @@ import { useQuickActionSettings } from '../../components/crm/quick-action-settin
 
 import type { ProjectRecord, ProjectMilestone, GalleryRecord } from '../../data/crm';
 
-const BigCalendar = dynamic<CalendarProps<CalendarEvent>>(async () => {
-    const mod = await import('react-big-calendar');
-    return mod.Calendar;
+const FullCalendar = dynamic(async () => {
+    const mod = await import('@fullcalendar/react');
+    return mod.default;
 }, { ssr: false });
 
 dayjs.extend(customParseFormat);
-
-const calendarLocalizer = dayjsLocalizer(dayjs);
 
 type SidebarModuleId = 'calendar' | 'clients' | 'invoices' | 'galleries' | 'projects' | 'settings';
 
@@ -59,13 +59,18 @@ type PhotographySidebarProps = {
     invoices: InvoiceRecord[];
 };
 
-type CalendarEvent = CalendarEventBase & {
+type CalendarEventExtendedProps = {
+    status: BookingStatus;
+    location: string;
+};
+
+type CalendarEvent = EventInput & {
     id: string;
     title: string;
     start: Date;
     end: Date;
-    status: BookingStatus;
-    location: string;
+    extendedProps: CalendarEventExtendedProps;
+    classNames: string[];
 };
 
 const invoiceStatusTone: Record<InvoiceStatus, React.ComponentProps<typeof StatusPill>['tone']> = {
@@ -73,6 +78,12 @@ const invoiceStatusTone: Record<InvoiceStatus, React.ComponentProps<typeof Statu
     Sent: 'info',
     Paid: 'success',
     Overdue: 'danger'
+};
+
+const SIDEBAR_STATUS_COLORS: Record<BookingStatus, { background: string; border: string }> = {
+    Confirmed: { background: '#10b981', border: 'rgba(16, 185, 129, 0.25)' },
+    Pending: { background: '#f59e0b', border: 'rgba(245, 158, 11, 0.25)' },
+    Editing: { background: '#6366f1', border: 'rgba(99, 102, 241, 0.25)' }
 };
 
 const formatCurrency = (value: number) =>
@@ -288,32 +299,55 @@ function CalendarModule({ bookings }: CalendarModuleProps) {
         () =>
             bookings.map((booking) => {
                 const start = parseDateTime(booking.date, booking.startTime);
-                const end = booking.endTime
-                    ? parseDateTime(booking.date, booking.endTime)
-                    : start.add(2, 'hour');
+                const endRaw = booking.endTime ? parseDateTime(booking.date, booking.endTime) : start.add(2, 'hour');
+                const end = endRaw.isAfter(start) ? endRaw : start.add(2, 'hour');
+                const tone = SIDEBAR_STATUS_COLORS[booking.status];
+
                 return {
                     id: booking.id,
                     title: `${booking.client} · ${booking.shootType}`,
                     start: start.toDate(),
                     end: end.toDate(),
-                    status: booking.status,
-                    location: booking.location
+                    backgroundColor: tone.background,
+                    borderColor: tone.border,
+                    textColor: '#fff',
+                    display: 'block',
+                    classNames: ['crm-event', `crm-event--${booking.status.toLowerCase()}`],
+                    extendedProps: {
+                        status: booking.status,
+                        location: booking.location
+                    }
                 };
             }),
         [bookings]
     );
 
-    const eventPropGetter = React.useCallback((event: CalendarEvent) => {
-        const tone = event.status === 'Confirmed' ? '#10b981' : event.status === 'Pending' ? '#f59e0b' : '#6366f1';
-        return {
-            style: {
-                backgroundColor: tone,
-                borderRadius: '0.75rem',
-                border: 'none',
-                color: '#fff',
-                boxShadow: event.status === 'Confirmed' ? '0 0 0 2px rgba(16, 185, 129, 0.18)' : '0 0 0 1px rgba(15, 23, 42, 0.05)'
+    const renderEventContent = React.useCallback((eventInfo: EventContentArg) => {
+        const extendedProps = eventInfo.event.extendedProps as CalendarEventExtendedProps | undefined;
+        return (
+            <div className="crm-event-content">
+                <span className="crm-event-title">{eventInfo.event.title}</span>
+                {extendedProps?.location ? (
+                    <span className="crm-event-location">{extendedProps.location}</span>
+                ) : null}
+            </div>
+        );
+    }, []);
+
+    const handleEventDidMount = React.useCallback((info: EventMountArg) => {
+        const extendedProps = info.event.extendedProps as CalendarEventExtendedProps | undefined;
+        if (!extendedProps) {
+            return;
+        }
+
+        const tone = SIDEBAR_STATUS_COLORS[extendedProps.status];
+        if (info.view.type.startsWith('list')) {
+            const dot = info.el.querySelector('.fc-list-event-dot');
+            if (dot instanceof HTMLElement) {
+                dot.style.borderColor = tone.background;
+                dot.style.backgroundColor = tone.background;
             }
-        };
+        }
     }, []);
 
     return (
@@ -332,17 +366,31 @@ function CalendarModule({ bookings }: CalendarModuleProps) {
                         <LegendDot color="bg-indigo-500">Editing</LegendDot>
                     </div>
                 </div>
-                <div className="h-[580px] rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <BigCalendar
-                        localizer={calendarLocalizer}
+                <div className="crm-calendar h-[580px] rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <FullCalendar
+                        plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
+                        initialView="dayGridMonth"
+                        headerToolbar={{
+                            start: 'prev,next today',
+                            center: 'title',
+                            end: 'dayGridMonth,timeGridWeek,listWeek'
+                        }}
+                        buttonText={{
+                            today: 'Today',
+                            dayGridMonth: 'Month',
+                            timeGridWeek: 'Week',
+                            listWeek: 'Agenda'
+                        }}
+                        height="100%"
                         events={events}
-                        startAccessor="start"
-                        endAccessor="end"
-                        views={['month', 'week', 'agenda']}
-                        defaultView="month"
-                        step={30}
-                        popup
-                        eventPropGetter={eventPropGetter}
+                        eventContent={renderEventContent}
+                        eventDidMount={handleEventDidMount}
+                        nowIndicator
+                        dayMaxEventRows={3}
+                        slotDuration="00:30:00"
+                        slotLabelFormat={{ hour: 'numeric', minute: '2-digit', hour12: true }}
+                        eventTimeFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
+                        displayEventTime
                     />
                 </div>
             </div>

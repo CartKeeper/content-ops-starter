@@ -4,8 +4,17 @@ import Head from 'next/head';
 import dynamic from 'next/dynamic';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
-import { dayjsLocalizer, type CalendarProps, type Event as CalendarEventBase } from 'react-big-calendar';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
+import type {
+    DateSelectArg,
+    EventClickArg,
+    EventContentArg,
+    EventInput,
+    EventMountArg
+} from '@fullcalendar/core';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import listPlugin from '@fullcalendar/list';
+import timeGridPlugin from '@fullcalendar/timegrid';
 
 import {
     BookingList,
@@ -21,21 +30,24 @@ import { readCmsCollection } from '../../utils/read-cms-collection';
 
 dayjs.extend(customParseFormat);
 
-const BigCalendar = dynamic<CalendarProps<CalendarEvent>>(async () => {
-    const mod = await import('react-big-calendar');
-    return mod.Calendar;
+const FullCalendar = dynamic(async () => {
+    const mod = await import('@fullcalendar/react');
+    return mod.default;
 }, { ssr: false });
 
-const calendarLocalizer = dayjsLocalizer(dayjs);
+type CalendarEventExtendedProps = {
+    resource: BookingRecord;
+    status: BookingStatus;
+    location: string;
+};
 
-type CalendarEvent = CalendarEventBase & {
+type CalendarEvent = EventInput & {
     id: string;
     title: string;
     start: Date;
     end: Date;
-    resource: BookingRecord;
-    status: BookingStatus;
-    location: string;
+    extendedProps: CalendarEventExtendedProps;
+    classNames: string[];
 };
 
 type ModalState =
@@ -59,12 +71,6 @@ type BookingsPageProps = {
 };
 
 type RawBookingRecord = Record<string, unknown>;
-
-type CalendarSlotInfo = {
-    start: Date;
-    end: Date;
-    action?: string;
-};
 
 const STATUS_COLOR_MAP: Record<BookingStatus, { background: string; border: string }> = {
     Confirmed: { background: '#10b981', border: 'rgba(16, 185, 129, 0.25)' },
@@ -240,14 +246,16 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
         });
     }, []);
 
-    const handleSelectSlot = React.useCallback((slot: CalendarSlotInfo) => {
-        const start = dayjs(slot.start);
-        const end = dayjs(slot.end);
+    const handleSelectSlot = React.useCallback((selection: DateSelectArg) => {
+        const start = dayjs(selection.start);
+        const end = dayjs(selection.end);
         const duration = end.diff(start, 'minute');
-        const isAllDay = duration >= 24 * 60;
+        const isAllDay = selection.allDay || duration >= 24 * 60;
 
         const defaultStart = isAllDay ? '09:00' : start.format('HH:mm');
         const defaultEnd = !isAllDay && duration >= 15 ? end.format('HH:mm') : '';
+
+        selection.view.calendar.unselect();
 
         setModalState({
             mode: 'create',
@@ -260,8 +268,41 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
         });
     }, []);
 
-    const handleSelectEvent = React.useCallback((event: CalendarEvent) => {
-        setModalState({ mode: 'edit', booking: event.resource });
+    const handleSelectEvent = React.useCallback((event: EventClickArg) => {
+        const extendedProps = event.event.extendedProps as CalendarEventExtendedProps | undefined;
+        if (!extendedProps?.resource) {
+            return;
+        }
+
+        setModalState({ mode: 'edit', booking: extendedProps.resource });
+    }, []);
+
+    const renderEventContent = React.useCallback((eventInfo: EventContentArg) => {
+        const extendedProps = eventInfo.event.extendedProps as CalendarEventExtendedProps | undefined;
+        return (
+            <div className="crm-event-content">
+                <span className="crm-event-title">{eventInfo.event.title}</span>
+                {extendedProps?.location ? (
+                    <span className="crm-event-location">{extendedProps.location}</span>
+                ) : null}
+            </div>
+        );
+    }, []);
+
+    const handleEventDidMount = React.useCallback((info: EventMountArg) => {
+        const extendedProps = info.event.extendedProps as CalendarEventExtendedProps | undefined;
+        if (!extendedProps) {
+            return;
+        }
+
+        const tone = STATUS_COLOR_MAP[extendedProps.status];
+        if (info.view.type.startsWith('list')) {
+            const dot = info.el.querySelector('.fc-list-event-dot');
+            if (dot instanceof HTMLElement) {
+                dot.style.borderColor = tone.background;
+                dot.style.backgroundColor = tone.background;
+            }
+        }
     }, []);
 
     const handleCloseModal = React.useCallback(() => {
@@ -351,19 +392,6 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
         [modalState]
     );
 
-    const eventPropGetter = React.useCallback((event: CalendarEvent) => {
-        const tone = STATUS_COLOR_MAP[event.status];
-        return {
-            style: {
-                backgroundColor: tone.background,
-                borderRadius: '0.75rem',
-                border: `1px solid ${tone.border}`,
-                color: '#fff',
-                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)'
-            }
-        };
-    }, []);
-
     return (
         <>
             <Head>
@@ -445,24 +473,35 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
                                     <LegendDot color="bg-indigo-500">Editing</LegendDot>
                                 </div>
                             </div>
-                            <div className="h-[720px] rounded-2xl border border-slate-200 bg-white p-3 shadow-inner dark:border-slate-800 dark:bg-slate-950/60">
-                                <BigCalendar
-                                    localizer={calendarLocalizer}
-                                    events={calendarEvents}
-                                    startAccessor="start"
-                                    endAccessor="end"
-                                    views={['month', 'week', 'agenda']}
-                                    popup
-                                    selectable
-                                    onSelectEvent={handleSelectEvent}
-                                    onSelectSlot={handleSelectSlot}
-                                    eventPropGetter={eventPropGetter}
-                                    components={{
-                                        event: CalendarEventCard,
-                                        agenda: {
-                                            event: CalendarAgendaRow
-                                        }
+                            <div className="crm-calendar h-[720px] rounded-2xl border border-slate-200 bg-white p-3 shadow-inner dark:border-slate-800 dark:bg-slate-950/60">
+                                <FullCalendar
+                                    plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+                                    initialView="dayGridMonth"
+                                    headerToolbar={{
+                                        start: 'prev,next today',
+                                        center: 'title',
+                                        end: 'dayGridMonth,timeGridWeek,listWeek'
                                     }}
+                                    buttonText={{
+                                        today: 'Today',
+                                        dayGridMonth: 'Month',
+                                        timeGridWeek: 'Week',
+                                        listWeek: 'Agenda'
+                                    }}
+                                    height="100%"
+                                    events={calendarEvents}
+                                    selectable
+                                    selectMirror
+                                    select={handleSelectSlot}
+                                    eventClick={handleSelectEvent}
+                                    eventContent={renderEventContent}
+                                    eventDidMount={handleEventDidMount}
+                                    nowIndicator
+                                    dayMaxEventRows={4}
+                                    slotDuration="00:30:00"
+                                    slotLabelFormat={{ hour: 'numeric', minute: '2-digit', hour12: true }}
+                                    eventTimeFormat={{ hour: 'numeric', minute: '2-digit', meridiem: 'short' }}
+                                    displayEventTime
                                 />
                             </div>
                         </section>
@@ -500,24 +539,6 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
                 />
             ) : null}
         </>
-    );
-}
-
-function CalendarEventCard({ event }: { event: CalendarEvent }) {
-    return (
-        <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold leading-tight text-white">{event.title}</span>
-            <span className="text-[11px] text-white/80">{event.location}</span>
-        </div>
-    );
-}
-
-function CalendarAgendaRow({ event }: { event: CalendarEvent }) {
-    return (
-        <div className="flex flex-col">
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{event.title}</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">{event.location}</span>
-        </div>
     );
 }
 
@@ -809,14 +830,23 @@ function mergeRecordSources(
 
 function createCalendarEvent(booking: BookingRecord): CalendarEvent {
     const { start, end } = resolveEventTimes(booking);
+    const tone = STATUS_COLOR_MAP[booking.status];
+
     return {
         id: booking.id,
         title: `${booking.client} · ${booking.shootType}`,
         start: start.toDate(),
         end: end.toDate(),
-        resource: booking,
-        status: booking.status,
-        location: booking.location
+        backgroundColor: tone.background,
+        borderColor: tone.border,
+        textColor: '#fff',
+        display: 'block',
+        classNames: ['crm-event', `crm-event--${booking.status.toLowerCase()}`],
+        extendedProps: {
+            resource: booking,
+            status: booking.status,
+            location: booking.location
+        }
     };
 }
 
