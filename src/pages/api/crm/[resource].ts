@@ -16,7 +16,7 @@ import { generateInvoicePdf } from '../../../server/invoices/generator';
 import { sendInvoiceEmail, type InvoiceEmailResult } from '../../../server/invoices/mailer';
 import { createStripePaymentLink } from '../../../server/invoices/stripe';
 
-type ResourceKey = 'bookings' | 'invoices' | 'galleries';
+type ResourceKey = 'bookings' | 'invoices' | 'galleries' | 'clients';
 
 type ResourceConfig = {
     file: string;
@@ -24,6 +24,7 @@ type ResourceConfig = {
 };
 
 const RESOURCE_CONFIG: Record<ResourceKey, ResourceConfig> = {
+    clients: { file: 'crm-clients.json', type: 'CrmClients' },
     bookings: { file: 'crm-bookings.json', type: 'CrmBookings' },
     invoices: { file: 'crm-invoices.json', type: 'CrmInvoices' },
     galleries: { file: 'crm-galleries.json', type: 'CrmGalleries' }
@@ -34,6 +35,16 @@ const DATA_DIRECTORY = path.join(process.cwd(), 'content', 'data');
 const INVOICE_STATUSES: InvoiceStatus[] = ['Draft', 'Sent', 'Paid', 'Overdue'];
 const GALLERY_STATUSES: GalleryStatus[] = ['Delivered', 'Pending'];
 const INVOICE_TEMPLATES: InvoiceTemplateId[] = ['classic', 'minimal', 'branded'];
+
+type CmsClientRecord = {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    address?: string;
+    notes?: string;
+    related_projects?: string[];
+};
 
 type NormalizedInvoiceResult = {
     invoice: InvoiceRecord;
@@ -230,6 +241,71 @@ function sanitizeCustomFields(value: unknown): Record<string, string | boolean> 
     });
 
     return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function normalizeClientRecord(
+    payload: Record<string, unknown>,
+    existing?: CmsClientRecord
+): CmsClientRecord {
+    const id = parseString(payload.id, existing?.id ?? `cl-${randomUUID().slice(0, 8)}`);
+    const name = parseString(payload.name, existing?.name ?? 'New client');
+    const email = parseString(payload.email, existing?.email ?? 'client@codex.studio');
+
+    const hasPhone = Object.prototype.hasOwnProperty.call(payload, 'phone');
+    const phone = hasPhone ? parseOptionalString(payload.phone) ?? undefined : existing?.phone;
+
+    const hasAddress = Object.prototype.hasOwnProperty.call(payload, 'address');
+    const address = hasAddress ? parseOptionalString(payload.address) ?? undefined : existing?.address;
+
+    const hasNotes = Object.prototype.hasOwnProperty.call(payload, 'notes');
+    const notes = hasNotes ? parseOptionalString(payload.notes) ?? undefined : existing?.notes;
+
+    const hasRelatedProjects =
+        Object.prototype.hasOwnProperty.call(payload, 'related_projects') ||
+        Object.prototype.hasOwnProperty.call(payload, 'relatedProjects');
+
+    let relatedProjects: string[] | undefined = existing?.related_projects;
+
+    if (hasRelatedProjects) {
+        const rawProjects = Object.prototype.hasOwnProperty.call(payload, 'related_projects')
+            ? payload.related_projects
+            : payload.relatedProjects;
+
+        if (Array.isArray(rawProjects)) {
+            const normalized = rawProjects
+                .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+                .filter((entry) => entry.length > 0);
+            relatedProjects = normalized.length > 0 ? normalized : undefined;
+        } else if (typeof rawProjects === 'string') {
+            const normalized = rawProjects
+                .split(/[,\n]/)
+                .map((entry) => entry.trim())
+                .filter((entry) => entry.length > 0);
+            relatedProjects = normalized.length > 0 ? normalized : undefined;
+        } else {
+            relatedProjects = undefined;
+        }
+    }
+
+    const record: CmsClientRecord = { id, name, email };
+
+    if (phone) {
+        record.phone = phone;
+    }
+
+    if (address) {
+        record.address = address;
+    }
+
+    if (notes) {
+        record.notes = notes;
+    }
+
+    if (relatedProjects) {
+        record.related_projects = relatedProjects;
+    }
+
+    return record;
 }
 
 function normalizeGalleryRecord(
@@ -451,7 +527,7 @@ function parseResourceKey(value: string | string[] | undefined): ResourceKey | n
 
     const key = Array.isArray(value) ? value[0] : value;
 
-    if (key === 'bookings' || key === 'invoices' || key === 'galleries') {
+    if (key === 'bookings' || key === 'invoices' || key === 'galleries' || key === 'clients') {
         return key;
     }
 
@@ -485,7 +561,13 @@ function ensureRecordId(resource: ResourceKey, records: Array<{ id?: unknown }>,
         return result;
     }
 
-    const prefix = resource === 'bookings' ? 'bk' : 'gal';
+    let prefix = 'gal';
+    if (resource === 'bookings') {
+        prefix = 'bk';
+    } else if (resource === 'clients') {
+        prefix = 'cl';
+    }
+
     result.id = `${prefix}-${randomUUID().slice(0, 8)}`;
     return result;
 }
@@ -511,7 +593,31 @@ function parsePayload(body: NextApiRequest['body']): Record<string, unknown> | n
     return null;
 }
 
-async function handleGet(req: NextApiRequest, res: NextApiResponse, config: ResourceConfig) {
+async function handleGet(
+    req: NextApiRequest,
+    res: NextApiResponse,
+    resourceKey: ResourceKey,
+    config: ResourceConfig
+) {
+    if (resourceKey === 'clients') {
+        const records = await readRecords<Record<string, unknown>>(config);
+        let needsWrite = false;
+
+        const normalized = records.map((record) => {
+            const sanitized = normalizeClientRecord(record, record as CmsClientRecord | undefined);
+            if (!needsWrite) {
+                needsWrite = JSON.stringify(record) !== JSON.stringify(sanitized);
+            }
+            return sanitized;
+        });
+
+        if (needsWrite) {
+            await writeRecords(config, normalized);
+        }
+
+        return res.status(200).json({ data: normalized });
+    }
+
     const records = await readRecords(config);
     return res.status(200).json({ data: records });
 }
@@ -572,6 +678,17 @@ async function handlePost(
         return res.status(201).json({ data: gallery });
     }
 
+    if (resourceKey === 'clients') {
+        const clients = await readRecords<CmsClientRecord>(config);
+        const recordWithId = ensureRecordId(resourceKey, clients, payload);
+        const client = normalizeClientRecord(recordWithId);
+
+        clients.push(client);
+        await writeRecords(config, clients);
+
+        return res.status(201).json({ data: client });
+    }
+
     const records = await readRecords<Record<string, unknown>>(config);
     const recordWithId = ensureRecordId(resourceKey, records, payload);
     records.push(recordWithId);
@@ -624,6 +741,22 @@ async function handlePut(
         return res.status(200).json({ data: updated });
     }
 
+    if (resourceKey === 'clients') {
+        const clients = await readRecords<CmsClientRecord>(config);
+        const index = clients.findIndex((client) => client.id === id);
+
+        if (index === -1) {
+            return res.status(404).json({ error: 'Record not found.' });
+        }
+
+        const payloadWithId: Record<string, unknown> = { ...payload, id };
+        const updated = normalizeClientRecord(payloadWithId, clients[index]);
+        clients[index] = updated;
+        await writeRecords(config, clients);
+
+        return res.status(200).json({ data: updated });
+    }
+
     const records = await readRecords<Record<string, unknown>>(config);
     const index = records.findIndex((record) => {
         const recordId = typeof record.id === 'string' ? record.id : typeof record.id === 'number' ? String(record.id) : null;
@@ -640,6 +773,34 @@ async function handlePut(
     return res.status(200).json({ data: records[index] });
 }
 
+async function handleDelete(
+    req: NextApiRequest,
+    res: NextApiResponse,
+    resourceKey: ResourceKey,
+    config: ResourceConfig
+) {
+    const id = parseRequestId(req);
+
+    if (!id) {
+        return res.status(400).json({ error: 'An id query parameter is required to delete a record.' });
+    }
+
+    const records = await readRecords<Record<string, unknown>>(config);
+    const index = records.findIndex((record) => {
+        const recordId = typeof record.id === 'string' ? record.id : typeof record.id === 'number' ? String(record.id) : null;
+        return recordId === id;
+    });
+
+    if (index === -1) {
+        return res.status(404).json({ error: 'Record not found.' });
+    }
+
+    const [removed] = records.splice(index, 1);
+    await writeRecords(config, records);
+
+    return res.status(200).json({ data: removed });
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     const resourceKey = parseResourceKey(req.query.resource);
 
@@ -652,13 +813,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
         switch (req.method) {
             case 'GET':
-                return await handleGet(req, res, config);
+                return await handleGet(req, res, resourceKey, config);
             case 'POST':
                 return await handlePost(req, res, resourceKey, config);
             case 'PUT':
                 return await handlePut(req, res, resourceKey, config);
+            case 'DELETE':
+                return await handleDelete(req, res, resourceKey, config);
             default:
-                res.setHeader('Allow', ['GET', 'POST', 'PUT']);
+                res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
                 return res.status(405).json({ error: `Method ${req.method} not allowed.` });
         }
     } catch (error) {

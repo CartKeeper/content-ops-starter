@@ -1,5 +1,6 @@
 import type { Handler } from '@netlify/functions';
-import PDFDocument from 'pdfkit';
+// @ts-ignore - pdfkit is bundled by Netlify Functions but lacks type resolution in Next.js builds
+const PDFDocument = require('pdfkit');
 
 import type { InvoiceRecord, InvoiceLineItem } from '../../src/types/invoice';
 
