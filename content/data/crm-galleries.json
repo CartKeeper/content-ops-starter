@@ -7,7 +7,106 @@
             "shootType": "Engagement Session",
             "deliveryDueDate": "2025-05-14",
             "status": "Pending",
-            "coverImage": "/images/main-hero.jpg"
+            "coverImage": "/images/main-hero.jpg",
+            "assets": [
+                {
+                    "id": "gal-01-asset-01",
+                    "fileName": "aurora-dunes.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 512000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-01/aurora-dunes.svg",
+                    "publicUrl": "/images/galleries/aurora-dunes.svg",
+                    "width": 1600,
+                    "height": 1000,
+                    "title": "Sunset over the dunes",
+                    "caption": "A sweeping view captured just after golden hour."
+                },
+                {
+                    "id": "gal-01-asset-02",
+                    "fileName": "golden-hour-ridge.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 468000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-01/golden-hour-ridge.svg",
+                    "publicUrl": "/images/galleries/golden-hour-ridge.svg",
+                    "width": 1000,
+                    "height": 1600,
+                    "title": "Golden ridge embrace",
+                    "caption": "Portraits along the windswept ridge moments before sunset."
+                },
+                {
+                    "id": "gal-01-asset-03",
+                    "fileName": "seaside-trail.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 489000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-01/seaside-trail.svg",
+                    "publicUrl": "/images/galleries/seaside-trail.svg",
+                    "width": 1600,
+                    "height": 960,
+                    "title": "Coastal path walk",
+                    "caption": "Candid laughter along the bluffs."
+                },
+                {
+                    "id": "gal-01-asset-04",
+                    "fileName": "botanical-study.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 420000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-01/botanical-study.svg",
+                    "publicUrl": "/images/galleries/botanical-study.svg",
+                    "width": 1400,
+                    "height": 1400,
+                    "title": "Details in the greenhouse",
+                    "caption": "Close-up details from the greenhouse mini session."
+                },
+                {
+                    "id": "gal-01-asset-05",
+                    "fileName": "artisan-details.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 398000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-01/artisan-details.svg",
+                    "publicUrl": "/images/galleries/artisan-details.svg",
+                    "width": 1000,
+                    "height": 1500,
+                    "title": "Heirloom keepsakes",
+                    "caption": "Flat-lay featuring stationery and rings."
+                },
+                {
+                    "id": "gal-01-asset-06",
+                    "fileName": "craftsmanship.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 536000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-01/craftsmanship.svg",
+                    "publicUrl": "/images/galleries/craftsmanship.svg",
+                    "width": 1600,
+                    "height": 900,
+                    "title": "Reception setup",
+                    "caption": "Soft-lit reception tables moments before guests arrived."
+                }
+            ],
+            "totalStorageBytes": 2823000,
+            "totalStorageFormatted": "2.82 MB",
+            "storageSummary": {
+                "assetCount": 6,
+                "totalBytes": 2823000,
+                "formattedTotal": "2.82 MB"
+            },
+            "portalSettings": {
+                "password": "wanderlust-love",
+                "token": "evelyn-portal",
+                "hint": "Use the phrase we texted after your session.",
+                "welcomeMessage": "Hi Evelyn! Relive your engagement weekend highlights here.",
+                "defaultView": "pinterest",
+                "availableViews": [
+                    "pinterest",
+                    "lightbox",
+                    "carousel"
+                ]
+            }
         },
         {
             "id": "gal-02",
@@ -17,8 +116,80 @@
             "status": "Pending",
             "projectId": "proj-02",
             "coverImage": "/images/hero3.svg",
+            "assets": [
+                {
+                    "id": "gal-02-asset-01",
+                    "fileName": "collaboration.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 548000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-02/collaboration.svg",
+                    "publicUrl": "/images/galleries/collaboration.svg",
+                    "width": 1600,
+                    "height": 900,
+                    "title": "Celebration welcome party",
+                    "caption": "Welcome party toasts at the rooftop venue."
+                },
+                {
+                    "id": "gal-02-asset-02",
+                    "fileName": "skyline-dusk.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 502000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-02/skyline-dusk.svg",
+                    "publicUrl": "/images/galleries/skyline-dusk.svg",
+                    "width": 1600,
+                    "height": 1000,
+                    "title": "City skyline portraits",
+                    "caption": "Evening skyline portraits with the couple."
+                },
+                {
+                    "id": "gal-02-asset-03",
+                    "fileName": "cobalt-harbor.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 486000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-02/cobalt-harbor.svg",
+                    "publicUrl": "/images/galleries/cobalt-harbor.svg",
+                    "width": 1600,
+                    "height": 1060,
+                    "title": "Harbor rehearsal dinner",
+                    "caption": "Reflections from the harbor-side rehearsal dinner."
+                },
+                {
+                    "id": "gal-02-asset-04",
+                    "fileName": "studio-session.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 472000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-02/studio-session.svg",
+                    "publicUrl": "/images/galleries/studio-session.svg",
+                    "width": 1600,
+                    "height": 1100,
+                    "title": "Editorial studio portraits",
+                    "caption": "Clean studio portrait series for the couple."
+                }
+            ],
+            "totalStorageBytes": 2008000,
+            "totalStorageFormatted": "2.01 MB",
+            "storageSummary": {
+                "assetCount": 4,
+                "totalBytes": 2008000,
+                "formattedTotal": "2.01 MB"
+            },
             "customFields": {
                 "deliveryEmail": "hello@harrisonandjune.com"
+            },
+            "portalSettings": {
+                "password": "hj-weekend-2025",
+                "hint": "It combines your initials with the event year.",
+                "welcomeMessage": "Welcome back! Your full wedding weekend story is ready.",
+                "defaultView": "carousel",
+                "availableViews": [
+                    "carousel",
+                    "lightbox",
+                    "pinterest"
+                ]
             }
         },
         {
@@ -30,8 +201,66 @@
             "status": "Delivered",
             "projectId": "proj-03",
             "coverImage": "/images/abstract-feature1.svg",
+            "assets": [
+                {
+                    "id": "gal-03-asset-01",
+                    "fileName": "studio-session.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 458000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-03/studio-session.svg",
+                    "publicUrl": "/images/galleries/studio-session.svg",
+                    "width": 1600,
+                    "height": 1100,
+                    "title": "Launch hero scene",
+                    "caption": "Primary hero scene for the lifestyle campaign."
+                },
+                {
+                    "id": "gal-03-asset-02",
+                    "fileName": "collaboration.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 446000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-03/collaboration.svg",
+                    "publicUrl": "/images/galleries/collaboration.svg",
+                    "width": 1600,
+                    "height": 900,
+                    "title": "Team ideation",
+                    "caption": "Creative team collaborating during concept exploration."
+                },
+                {
+                    "id": "gal-03-asset-03",
+                    "fileName": "craftsmanship.svg",
+                    "contentType": "image/svg+xml",
+                    "size": 430000,
+                    "storageBucket": "public",
+                    "storagePath": "galleries/gal-03/craftsmanship.svg",
+                    "publicUrl": "/images/galleries/craftsmanship.svg",
+                    "width": 1600,
+                    "height": 900,
+                    "title": "Product detail vignette",
+                    "caption": "Handcrafted materials styled for the product story."
+                }
+            ],
+            "totalStorageBytes": 1334000,
+            "totalStorageFormatted": "1.33 MB",
+            "storageSummary": {
+                "assetCount": 3,
+                "totalBytes": 1334000,
+                "formattedTotal": "1.33 MB"
+            },
             "customFields": {
                 "deliveryEmail": "sona@patelcreative.co"
+            },
+            "portalSettings": {
+                "token": "sona-brand-access",
+                "hint": "Use the token shared in your kickoff recap.",
+                "welcomeMessage": "Sona, download final selects for the campaign launch.",
+                "defaultView": "lightbox",
+                "availableViews": [
+                    "lightbox",
+                    "pinterest"
+                ]
             }
         },
         {

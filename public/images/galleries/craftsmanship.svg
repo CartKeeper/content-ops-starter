@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Craftsmanship vignette</title>
+  <desc id="desc">Soft focus workshop scene rendered in warm neutrals.</desc>
+  <defs>
+    <linearGradient id="craft-bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f1f5f9" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+    <radialGradient id="craft-light" cx="30%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#fde68a" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#facc15" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#craft-bg)" />
+  <ellipse cx="580" cy="360" rx="320" ry="220" fill="#f8fafc" opacity="0.45" />
+  <ellipse cx="1080" cy="460" rx="420" ry="260" fill="#f8fafc" opacity="0.35" />
+  <rect x="460" y="420" width="280" height="200" rx="24" fill="#fbbf24" opacity="0.6" />
+  <rect x="880" y="460" width="320" height="180" rx="28" fill="#f97316" opacity="0.45" />
+  <ellipse cx="640" cy="380" rx="220" ry="140" fill="url(#craft-light)" />
+</svg>

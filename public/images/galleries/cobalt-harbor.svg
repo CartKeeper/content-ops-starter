@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1060" role="img" aria-labelledby="title desc">
+  <title id="title">Cobalt harbor reflections</title>
+  <desc id="desc">Stylized waterfront skyline with shimmering reflections in deep blues.</desc>
+  <defs>
+    <linearGradient id="harbor-sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="40%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+    <linearGradient id="harbor-water" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0ea5e9" />
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1060" fill="url(#harbor-sky)" />
+  <g fill="#f8fafc" opacity="0.85">
+    <rect x="160" y="180" width="120" height="320" rx="20" />
+    <rect x="320" y="220" width="160" height="380" rx="20" />
+    <rect x="540" y="140" width="180" height="460" rx="24" />
+    <rect x="820" y="200" width="200" height="400" rx="18" />
+    <rect x="1100" y="260" width="140" height="340" rx="16" />
+    <rect x="1280" y="240" width="120" height="360" rx="16" />
+  </g>
+  <rect y="620" width="1600" height="440" fill="url(#harbor-water)" />
+  <g fill="#bae6fd" opacity="0.45">
+    <rect x="160" y="660" width="120" height="320" rx="20" />
+    <rect x="320" y="700" width="160" height="260" rx="20" />
+    <rect x="540" y="660" width="180" height="300" rx="24" />
+    <rect x="820" y="700" width="200" height="260" rx="18" />
+    <rect x="1100" y="720" width="140" height="220" rx="16" />
+    <rect x="1280" y="720" width="120" height="220" rx="16" />
+  </g>
+</svg>

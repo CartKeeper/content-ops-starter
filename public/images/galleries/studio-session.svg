@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" role="img" aria-labelledby="title desc">
+  <title id="title">Studio session</title>
+  <desc id="desc">Minimal studio interior with lighting gradients and soft shadows.</desc>
+  <defs>
+    <linearGradient id="studio-bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f4f4f5" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+    <radialGradient id="studio-light" cx="35%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#f1f5f9" />
+      <stop offset="100%" stop-color="#e2e8f0" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="1100" fill="url(#studio-bg)" />
+  <rect x="220" y="320" width="1160" height="540" rx="40" fill="#1f2937" opacity="0.08" />
+  <rect x="260" y="360" width="1080" height="460" rx="32" fill="#1f2937" opacity="0.1" />
+  <ellipse cx="900" cy="520" rx="420" ry="260" fill="url(#studio-light)" />
+  <rect x="520" y="460" width="320" height="220" rx="28" fill="#334155" opacity="0.45" />
+  <rect x="880" y="500" width="360" height="180" rx="24" fill="#0f172a" opacity="0.35" />
+</svg>

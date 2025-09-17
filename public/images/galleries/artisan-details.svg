@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1500" role="img" aria-labelledby="title desc">
+  <title id="title">Artisan details</title>
+  <desc id="desc">Soft neutrals with organic shapes suggesting handcrafted objects.</desc>
+  <defs>
+    <linearGradient id="artisan-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f1f5f9" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+  </defs>
+  <rect width="1000" height="1500" fill="url(#artisan-bg)" />
+  <g fill="#fde68a" opacity="0.85">
+    <path d="M180,960 C320,820 360,620 440,440 C520,260 640,160 780,180 C640,300 620,440 560,620 C500,800 360,1020 180,960 Z" />
+  </g>
+  <g fill="#fbbf24" opacity="0.55">
+    <circle cx="620" cy="420" r="120" />
+    <circle cx="720" cy="560" r="80" />
+  </g>
+  <g fill="#94a3b8" opacity="0.4">
+    <rect x="220" y="1080" width="320" height="220" rx="40" />
+    <rect x="580" y="1020" width="200" height="240" rx="60" />
+  </g>
+</svg>
