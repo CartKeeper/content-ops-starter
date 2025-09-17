@@ -6,8 +6,19 @@ import { ApertureMark } from './ApertureMark';
 const STORAGE_KEY = 'crm-auth-access-token';
 const RESOLVED_ACCESS_CODE =
     (process.env.NEXT_PUBLIC_CRM_ACCESS_TOKEN ?? process.env.CRM_ACCESS_TOKEN ?? '').trim();
+const AUTH_DISABLED_OVERRIDE = (
+    process.env.NEXT_PUBLIC_CRM_DISABLE_AUTH ?? process.env.CRM_DISABLE_AUTH ?? 'true'
+)
+    .trim()
+    .toLowerCase();
 
-const guardIsEnabled = RESOLVED_ACCESS_CODE.length > 0;
+const guardOverrideDisabled =
+    AUTH_DISABLED_OVERRIDE === 'true' ||
+    AUTH_DISABLED_OVERRIDE === '1' ||
+    AUTH_DISABLED_OVERRIDE === 'yes' ||
+    AUTH_DISABLED_OVERRIDE === 'on';
+
+const guardIsEnabled = !guardOverrideDisabled && RESOLVED_ACCESS_CODE.length > 0;
 
 type CrmAuthContextValue = {
     isAuthenticated: boolean;
@@ -32,14 +43,20 @@ type CrmAuthGuardProps = {
 };
 
 export function CrmAuthGuard({ children, title, description }: CrmAuthGuardProps) {
+    const guardDisabled = guardOverrideDisabled;
     const identity = useNetlifyIdentity();
-    const identityGuardEnabled = identity.hasWidget;
+    const identityGuardEnabled = !guardDisabled && identity.hasWidget;
     const passcodeGuardEnabled = guardIsEnabled && !identityGuardEnabled;
 
     const [isAuthenticated, setIsAuthenticated] = React.useState<boolean>(() => !guardIsEnabled);
     const [isReady, setIsReady] = React.useState<boolean>(() => !guardIsEnabled);
     const [accessCode, setAccessCode] = React.useState('');
     const [error, setError] = React.useState<string | null>(null);
+
+    const disabledContextValue = React.useMemo<CrmAuthContextValue>(
+        () => ({ isAuthenticated: true, guardEnabled: false, signOut: () => undefined }),
+        []
+    );
 
     const identityContextValue = React.useMemo<CrmAuthContextValue>(
         () => ({
@@ -49,6 +66,10 @@ export function CrmAuthGuard({ children, title, description }: CrmAuthGuardProps
         }),
         [identity.isAuthenticated, identity.isPhotographer, identity.logout]
     );
+
+    if (guardDisabled) {
+        return <CrmAuthContext.Provider value={disabledContextValue}>{children}</CrmAuthContext.Provider>;
+    }
 
     React.useEffect(() => {
         if (identityGuardEnabled) {
