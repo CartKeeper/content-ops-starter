@@ -22,6 +22,32 @@ If you click "Deploy to Netlify" button, it will create a new repo for you that 
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/netlify-templates/content-ops-starter)
 
+### Gallery expiration reminders
+
+Galleries now automatically receive an `expiresAt` value one year after they are marked as delivered. A Netlify scheduled function located at `netlify/functions/gallery-expiration-reminder.ts` runs once per day to find delivered galleries that are 11 months past delivery, send an expiration reminder email, and persist the `reminderSentAt` timestamp so clients are only notified once. Reminder activity is appended to `content/logs/gallery-reminders.log` for auditing.
+
+Configure the mailer by setting the following environment variables before deploying:
+
+- `GALLERY_REMINDER_FROM_EMAIL` &mdash; the from/reply address used in the reminder email (defaults to `no-reply@averyloganstudio.com`).
+- `GALLERY_REMINDER_OPT_OUT_URL` &mdash; optional link included in the footer so clients can manage reminders.
+
+The reminder template is a concise plain-text email:
+
+```
+Subject: Your gallery expires on {expirationDate}
+
+Hi {clientName},
+
+We hope you're enjoying the "{shootType}" gallery. This is a friendly reminder that access expires on {expirationDate}.
+Download the full-resolution files and favorites before the link is closed to keep a local backup.
+{Opt-out URL (if configured)}
+
+With gratitude,
+Avery Logan Studio
+```
+
+Reminders are only attempted when a gallery includes a `deliveryEmail` custom field. You can capture this value through the gallery quick-action modal or by editing the gallery record directly.
+
 ## Develop with Netlify Visual Editor Locally
 
 The typical development process is to begin by working locally. Clone this repository, then run `npm install` in its root directory.

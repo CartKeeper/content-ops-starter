@@ -11,7 +11,10 @@ export type GalleryRecord = {
     shootType: string;
     deliveryDueDate?: string;
     deliveredAt?: string;
+    expiresAt?: string;
+    reminderSentAt?: string;
     status: GalleryStatus;
+    projectId?: string;
     coverImage?: string;
     customFields?: Record<string, string | boolean>;
 };
@@ -121,21 +124,31 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Wedding Weekend',
         deliveryDueDate: '2025-05-27',
         status: 'Pending',
-        coverImage: '/images/hero3.svg'
+        projectId: 'proj-02',
+        coverImage: '/images/hero3.svg',
+        customFields: {
+            deliveryEmail: 'hello@harrisonandjune.com'
+        }
     },
     {
         id: 'gal-03',
         client: 'Sona Patel',
         shootType: 'Brand Lifestyle Campaign',
         deliveredAt: '2025-04-28',
+        expiresAt: '2026-04-28',
         status: 'Delivered',
-        coverImage: '/images/abstract-feature1.svg'
+        projectId: 'proj-03',
+        coverImage: '/images/abstract-feature1.svg',
+        customFields: {
+            deliveryEmail: 'sona@patelcreative.co'
+        }
     },
     {
         id: 'gal-04',
         client: 'Fern & Pine Studio',
         shootType: 'Lookbook Launch',
         deliveredAt: '2025-04-10',
+        expiresAt: '2026-04-10',
         status: 'Delivered',
         coverImage: '/images/abstract-feature2.svg'
     },
@@ -144,14 +157,20 @@ export const galleryCollection: GalleryRecord[] = [
         client: 'Evergreen Architects',
         shootType: 'Team Headshots',
         deliveredAt: '2025-03-23',
+        expiresAt: '2026-03-23',
         status: 'Delivered',
-        coverImage: '/images/abstract-feature3.svg'
+        projectId: 'proj-01',
+        coverImage: '/images/abstract-feature3.svg',
+        customFields: {
+            deliveryEmail: 'team@evergreenarchitects.com'
+        }
     },
     {
         id: 'gal-06',
         client: 'Violet & Thread',
         shootType: 'Spring Collection',
         deliveredAt: '2025-02-24',
+        expiresAt: '2026-02-24',
         status: 'Delivered',
         coverImage: '/images/hero2.svg'
     },
@@ -160,6 +179,7 @@ export const galleryCollection: GalleryRecord[] = [
         client: 'Atlas Fitness',
         shootType: 'Brand Campaign',
         deliveredAt: '2025-02-02',
+        expiresAt: '2026-02-02',
         status: 'Delivered',
         coverImage: '/images/hero.svg'
     },
@@ -168,24 +188,35 @@ export const galleryCollection: GalleryRecord[] = [
         client: 'Harbor & Co',
         shootType: 'Product Launch',
         deliveredAt: '2024-12-18',
+        expiresAt: '2025-12-18',
         status: 'Delivered',
-        coverImage: '/images/abstract-background.svg'
+        coverImage: '/images/abstract-background.svg',
+        customFields: {
+            deliveryEmail: 'projects@harborandco.com'
+        },
+        reminderSentAt: '2025-11-18T09:15:00.000Z'
     },
     {
         id: 'gal-09',
         client: 'Lumen Studio',
         shootType: 'Agency Portfolio',
         deliveredAt: '2024-11-23',
+        expiresAt: '2025-11-23',
         status: 'Delivered',
-        coverImage: '/images/background-grid.svg'
+        coverImage: '/images/background-grid.svg',
+        customFields: {
+            deliveryEmail: 'hello@lumen.studio'
+        }
     },
     {
         id: 'gal-10',
         client: 'Beacon Realty',
         shootType: 'Property Showcase',
         deliveredAt: '2024-10-12',
+        expiresAt: '2025-10-12',
         status: 'Delivered',
-        coverImage: '/images/hero2.svg'
+        coverImage: '/images/hero2.svg',
+        reminderSentAt: '2025-09-12T18:00:00.000Z'
     }
 ];
 

@@ -11,6 +11,7 @@ import {
     type InvoiceStatus,
     type InvoiceTemplateId
 } from '../../../types/invoice';
+import type { GalleryRecord, GalleryStatus } from '../../../data/crm';
 import { generateInvoicePdf } from '../../../server/invoices/generator';
 import { sendInvoiceEmail, type InvoiceEmailResult } from '../../../server/invoices/mailer';
 import { createStripePaymentLink } from '../../../server/invoices/stripe';
@@ -31,6 +32,7 @@ const RESOURCE_CONFIG: Record<ResourceKey, ResourceConfig> = {
 const DATA_DIRECTORY = path.join(process.cwd(), 'content', 'data');
 
 const INVOICE_STATUSES: InvoiceStatus[] = ['Draft', 'Sent', 'Paid', 'Overdue'];
+const GALLERY_STATUSES: GalleryStatus[] = ['Delivered', 'Pending'];
 const INVOICE_TEMPLATES: InvoiceTemplateId[] = ['classic', 'minimal', 'branded'];
 
 type NormalizedInvoiceResult = {
@@ -81,6 +83,16 @@ function parseString(value: unknown, fallback: string): string {
     return fallback;
 }
 
+function parseOptionalString(value: unknown): string | undefined {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) {
+            return trimmed;
+        }
+    }
+    return undefined;
+}
+
 function parseDateValue(value: unknown, fallback: string): string {
     if (typeof value === 'string') {
         const trimmed = value.trim();
@@ -89,6 +101,26 @@ function parseDateValue(value: unknown, fallback: string): string {
         }
     }
     return fallback;
+}
+
+function parseOptionalDateValue(value: unknown): string | undefined {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed && dayjs(trimmed).isValid()) {
+            return dayjs(trimmed).format('YYYY-MM-DD');
+        }
+    }
+    return undefined;
+}
+
+function parseOptionalDateTimeValue(value: unknown): string | undefined {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed && dayjs(trimmed).isValid()) {
+            return dayjs(trimmed).toISOString();
+        }
+    }
+    return undefined;
 }
 
 function parseNumber(value: unknown): number | null {
@@ -198,6 +230,86 @@ function sanitizeCustomFields(value: unknown): Record<string, string | boolean> 
     });
 
     return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function normalizeGalleryRecord(
+    payload: Record<string, unknown>,
+    existing?: GalleryRecord
+): GalleryRecord {
+    const id = parseString(payload.id, existing?.id ?? randomUUID());
+    const client = parseString(payload.client, existing?.client ?? 'New client');
+    const shootType = parseString(payload.shootType, existing?.shootType ?? 'New gallery');
+
+    const status =
+        typeof payload.status === 'string' && GALLERY_STATUSES.includes(payload.status as GalleryStatus)
+            ? (payload.status as GalleryStatus)
+            : existing?.status ?? 'Pending';
+
+    const hasDeliveryDueDate = Object.prototype.hasOwnProperty.call(payload, 'deliveryDueDate');
+    const deliveryDueDate = hasDeliveryDueDate
+        ? parseOptionalDateValue(payload.deliveryDueDate)
+        : existing?.deliveryDueDate;
+
+    let deliveredAt: string | undefined;
+    if (status === 'Delivered') {
+        if (Object.prototype.hasOwnProperty.call(payload, 'deliveredAt')) {
+            deliveredAt = parseOptionalDateValue(payload.deliveredAt);
+        } else {
+            deliveredAt = existing?.deliveredAt;
+        }
+
+        if (!deliveredAt) {
+            deliveredAt = deliveryDueDate ?? existing?.deliveryDueDate ?? dayjs().format('YYYY-MM-DD');
+        }
+    }
+
+    const hasReminderField = Object.prototype.hasOwnProperty.call(payload, 'reminderSentAt');
+    let reminderSentAt: string | undefined;
+    if (status === 'Delivered') {
+        if (hasReminderField) {
+            reminderSentAt =
+                payload.reminderSentAt === null
+                    ? undefined
+                    : parseOptionalDateTimeValue(payload.reminderSentAt);
+        } else {
+            reminderSentAt = existing?.reminderSentAt;
+        }
+    }
+
+    const expiresAt =
+        status === 'Delivered' && deliveredAt
+            ? dayjs(deliveredAt).add(1, 'year').format('YYYY-MM-DD')
+            : undefined;
+
+    const hasProjectId = Object.prototype.hasOwnProperty.call(payload, 'projectId');
+    const projectId = hasProjectId
+        ? payload.projectId === null
+            ? undefined
+            : parseOptionalString(payload.projectId) ?? undefined
+        : existing?.projectId;
+
+    const hasCoverImage = Object.prototype.hasOwnProperty.call(payload, 'coverImage');
+    const coverImage = hasCoverImage
+        ? payload.coverImage === null
+            ? undefined
+            : parseOptionalString(payload.coverImage) ?? undefined
+        : existing?.coverImage;
+
+    const customFields = sanitizeCustomFields(payload.customFields) ?? existing?.customFields;
+
+    return {
+        id,
+        client,
+        shootType,
+        status,
+        deliveryDueDate,
+        deliveredAt,
+        expiresAt,
+        reminderSentAt,
+        projectId,
+        coverImage,
+        customFields
+    } satisfies GalleryRecord;
 }
 
 function normalizeInvoiceRecord(payload: Record<string, unknown>): NormalizedInvoiceResult {
@@ -449,6 +561,17 @@ async function handlePost(
         return res.status(201).json({ data: invoice, meta: { email: emailResult, pdf: generated } });
     }
 
+    if (resourceKey === 'galleries') {
+        const galleries = await readRecords<GalleryRecord>(config);
+        const recordWithId = ensureRecordId(resourceKey, galleries, payload);
+        const gallery = normalizeGalleryRecord(recordWithId);
+
+        galleries.push(gallery);
+        await writeRecords(config, galleries);
+
+        return res.status(201).json({ data: gallery });
+    }
+
     const records = await readRecords<Record<string, unknown>>(config);
     const recordWithId = ensureRecordId(resourceKey, records, payload);
     records.push(recordWithId);
@@ -481,6 +604,22 @@ async function handlePut(
         const updated = applyInvoiceUpdate(invoices[index], payload);
         invoices[index] = updated;
         await writeRecords(config, invoices);
+
+        return res.status(200).json({ data: updated });
+    }
+
+    if (resourceKey === 'galleries') {
+        const galleries = await readRecords<GalleryRecord>(config);
+        const index = galleries.findIndex((gallery) => gallery.id === id);
+
+        if (index === -1) {
+            return res.status(404).json({ error: 'Record not found.' });
+        }
+
+        const payloadWithId: Record<string, unknown> = { ...payload, id };
+        const updated = normalizeGalleryRecord(payloadWithId, galleries[index]);
+        galleries[index] = updated;
+        await writeRecords(config, galleries);
 
         return res.status(200).json({ data: updated });
     }

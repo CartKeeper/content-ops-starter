@@ -10,6 +10,7 @@
     "dependencies": {
         "@algolia/autocomplete-js": "^1.17.1",
         "@algolia/autocomplete-theme-classic": "^1.17.1",
+        "@netlify/functions": "^2.7.0",
         "@radix-ui/react-dialog": "^1.1.15",
         "@react-pdf/renderer": "^4.3.0",
         "@reduxjs/toolkit": "^2.9.0",
