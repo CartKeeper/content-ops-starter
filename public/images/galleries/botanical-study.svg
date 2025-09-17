@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1400" role="img" aria-labelledby="title desc">
+  <title id="title">Botanical study</title>
+  <desc id="desc">Illustrated foliage with layered leaves in fresh greens.</desc>
+  <defs>
+    <linearGradient id="leaf-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#bbf7d0" />
+      <stop offset="100%" stop-color="#22c55e" />
+    </linearGradient>
+    <linearGradient id="background" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ecfccb" />
+      <stop offset="100%" stop-color="#f1f5f9" />
+    </linearGradient>
+  </defs>
+  <rect width="1400" height="1400" fill="url(#background)" />
+  <g fill="url(#leaf-gradient)" opacity="0.9">
+    <path d="M320,980 C460,620 760,520 960,260 C820,580 900,760 740,920 C560,1120 420,1080 320,980 Z" />
+    <path d="M520,1120 C700,780 860,760 1080,520 C960,820 1040,980 900,1140 C760,1260 620,1240 520,1120 Z" opacity="0.65" />
+    <path d="M360,820 C500,540 760,420 960,220 C840,520 860,720 700,880 C520,1040 420,960 360,820 Z" opacity="0.5" />
+  </g>
+</svg>

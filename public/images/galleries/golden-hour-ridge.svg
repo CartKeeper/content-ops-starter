@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1600" role="img" aria-labelledby="title desc">
+  <title id="title">Golden hour ridge</title>
+  <desc id="desc">Warm light wraps rolling hills with silhouetted trees at sunset.</desc>
+  <defs>
+    <linearGradient id="ridge-sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fb7185" />
+      <stop offset="55%" stop-color="#f97316" />
+      <stop offset="100%" stop-color="#facc15" />
+    </linearGradient>
+    <linearGradient id="ridge-hills" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#0ea5e9" />
+    </linearGradient>
+  </defs>
+  <rect width="1000" height="1600" fill="url(#ridge-sky)" />
+  <path d="M0,1080 C180,1020 320,1120 520,1080 C720,1040 860,1160 1000,1100 L1000,1600 L0,1600 Z" fill="#1d4ed8" opacity="0.45" />
+  <path d="M0,1180 C220,1120 360,1220 520,1180 C720,1120 860,1280 1000,1220 L1000,1600 L0,1600 Z" fill="url(#ridge-hills)" />
+  <g fill="#0f172a" opacity="0.75">
+    <circle cx="280" cy="1130" r="22" />
+    <circle cx="340" cy="1120" r="18" />
+    <circle cx="760" cy="1200" r="20" />
+    <circle cx="820" cy="1190" r="15" />
+  </g>
+</svg>
