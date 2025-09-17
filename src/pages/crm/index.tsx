@@ -570,31 +570,114 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
         [bookingList, currentMonth]
     );
 
-    const galleryDeliveryDeadlines = React.useMemo(
-        () => {
-            const referenceDate = currentMonth.startOf('day');
+    const galleryLifecycleAlerts = React.useMemo(() => {
+        type AlertTone = 'danger' | 'warning' | 'info' | 'muted';
+        type GalleryAlert = {
+            id: string;
+            client: string;
+            shootType: string;
+            projectId?: string;
+            eventType: 'delivery' | 'expiration';
+            eventDate: string;
+            eventDateLabel: string;
+            countdownLabel: string;
+            tone: AlertTone;
+            reminderSentLabel?: string;
+        };
 
-            return galleryList
-                .filter((gallery) => gallery.status === 'Pending' && gallery.deliveryDueDate)
-                .map((gallery) => {
-                    const dueDate = dayjs(gallery.deliveryDueDate as string);
-                    const daysRemaining = dueDate.startOf('day').diff(referenceDate, 'day');
+        const referenceDate = dayjs().startOf('day');
+        const expirationWarningThreshold = 30;
 
-                    return {
-                        ...gallery,
-                        dueDateLabel: dueDate.format('MMM D'),
-                        daysRemaining,
-                        isOverdue: daysRemaining < 0
-                    };
-                })
-                .sort(
-                    (first, second) =>
-                        dayjs(first.deliveryDueDate as string).valueOf() -
-                        dayjs(second.deliveryDueDate as string).valueOf()
-                );
-        },
-        [currentMonth, galleryList]
-    );
+        return galleryList
+            .flatMap<GalleryAlert>((gallery) => {
+                const alerts: GalleryAlert[] = [];
+
+                if (gallery.status === 'Pending' && gallery.deliveryDueDate) {
+                    const dueDate = dayjs(gallery.deliveryDueDate);
+
+                    if (dueDate.isValid()) {
+                        const daysRemaining = dueDate.startOf('day').diff(referenceDate, 'day');
+                        let tone: AlertTone = 'info';
+
+                        if (daysRemaining < 0) {
+                            tone = 'danger';
+                        } else if (daysRemaining <= 3) {
+                            tone = 'warning';
+                        }
+
+                        const countdownLabel =
+                            daysRemaining < 0
+                                ? `Overdue by ${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) === 1 ? '' : 's'}`
+                                : daysRemaining === 0
+                                  ? 'Due today'
+                                  : daysRemaining === 1
+                                    ? 'Due tomorrow'
+                                    : `Due in ${daysRemaining} days`;
+
+                        alerts.push({
+                            id: `${gallery.id}-delivery`,
+                            client: gallery.client,
+                            shootType: gallery.shootType,
+                            projectId: gallery.projectId,
+                            eventType: 'delivery',
+                            eventDate: dueDate.toISOString(),
+                            eventDateLabel: dueDate.format('MMM D, YYYY'),
+                            countdownLabel,
+                            tone
+                        });
+                    }
+                }
+
+                if (gallery.status === 'Delivered' && gallery.expiresAt) {
+                    const expiresAt = dayjs(gallery.expiresAt);
+
+                    if (expiresAt.isValid()) {
+                        const daysRemaining = expiresAt.startOf('day').diff(referenceDate, 'day');
+                        let tone: AlertTone = 'muted';
+
+                        if (daysRemaining < 0) {
+                            tone = 'danger';
+                        } else if (daysRemaining <= expirationWarningThreshold) {
+                            tone = 'warning';
+                        }
+
+                        const countdownLabel =
+                            daysRemaining < 0
+                                ? `Expired ${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) === 1 ? '' : 's'} ago`
+                                : daysRemaining === 0
+                                  ? 'Expires today'
+                                  : daysRemaining === 1
+                                    ? 'Expires tomorrow'
+                                    : `Expires in ${daysRemaining} days`;
+
+                        alerts.push({
+                            id: `${gallery.id}-expiration`,
+                            client: gallery.client,
+                            shootType: gallery.shootType,
+                            projectId: gallery.projectId,
+                            eventType: 'expiration',
+                            eventDate: expiresAt.toISOString(),
+                            eventDateLabel: expiresAt.format('MMM D, YYYY'),
+                            countdownLabel,
+                            tone,
+                            reminderSentLabel: gallery.reminderSentAt
+                                ? dayjs(gallery.reminderSentAt).format('MMM D, YYYY')
+                                : undefined
+                        });
+                    }
+                }
+
+                return alerts;
+            })
+            .sort((first, second) => dayjs(first.eventDate).valueOf() - dayjs(second.eventDate).valueOf());
+    }, [galleryList]);
+
+    const galleryLifecycleToneClass: Record<'danger' | 'warning' | 'info' | 'muted', string> = {
+        danger: 'text-[#D61B7B] dark:text-[#FF9FD8]',
+        warning: 'text-amber-600 dark:text-amber-300',
+        info: 'text-[#0F9BD7] dark:text-[#63E8FF]',
+        muted: 'text-slate-500 dark:text-slate-400'
+    };
 
     return (
         <>
@@ -951,47 +1034,65 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                                     </SectionCard>
 
                                     <SectionCard
-                                        title="Gallery Delivery Deadlines"
-                                        description="Keep post-production commitments on schedule."
+                                        title="Gallery Delivery &amp; Expiration"
+                                        description="Keep post-production commitments on schedule and alert clients before galleries expire."
                                     >
-                                        {galleryDeliveryDeadlines.length > 0 ? (
+                                        {galleryLifecycleAlerts.length > 0 ? (
                                             <ul className="space-y-4">
-                                                {galleryDeliveryDeadlines.map((gallery) => (
-                                                    <li
-                                                        key={gallery.id}
-                                                        className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                                                    >
-                                                        <div className="flex items-start justify-between gap-4">
-                                                            <div>
-                                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                                                                    {gallery.client}
-                                                                </p>
-                                                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                                    {gallery.shootType}
-                                                                </p>
+                                                {galleryLifecycleAlerts.map((alert) => {
+                                                    const toneClass = galleryLifecycleToneClass[alert.tone];
+                                                    const badgeClass = [
+                                                        'inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold',
+                                                        alert.eventType === 'delivery'
+                                                            ? 'bg-indigo-100/80 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200'
+                                                            : alert.tone === 'danger'
+                                                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'
+                                                              : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
+                                                    ].join(' ');
+
+                                                    return (
+                                                        <li
+                                                            key={alert.id}
+                                                            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                                                        >
+                                                            <div className="flex items-start justify-between gap-4">
+                                                                <div>
+                                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                        {alert.client}
+                                                                    </p>
+                                                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                                        {alert.shootType}
+                                                                    </p>
+                                                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                                                        <span className={badgeClass}>
+                                                                            {alert.eventType === 'delivery' ? 'Delivery' : 'Expiration'}
+                                                                        </span>
+                                                                        {alert.projectId ? (
+                                                                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                                                                                {alert.projectId}
+                                                                            </span>
+                                                                        ) : null}
+                                                                        {alert.eventType === 'expiration' && alert.reminderSentLabel ? (
+                                                                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                                                                                Reminder sent {alert.reminderSentLabel}
+                                                                            </span>
+                                                                        ) : null}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-right text-xs">
+                                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                        {alert.eventDateLabel}
+                                                                    </p>
+                                                                    <p className={['font-semibold', toneClass].join(' ')}>{alert.countdownLabel}</p>
+                                                                </div>
                                                             </div>
-                                                            <div className="text-right text-xs">
-                                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                                                                    {gallery.dueDateLabel}
-                                                                </p>
-                                                                <p
-                                                                    className={[
-                                                                        'font-semibold',
-                                                                        gallery.isOverdue
-                                                                            ? 'text-[#D61B7B] dark:text-[#FF9FD8]'
-                                                                            : 'text-[#0F9BD7] dark:text-[#63E8FF]'
-                                                                    ].join(' ')}
-                                                                >
-                                                                    {formatDeadline(gallery.daysRemaining)}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </li>
-                                                ))}
+                                                        </li>
+                                                    );
+                                                })}
                                             </ul>
                                         ) : (
                                             <p className="text-sm text-slate-500 dark:text-slate-400">
-                                                All galleries have been delivered.
+                                                No upcoming deliveries or expirations.
                                             </p>
                                         )}
                                     </SectionCard>
@@ -1204,23 +1305,6 @@ function formatDaysUntil(days: number): string {
     }
 
     return `In ${days} days`;
-}
-
-function formatDeadline(daysRemaining: number): string {
-    if (daysRemaining < 0) {
-        const overdueBy = Math.abs(daysRemaining);
-        return `Overdue by ${overdueBy} day${overdueBy === 1 ? '' : 's'}`;
-    }
-
-    if (daysRemaining === 0) {
-        return 'Due today';
-    }
-
-    if (daysRemaining === 1) {
-        return 'Due tomorrow';
-    }
-
-    return `Due in ${daysRemaining} days`;
 }
 
 type EarningsProgressProps = {

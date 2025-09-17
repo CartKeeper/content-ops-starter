@@ -648,6 +648,31 @@ function GalleriesModule({ galleries }: GalleriesModuleProps) {
     const delivered = galleries.filter((gallery) => gallery.status === 'Delivered').length;
     const pending = galleries.filter((gallery) => gallery.status === 'Pending').length;
     const completion = galleries.length ? Math.round((delivered / galleries.length) * 100) : 0;
+    const today = dayjs().startOf('day');
+    const expirationWarningThreshold = 30;
+
+    const expiringSoon = galleries.filter((gallery) => {
+        if (gallery.status !== 'Delivered' || !gallery.expiresAt) {
+            return false;
+        }
+
+        const expiresAt = dayjs(gallery.expiresAt);
+        if (!expiresAt.isValid()) {
+            return false;
+        }
+
+        const daysRemaining = expiresAt.startOf('day').diff(today, 'day');
+        return daysRemaining >= 0 && daysRemaining <= expirationWarningThreshold;
+    }).length;
+
+    const expired = galleries.filter((gallery) => {
+        if (gallery.status !== 'Delivered' || !gallery.expiresAt) {
+            return false;
+        }
+
+        const expiresAt = dayjs(gallery.expiresAt);
+        return expiresAt.isValid() && expiresAt.startOf('day').isBefore(today);
+    }).length;
 
     return (
         <section className="relative space-y-6 pb-20">
@@ -663,17 +688,44 @@ function GalleriesModule({ galleries }: GalleriesModuleProps) {
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-200/70 px-3 py-1 font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200">
                             Delivered {delivered}
                         </span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/70 px-3 py-1 font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-200/70 px-3 py-1 font-semibold text-sky-700 dark:bg-sky-500/20 dark:text-sky-200">
                             Pending {pending}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-indigo-200/70 px-3 py-1 font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200">
                             {completion}% complete
                         </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/70 px-3 py-1 font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
+                            Expiring soon {expiringSoon}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-200/70 px-3 py-1 font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">
+                            Expired {expired}
+                        </span>
                     </div>
                 </div>
                 <div className="mt-4 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                     {galleries.map((gallery) => (
-                        <article key={gallery.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900">
+                        <article
+                            key={gallery.id}
+                            className={[
+                                'overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg dark:bg-slate-900',
+                                (() => {
+                                    if (gallery.status === 'Delivered' && gallery.expiresAt) {
+                                        const expiresAt = dayjs(gallery.expiresAt);
+                                        if (expiresAt.isValid()) {
+                                            const daysRemaining = expiresAt.startOf('day').diff(today, 'day');
+                                            if (daysRemaining < 0) {
+                                                return 'border-rose-300/80 dark:border-rose-500/50';
+                                            }
+                                            if (daysRemaining <= expirationWarningThreshold) {
+                                                return 'border-amber-300/80 dark:border-amber-400/50';
+                                            }
+                                        }
+                                    }
+
+                                    return 'border-slate-200 dark:border-slate-800';
+                                })()
+                            ].join(' ')}
+                        >
                             <div className="relative h-44 overflow-hidden">
                                 <Image
                                     src={gallery.coverImage ?? '/images/img-placeholder.svg'}
@@ -682,18 +734,112 @@ function GalleriesModule({ galleries }: GalleriesModuleProps) {
                                     sizes="(min-width: 1280px) 320px, (min-width: 640px) 50vw, 100vw"
                                     className="object-cover"
                                 />
-                                <div className="absolute left-4 top-4 inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-700 backdrop-blur dark:bg-slate-900/80 dark:text-slate-200">
-                                    {gallery.status}
+                                <div
+                                    className={[
+                                        'absolute left-4 top-4 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold backdrop-blur',
+                                        (() => {
+                                            if (gallery.status === 'Delivered' && gallery.expiresAt) {
+                                                const expiresAt = dayjs(gallery.expiresAt);
+                                                if (expiresAt.isValid()) {
+                                                    const daysRemaining = expiresAt.startOf('day').diff(today, 'day');
+                                                    if (daysRemaining < 0) {
+                                                        return 'bg-[#FFE6F5]/90 text-[#D61B7B] dark:bg-[#4D1331]/80 dark:text-[#FF9FD8]';
+                                                    }
+                                                    if (daysRemaining <= expirationWarningThreshold) {
+                                                        return 'bg-amber-100/90 text-amber-700 dark:bg-amber-500/30 dark:text-amber-100';
+                                                    }
+                                                }
+                                            }
+
+                                            return 'bg-white/80 text-slate-700 dark:bg-slate-900/80 dark:text-slate-200';
+                                        })()
+                                    ].join(' ')}
+                                >
+                                    {(() => {
+                                        if (gallery.status === 'Delivered' && gallery.expiresAt) {
+                                            const expiresAt = dayjs(gallery.expiresAt);
+                                            if (expiresAt.isValid()) {
+                                                const daysRemaining = expiresAt.startOf('day').diff(today, 'day');
+                                                if (daysRemaining < 0) {
+                                                    return 'Expired';
+                                                }
+                                                if (daysRemaining <= expirationWarningThreshold) {
+                                                    return 'Expires soon';
+                                                }
+                                            }
+                                        }
+
+                                        return gallery.status;
+                                    })()}
                                 </div>
                             </div>
                             <div className="space-y-2 px-5 py-4">
                                 <h4 className="text-base font-semibold text-slate-900 dark:text-white">{gallery.client}</h4>
                                 <p className="text-sm text-slate-500 dark:text-slate-400">{gallery.shootType}</p>
+                                {gallery.projectId ? (
+                                    <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400 dark:text-slate-500">
+                                        {gallery.projectId}
+                                    </p>
+                                ) : null}
                                 <p className="text-xs text-slate-400 dark:text-slate-500">
-                                    {gallery.status === 'Delivered'
-                                        ? `Delivered ${dayjs(gallery.deliveredAt).format('MMM D, YYYY')}`
-                                        : `Due ${dayjs(gallery.deliveryDueDate).format('MMM D, YYYY')}`}
+                                    {(() => {
+                                        if (gallery.status === 'Delivered') {
+                                            const deliveredAt = gallery.deliveredAt ? dayjs(gallery.deliveredAt) : null;
+                                            const expiresAt = gallery.expiresAt ? dayjs(gallery.expiresAt) : null;
+
+                                            if (expiresAt && expiresAt.isValid()) {
+                                                return expiresAt.startOf('day').diff(today, 'day') < 0
+                                                    ? `Expired ${expiresAt.format('MMM D, YYYY')}`
+                                                    : `Expires ${expiresAt.format('MMM D, YYYY')}`;
+                                            }
+
+                                            if (deliveredAt && deliveredAt.isValid()) {
+                                                return `Delivered ${deliveredAt.format('MMM D, YYYY')}`;
+                                            }
+
+                                            return 'Delivered';
+                                        }
+
+                                        const dueDate = gallery.deliveryDueDate ? dayjs(gallery.deliveryDueDate) : null;
+                                        return dueDate && dueDate.isValid()
+                                            ? `Due ${dueDate.format('MMM D, YYYY')}`
+                                            : 'Delivery date pending';
+                                    })()}
                                 </p>
+                                {(() => {
+                                    if (gallery.status !== 'Delivered' || !gallery.expiresAt) {
+                                        return null;
+                                    }
+
+                                    const expiresAt = dayjs(gallery.expiresAt);
+                                    if (!expiresAt.isValid()) {
+                                        return null;
+                                    }
+
+                                    const daysRemaining = expiresAt.startOf('day').diff(today, 'day');
+                                    const toneClass =
+                                        daysRemaining < 0
+                                            ? 'text-[#D61B7B] dark:text-[#FF9FD8]'
+                                            : daysRemaining <= expirationWarningThreshold
+                                              ? 'text-amber-600 dark:text-amber-300'
+                                              : 'text-slate-500 dark:text-slate-400';
+
+                                    const label =
+                                        daysRemaining < 0
+                                            ? `Expired ${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) === 1 ? '' : 's'} ago`
+                                            : daysRemaining === 0
+                                              ? 'Expires today'
+                                              : daysRemaining === 1
+                                                ? 'Expires tomorrow'
+                                                : `Expires in ${daysRemaining} days`;
+
+                                    return <p className={['text-xs font-semibold', toneClass].join(' ')}>{label}</p>;
+                                })()}
+                                {gallery.reminderSentAt ? (
+                                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                                        Reminder sent {dayjs(gallery.reminderSentAt).format('MMM D, YYYY')}
+                                    </p>
+                                ) : null}
                             </div>
                         </article>
                     ))}
