@@ -290,6 +290,25 @@ collections:
     - name: crm
       label: Studio CRM
       files:
+          - label: Clients
+            name: clients
+            file: content/data/crm-clients.json
+            format: json
+            fields:
+                - { label: Collection Type, name: type, widget: hidden, default: CrmClients }
+                - label: Client Records
+                  name: items
+                  widget: list
+                  fields:
+                      - { label: Name, name: name, widget: string }
+                      - { label: Email, name: email, widget: string }
+                      - { label: Phone, name: phone, widget: string, required: false }
+                      - { label: Address, name: address, widget: text, required: false }
+                      - { label: Notes, name: notes, widget: text, required: false }
+                      - label: Related Projects
+                        name: related_projects
+                        widget: list
+                        required: false
           - label: Bookings
             name: bookings
             file: content/data/crm-bookings.json
@@ -300,36 +319,12 @@ collections:
                   name: items
                   widget: list
                   fields:
-                      - { label: ID, name: id, widget: string }
                       - { label: Client, name: client, widget: string }
-                      - { label: Shoot Type, name: shootType, widget: string }
                       - { label: Date, name: date, widget: datetime, date_format: 'YYYY-MM-DD', time_format: false }
-                      - { label: Start Time, name: startTime, widget: string, required: false }
-                      - { label: End Time, name: endTime, widget: string, required: false }
-                      - { label: Location, name: location, widget: string, required: false }
+                      - { label: Time, name: time, widget: string }
+                      - { label: Location, name: location, widget: string }
+                      - { label: Shoot Type, name: shoot_type, widget: string }
                       - { label: Status, name: status, widget: string }
-          - label: Galleries
-            name: galleries
-            file: content/data/crm-galleries.json
-            format: json
-            fields:
-                - { label: Collection Type, name: type, widget: hidden, default: CrmGalleries }
-                - label: Gallery Records
-                  name: items
-                  widget: list
-                  fields:
-                      - { label: ID, name: id, widget: string }
-                      - { label: Client, name: client, widget: string }
-                      - { label: Shoot Type, name: shootType, widget: string }
-                      - { label: Status, name: status, widget: string }
-                      - { label: Cover Image, name: coverImage, widget: string, required: false }
-                      - { label: Delivery Due Date, name: deliveryDueDate, widget: datetime, required: false, date_format: 'YYYY-MM-DD', time_format: false }
-                      - { label: Delivered At, name: deliveredAt, widget: datetime, required: false }
-                      - { label: Expires At, name: expiresAt, widget: datetime, required: false }
-                      - { label: Storage Summary, name: storageSummary, widget: json, required: false }
-                      - { label: Portal Settings, name: portalSettings, widget: json, required: false }
-                      - { label: Assets, name: assets, widget: json, required: false }
-                      - { label: Custom Fields, name: customFields, widget: json, required: false }
           - label: Invoices
             name: invoices
             file: content/data/crm-invoices.json
@@ -340,35 +335,43 @@ collections:
                   name: items
                   widget: list
                   fields:
-                      - { label: ID, name: id, widget: string }
                       - { label: Client, name: client, widget: string }
-                      - { label: Client Email, name: clientEmail, widget: string, required: false }
-                      - { label: Project, name: project, widget: string }
-                      - { label: Issue Date, name: issueDate, widget: datetime, date_format: 'YYYY-MM-DD', time_format: false }
-                      - { label: Due Date, name: dueDate, widget: datetime, date_format: 'YYYY-MM-DD', time_format: false }
-                      - { label: Status, name: status, widget: string }
-                      - { label: Currency, name: currency, widget: string, default: USD }
                       - { label: Amount, name: amount, widget: number, value_type: float }
-                      - { label: Tax Rate, name: taxRate, widget: number, value_type: float, min: 0, max: 1, step: 0.001 }
-                      - label: Line Items
-                        name: lineItems
+                      - { label: Due Date, name: due_date, widget: datetime, date_format: 'YYYY-MM-DD', time_format: false }
+                      - { label: Status, name: status, widget: string }
+                      - { label: PDF URL, name: pdf_url, widget: string, required: false }
+          - label: Galleries
+            name: galleries
+            file: content/data/crm-galleries.json
+            format: json
+            fields:
+                - { label: Collection Type, name: type, widget: hidden, default: CrmGalleries }
+                - label: Gallery Records
+                  name: items
+                  widget: list
+                  fields:
+                      - { label: Client, name: client, widget: string }
+                      - { label: Project, name: project, widget: string }
+                      - label: Photos
+                        name: photos
                         widget: list
-                        fields:
-                            - { label: ID, name: id, widget: string }
-                            - { label: Description, name: description, widget: string }
-                            - { label: Quantity, name: quantity, widget: number, value_type: int, min: 1 }
-                            - { label: Unit Price, name: unitPrice, widget: number, value_type: float }
-                            - { label: Total, name: total, widget: number, value_type: float }
-                      - label: Totals
-                        name: totals
-                        widget: object
-                        fields:
-                            - { label: Subtotal, name: subtotal, widget: number, value_type: float }
-                            - { label: Tax Total, name: taxTotal, widget: number, value_type: float }
-                            - { label: Invoice Total, name: total, widget: number, value_type: float }
-                      - { label: Notes, name: notes, widget: text, required: false }
-                      - { label: Template, name: template, widget: string }
-                      - { label: PDF URL, name: pdfUrl, widget: string, required: false }
-                      - { label: Payment Link, name: paymentLink, widget: string, required: false }
-                      - { label: Last Sent At, name: lastSentAt, widget: datetime, required: false }
-                      - { label: Custom Fields, name: customFields, widget: json, required: false }
+                      - { label: Status, name: status, widget: string }
+          - label: Settings
+            name: settings
+            file: content/data/crm-settings.json
+            format: json
+            fields:
+                - { label: Collection Type, name: type, widget: hidden, default: CrmSettings }
+                - { label: Brand Logo, name: brand_logo, widget: image, required: false }
+                - label: Brand Colors
+                  name: brand_colors
+                  widget: list
+                  required: false
+                - { label: Notification Preferences, name: notification_prefs, widget: json, required: false }
+                - label: Custom Fields
+                  name: custom_fields
+                  widget: list
+                  required: false
+                  fields:
+                      - { label: Label, name: label, widget: string }
+                      - { label: Value, name: value, widget: string, required: false }
