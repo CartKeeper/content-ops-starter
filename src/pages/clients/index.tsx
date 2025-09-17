@@ -435,7 +435,7 @@ function ClientsWorkspace({ invoices }: ClientsPageProps) {
             return null;
         }
         const tokenQuery = selectedClient.portalToken ? `?token=${encodeURIComponent(selectedClient.portalToken)}` : '';
-        return `/portal/${selectedClient.portalId}${tokenQuery}`;
+        return `/gallery-portal/${selectedClient.portalId}${tokenQuery}`;
     }, [selectedClient]);
 
     return (
