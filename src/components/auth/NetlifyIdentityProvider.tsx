@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import type { User } from 'netlify-identity-widget';
+import type { NetlifyIdentity, User } from 'netlify-identity-widget';
 
 type IdentityView = 'login' | 'signup';
 
@@ -40,12 +40,10 @@ type NetlifyIdentityProviderProps = {
     children: React.ReactNode;
 };
 
-type IdentityModule = typeof import('netlify-identity-widget');
-
 type IdentityError = Error & { description?: string };
 
 export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderProps) {
-    const widgetRef = React.useRef<IdentityModule | null>(null);
+    const widgetRef = React.useRef<NetlifyIdentity | null>(null);
     const [user, setUser] = React.useState<User | null>(null);
     const [isReady, setIsReady] = React.useState(false);
     const [hasWidget, setHasWidget] = React.useState(false);
