@@ -15,6 +15,7 @@ import {
     StatCard,
     TaskList,
     ApertureMark,
+    CrmAuthGuard,
     type BookingRecord,
     type BookingStatus,
     type InvoiceRecord,
@@ -57,7 +58,7 @@ type PhotographyCrmDashboardProps = {
     invoices: InvoiceRecord[];
 };
 
-export default function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboardProps) {
+function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboardProps) {
     const [isDarkMode, setIsDarkMode] = React.useState<boolean | null>(null);
     const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
     const userMenuRef = React.useRef<HTMLDivElement | null>(null);
@@ -1132,6 +1133,18 @@ export default function PhotographyCrmDashboard({ bookings, invoices }: Photogra
                 ) : null}
             </AnimatePresence>
         </>
+    );
+}
+
+
+export default function PhotographyCrmDashboardPage(props: PhotographyCrmDashboardProps) {
+    return (
+        <CrmAuthGuard
+            title="Studio CRM access"
+            description="Authenticate with the studio access code to view client data, galleries, and billing activity."
+        >
+            <PhotographyCrmDashboard {...props} />
+        </CrmAuthGuard>
     );
 }
 
