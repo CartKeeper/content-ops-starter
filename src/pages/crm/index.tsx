@@ -22,6 +22,7 @@ import {
     type InvoiceStatus,
     type ChartPoint
 } from '../../components/crm';
+import { EarningsSummaryCard } from '../../components/crm/EarningsSummaryCard';
 import { useNetlifyIdentity } from '../../components/auth';
 import { InvoiceBuilderModal, type InvoiceBuilderSubmitValues } from '../../components/crm/InvoiceBuilderModal';
 import {
@@ -65,6 +66,55 @@ type FeedbackNotice = {
     message: string;
 };
 
+type DashboardLayoutPreset = 'earnings' | 'insights' | 'custom';
+type PrimaryPanelId = 'earnings' | 'overview' | 'profile';
+
+type LayoutOption = {
+    id: DashboardLayoutPreset;
+    label: string;
+    description: string;
+};
+
+type StoredLayoutConfig = {
+    preset: DashboardLayoutPreset;
+    order: PrimaryPanelId[];
+    visibility: Record<PrimaryPanelId, boolean>;
+};
+
+type PrimaryPanelDefinition = {
+    title: string;
+    description: string;
+    className: string;
+    render: () => React.ReactNode;
+};
+
+const primaryPanelIds: PrimaryPanelId[] = ['earnings', 'overview', 'profile'];
+
+const panelLayoutPresets: Record<Exclude<DashboardLayoutPreset, 'custom'>, PrimaryPanelId[]> = {
+    earnings: ['earnings', 'overview', 'profile'],
+    insights: ['overview', 'earnings', 'profile']
+};
+
+const layoutOptions: LayoutOption[] = [
+    {
+        id: 'earnings',
+        label: 'Earnings focus',
+        description: 'Prioritize revenue metrics with spotlighted cashflow analytics.'
+    },
+    {
+        id: 'insights',
+        label: 'Balanced view',
+        description: 'Blend calendar, revenue, and studio health indicators together.'
+    },
+    {
+        id: 'custom',
+        label: 'Custom layout',
+        description: 'Arrange the overview modules to match your personal workflow.'
+    }
+];
+
+const layoutStorageKey = 'aperture:dashboard-layout';
+
 function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboardProps) {
     const [isDarkMode, setIsDarkMode] = React.useState<boolean | null>(null);
     const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
@@ -81,6 +131,17 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
     const [checkoutInvoiceId, setCheckoutInvoiceId] = React.useState<string | null>(null);
     const [feedback, setFeedback] = React.useState<FeedbackNotice | null>(null);
     const identity = useNetlifyIdentity();
+    const [layoutPreset, setLayoutPreset] = React.useState<DashboardLayoutPreset>('earnings');
+    const [customPanelOrder, setCustomPanelOrder] = React.useState<PrimaryPanelId[]>(() => [...panelLayoutPresets.earnings]);
+    const [customPanelVisibility, setCustomPanelVisibility] = React.useState<Record<PrimaryPanelId, boolean>>(() =>
+        primaryPanelIds.reduce(
+            (accumulator, id) => {
+                accumulator[id] = true;
+                return accumulator;
+            },
+            {} as Record<PrimaryPanelId, boolean>
+        )
+    );
 
     React.useEffect(() => {
         if (!feedback || typeof window === 'undefined') {
@@ -129,9 +190,119 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
         return () => window.document.removeEventListener('mousedown', handleClick);
     }, []);
 
+    React.useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        try {
+            const raw = window.localStorage.getItem(layoutStorageKey);
+            if (!raw) {
+                return;
+            }
+
+            const parsed = JSON.parse(raw) as Partial<StoredLayoutConfig>;
+
+            if (parsed.order && Array.isArray(parsed.order)) {
+                const filtered = parsed.order.filter((panelId): panelId is PrimaryPanelId =>
+                    primaryPanelIds.includes(panelId as PrimaryPanelId)
+                );
+                const normalized = [...filtered];
+                primaryPanelIds.forEach((panelId) => {
+                    if (!normalized.includes(panelId)) {
+                        normalized.push(panelId);
+                    }
+                });
+                setCustomPanelOrder(normalized);
+            }
+
+            if (parsed.visibility) {
+                setCustomPanelVisibility((previous) => {
+                    const next: Record<PrimaryPanelId, boolean> = { ...previous };
+                    primaryPanelIds.forEach((panelId) => {
+                        if (typeof parsed.visibility?.[panelId] === 'boolean') {
+                            next[panelId] = parsed.visibility[panelId];
+                        }
+                    });
+                    return next;
+                });
+            }
+
+            if (parsed.preset && layoutOptions.some((option) => option.id === parsed.preset)) {
+                setLayoutPreset(parsed.preset);
+            }
+        } catch (error) {
+            console.warn('Unable to read stored dashboard layout', error);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const payload: StoredLayoutConfig = {
+            preset: layoutPreset,
+            order: customPanelOrder,
+            visibility: customPanelVisibility
+        };
+
+        try {
+            window.localStorage.setItem(layoutStorageKey, JSON.stringify(payload));
+        } catch (error) {
+            console.warn('Unable to persist dashboard layout', error);
+        }
+    }, [layoutPreset, customPanelOrder, customPanelVisibility]);
+
     const toggleDarkMode = () => {
         setIsDarkMode((previous) => (previous === null ? true : !previous));
     };
+
+    const movePanel = React.useCallback((panelId: PrimaryPanelId, direction: 'up' | 'down') => {
+        setCustomPanelOrder((previous) => {
+            const currentIndex = previous.indexOf(panelId);
+            if (currentIndex === -1) {
+                return previous;
+            }
+
+            const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+            if (targetIndex < 0 || targetIndex >= previous.length) {
+                return previous;
+            }
+
+            const next = [...previous];
+            next.splice(currentIndex, 1);
+            next.splice(targetIndex, 0, panelId);
+            return next;
+        });
+    }, []);
+
+    const handleTogglePanelVisibility = React.useCallback((panelId: PrimaryPanelId) => {
+        setCustomPanelVisibility((previous) => {
+            const isVisible = previous[panelId] !== false;
+            if (isVisible) {
+                const remainingVisible = primaryPanelIds.filter((id) => id !== panelId && previous[id] !== false).length;
+                if (remainingVisible === 0) {
+                    return previous;
+                }
+            }
+
+            return { ...previous, [panelId]: !isVisible };
+        });
+    }, []);
+
+    const handleResetLayout = React.useCallback(() => {
+        setCustomPanelOrder([...panelLayoutPresets.earnings]);
+        setCustomPanelVisibility(() =>
+            primaryPanelIds.reduce(
+                (accumulator, id) => {
+                    accumulator[id] = true;
+                    return accumulator;
+                },
+                {} as Record<PrimaryPanelId, boolean>
+            )
+        );
+    }, []);
 
     const clientOptions = React.useMemo(
         () => clients.map((client) => ({ value: client.name, label: client.name })),
@@ -617,6 +788,34 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
         [bookingList, currentMonth, invoiceList]
     );
 
+    const panelOrder = React.useMemo(() => {
+        if (layoutPreset === 'custom') {
+            return customPanelOrder;
+        }
+        return panelLayoutPresets[layoutPreset];
+    }, [layoutPreset, customPanelOrder]);
+
+    const panelsToRender = React.useMemo(
+        () =>
+            panelOrder.filter((panelId, index, self) => {
+                if (self.indexOf(panelId) !== index) {
+                    return false;
+                }
+
+                if (layoutPreset === 'custom') {
+                    return customPanelVisibility[panelId] !== false;
+                }
+
+                return true;
+            }),
+        [panelOrder, layoutPreset, customPanelVisibility]
+    );
+
+    const activeLayoutDescription = React.useMemo(() => {
+        const match = layoutOptions.find((option) => option.id === layoutPreset);
+        return match?.description ?? '';
+    }, [layoutPreset]);
+
     const deliveredGalleries = galleryList.filter((gallery) => gallery.status === 'Delivered').length;
     const pendingGalleries = galleryList.length - deliveredGalleries;
     const galleryCompletion = galleryList.length
@@ -643,6 +842,63 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
         { id: 'shoots', label: 'Shoots this year', value: shootsThisYear.toString() },
         { id: 'invoices', label: 'Outstanding invoices', value: outstandingInvoiceCount.toString() }
     ];
+
+    const primaryPanelDefinitions = React.useMemo(
+        () => ({
+            earnings: {
+                title: 'Earnings metrics',
+                description: 'Revenue pulse, goal progress, and cashflow trajectory.',
+                className: 'w-full xl:col-span-2',
+                render: () => (
+                    <EarningsSummaryCard
+                        data={analyticsData.monthly}
+                        monthlyRevenue={revenueThisMonth}
+                        revenueChange={revenueChange}
+                        yearToDateRevenue={paidRevenue}
+                        annualGoal={earningsGoal}
+                    />
+                )
+            },
+            overview: {
+                title: 'Studio overview',
+                description: 'Shoots scheduled and revenue performance across time horizons.',
+                className: 'w-full xl:col-span-2',
+                render: () => <OverviewChart data={analyticsData} />
+            },
+            profile: {
+                title: 'Team & galleries',
+                description: 'Client milestones, gallery delivery momentum, and yearly goals.',
+                className: 'w-full xl:col-span-1',
+                render: () => (
+                    <ProfileHighlights
+                        profileStats={profileStats}
+                        earningsPercentage={earningsPercentage}
+                        paidRevenue={paidRevenue}
+                        earningsGoal={earningsGoal}
+                        earningsRemaining={earningsRemaining}
+                        deliveredGalleries={deliveredGalleries}
+                        pendingGalleries={pendingGalleries}
+                        galleryCompletion={galleryCompletion}
+                        pendingGalleryClients={pendingGalleryClients}
+                    />
+                )
+            }
+        }),
+        [
+            analyticsData,
+            revenueThisMonth,
+            revenueChange,
+            paidRevenue,
+            earningsGoal,
+            profileStats,
+            earningsPercentage,
+            earningsRemaining,
+            deliveredGalleries,
+            pendingGalleries,
+            galleryCompletion,
+            pendingGalleryClients
+        ]
+    );
 
     const topClientsByRevenue = React.useMemo(
         () => {
@@ -824,8 +1080,11 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
     return (
         <>
             <Head>
-                <title>Photography CRM Dashboard</title>
-                <meta name="description" content="Command center for managing photography clients, shoots and invoices." />
+                <title>APERTURE Studio CRM Dashboard</title>
+                <meta
+                    name="description"
+                    content="Aperture Studio CRM dashboard with earnings insights, revenue graphs, and a customizable workspace."
+                />
             </Head>
             <div className="min-h-screen bg-slate-100 transition-colors dark:bg-slate-950">
                 <div className="flex min-h-screen">
@@ -854,14 +1113,14 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                             <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-4 text-xs text-slate-400 shadow-lg">
                                 <ApertureMark
                                     className="mt-0.5 h-7 w-7 text-white/90"
-                                    title="Aperture Codex brand insignia"
+                                    title="Aperture Studio brand insignia"
                                 />
                                 <div>
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.48em] text-slate-300">
-                                        Codex Environment
+                                        Aperture Studio
                                     </p>
                                     <p className="mt-2 leading-relaxed text-slate-400">
-                                        Organize every shoot, deliverable, and client moment.
+                                        Calibrate layouts, earnings insights, and production workflows inside your branded CRM hub.
                                     </p>
                                 </div>
                             </div>
@@ -873,12 +1132,12 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                 <span className="relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-white/10">
                                     <ApertureMark
                                         className="h-7 w-7 text-slate-900 drop-shadow-sm dark:text-white/90"
-                                        title="Aperture Codex brand mark"
+                                        title="Aperture Studio brand mark"
                                     />
                                 </span>
                                 <div className="leading-tight">
                                     <p className="text-[10px] font-semibold uppercase tracking-[0.64em] text-[#4534FF] dark:text-[#9DAAFF]">
-                                        Aperture
+                                        APERTURE
                                     </p>
                                     <p className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
                                         Studio CRM
@@ -943,29 +1202,124 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                 <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                                     <div>
                                         <p className="text-sm font-semibold uppercase tracking-widest text-[#4534FF] dark:text-[#9DAAFF]">
-                                            Studio Command Center
+                                            Command Dashboard
                                         </p>
                                         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                                            Photography CRM Dashboard
+                                            APERTURE Studio CRM
                                         </h1>
                                         <p className="mt-3 max-w-2xl text-base text-slate-600 dark:text-slate-300">
-                                            Track client relationships, keep shoots on schedule, and stay ahead of deliverables—all from a
-                                            single workspace designed for busy photographers.
+                                            Guide your studio with the earnings-first dashboard you loved—now paired with customizable layout presets, real-time revenue graphs, and workflow automation accents.
                                         </p>
                                     </div>
-                                    <div className="flex flex-wrap gap-3">
-                                        {quickActions.map((action) => (
-                                            <button
-                                                key={action.id}
-                                                type="button"
-                                                onClick={() => setActiveModal(action.modal)}
-                                                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4DE5FF] dark:focus:ring-offset-slate-900"
-                                            >
-                                                {action.label}
-                                            </button>
-                                        ))}
+                                    <div className="flex flex-col items-start gap-4 lg:items-end">
+                                        <div className="flex flex-wrap items-center justify-start gap-3 lg:justify-end">
+                                            <div className="inline-flex shrink-0 rounded-full border border-slate-200 bg-white/90 p-1 text-xs font-semibold text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                                                {layoutOptions.map((option) => {
+                                                    const isActive = layoutPreset === option.id;
+                                                    return (
+                                                        <button
+                                                            key={option.id}
+                                                            type="button"
+                                                            onClick={() => setLayoutPreset(option.id)}
+                                                            aria-pressed={isActive}
+                                                            className={[
+                                                                'rounded-full px-3 py-1 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#4DE5FF] dark:focus-visible:ring-offset-slate-900',
+                                                                isActive
+                                                                    ? 'bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] text-white shadow-sm'
+                                                                    : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                                                            ].join(' ')}
+                                                        >
+                                                            {option.label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="flex flex-wrap gap-3">
+                                                {quickActions.map((action) => (
+                                                    <button
+                                                        key={action.id}
+                                                        type="button"
+                                                        onClick={() => setActiveModal(action.modal)}
+                                                        className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#4DE5FF] dark:focus-visible:ring-offset-slate-900"
+                                                    >
+                                                        {action.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {activeLayoutDescription ? (
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 lg:text-right">
+                                                {activeLayoutDescription}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </header>
+
+                                {layoutPreset === 'custom' ? (
+                                    <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm shadow-sm transition dark:border-slate-800 dark:bg-slate-900">
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Customize your overview</h2>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                    Toggle modules and reorder them to craft a layout that matches your studio workflow.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleResetLayout}
+                                                className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-[#5D3BFF] hover:text-[#5D3BFF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4DE5FF] focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-300 dark:hover:border-[#4DE5FF] dark:hover:text-[#4DE5FF] dark:focus-visible:ring-offset-slate-900"
+                                            >
+                                                Reset layout
+                                            </button>
+                                        </div>
+                                        <div className="mt-4 space-y-3">
+                                            {customPanelOrder.map((panelId, index) => {
+                                                const definition = primaryPanelDefinitions[panelId];
+                                                const isVisible = customPanelVisibility[panelId] !== false;
+                                                const canMoveUp = index > 0;
+                                                const canMoveDown = index < customPanelOrder.length - 1;
+
+                                                return (
+                                                    <div
+                                                        key={panelId}
+                                                        className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm transition hover:border-[#5D3BFF] hover:shadow-md dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-[#4DE5FF] sm:flex-row sm:items-center sm:justify-between"
+                                                    >
+                                                        <div className="space-y-2">
+                                                            <label className="flex items-center gap-3 text-slate-900 dark:text-white">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isVisible}
+                                                                    onChange={() => handleTogglePanelVisibility(panelId)}
+                                                                    className="h-4 w-4 rounded border-slate-300 text-[#5D3BFF] focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:border-slate-600"
+                                                                />
+                                                                <span className="font-semibold">{definition.title}</span>
+                                                            </label>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400 sm:ml-7">{definition.description}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 sm:pl-4">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => movePanel(panelId, 'up')}
+                                                                disabled={!canMoveUp}
+                                                                className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600 transition hover:border-[#5D3BFF] hover:text-[#5D3BFF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4DE5FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-[#4DE5FF] dark:hover:text-[#4DE5FF] dark:focus-visible:ring-offset-slate-900 dark:disabled:border-slate-800 dark:disabled:text-slate-600"
+                                                            >
+                                                                Move up
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => movePanel(panelId, 'down')}
+                                                                disabled={!canMoveDown}
+                                                                className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600 transition hover:border-[#5D3BFF] hover:text-[#5D3BFF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4DE5FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-[#4DE5FF] dark:hover:text-[#4DE5FF] dark:focus-visible:ring-offset-slate-900 dark:disabled:border-slate-800 dark:disabled:text-slate-600"
+                                                            >
+                                                                Move down
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </section>
+                                ) : null}
 
                                 <AnimatePresence>
                                     {feedback ? (
@@ -1020,71 +1374,15 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                     ))}
                                 </section>
 
-                                <div className="grid gap-6 xl:grid-cols-[2fr_minmax(0,1fr)]">
-                                    <OverviewChart data={analyticsData} />
-                                    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
-                                        <div className="flex items-center gap-4">
-                                            <Image
-                                                src="/images/avatar4.svg"
-                                                alt="Avery Logan"
-                                                width={64}
-                                                height={64}
-                                                className="h-16 w-16 rounded-full border border-slate-200 bg-white p-1 dark:border-slate-700"
-                                            />
-                                            <div>
-                                                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#4534FF] dark:text-[#9DAAFF]">
-                                                    Lead Photographer
-                                                </p>
-                                                <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">Avery Logan</h2>
-                                                <p className="text-sm text-slate-500 dark:text-slate-400">San Francisco Bay Area</p>
+                                <div className="grid gap-6 xl:grid-cols-3">
+                                    {panelsToRender.map((panelId) => {
+                                        const panel = primaryPanelDefinitions[panelId];
+                                        return (
+                                            <div key={panelId} className={panel.className}>
+                                                {panel.render()}
                                             </div>
-                                        </div>
-                                        <dl className="mt-6 grid gap-4 sm:grid-cols-3">
-                                            {profileStats.map((stat) => (
-                                                <div
-                                                    key={stat.id}
-                                                    className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/40"
-                                                >
-                                                    <dt className="font-medium text-slate-500 dark:text-slate-400">{stat.label}</dt>
-                                                    <dd className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{stat.value}</dd>
-                                                </div>
-                                            ))}
-                                        </dl>
-                                        <div className="mt-8 rounded-2xl bg-slate-50 p-5 dark:bg-slate-800/40">
-                                            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                                                <EarningsProgress percentage={earningsPercentage} />
-                                                <div>
-                                                    <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Earnings goal</p>
-                                                    <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
-                                                        {formatCurrency(paidRevenue)}
-                                                    </p>
-                                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                        Target {formatCurrency(earningsGoal)} · {formatCurrency(earningsRemaining)} to go
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800">
-                                            <h3 className="text-xs font-semibold uppercase tracking-[0.32em] text-[#4534FF] dark:text-[#9DAAFF]">Galleries</h3>
-                                            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                                                {deliveredGalleries} delivered · {pendingGalleries} pending ({galleryCompletion}% complete)
-                                            </p>
-                                            <div className="mt-4 flex items-center gap-3">
-                                                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                                                    <div
-                                                        className="h-full rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF]"
-                                                        style={{ width: `${galleryCompletion}%` }}
-                                                    />
-                                                </div>
-                                                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{galleryCompletion}%</span>
-                                            </div>
-                                            {pendingGalleryClients.length > 0 && (
-                                                <p className="mt-3 text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
-                                                    Pending: {pendingGalleryClients.join(' · ')}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </section>
+                                        );
+                                    })}
                                 </div>
 
                                 <div className="grid gap-6 lg:grid-cols-3">
@@ -1525,6 +1823,94 @@ function formatDaysUntil(days: number): string {
     }
 
     return `In ${days} days`;
+}
+
+type ProfileHighlightsProps = {
+    profileStats: { id: string; label: string; value: string }[];
+    earningsPercentage: number;
+    paidRevenue: number;
+    earningsGoal: number;
+    earningsRemaining: number;
+    deliveredGalleries: number;
+    pendingGalleries: number;
+    galleryCompletion: number;
+    pendingGalleryClients: string[];
+};
+
+function ProfileHighlights({
+    profileStats,
+    earningsPercentage,
+    paidRevenue,
+    earningsGoal,
+    earningsRemaining,
+    deliveredGalleries,
+    pendingGalleries,
+    galleryCompletion,
+    pendingGalleryClients
+}: ProfileHighlightsProps) {
+    return (
+        <section className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-lg dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center gap-4">
+                <Image
+                    src="/images/avatar4.svg"
+                    alt="Avery Logan"
+                    width={64}
+                    height={64}
+                    className="h-16 w-16 rounded-full border border-slate-200 bg-white p-1 dark:border-slate-700"
+                />
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#4534FF] dark:text-[#9DAAFF]">
+                        Lead Photographer
+                    </p>
+                    <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">Avery Logan</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">San Francisco Bay Area</p>
+                </div>
+            </div>
+            <dl className="mt-6 grid gap-4 sm:grid-cols-3">
+                {profileStats.map((stat) => (
+                    <div
+                        key={stat.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/40"
+                    >
+                        <dt className="font-medium text-slate-500 dark:text-slate-400">{stat.label}</dt>
+                        <dd className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{stat.value}</dd>
+                    </div>
+                ))}
+            </dl>
+            <div className="mt-8 rounded-2xl bg-slate-50 p-5 dark:bg-slate-800/40">
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                    <EarningsProgress percentage={earningsPercentage} />
+                    <div>
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Earnings goal</p>
+                        <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{formatCurrency(paidRevenue)}</p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Target {formatCurrency(earningsGoal)} · {formatCurrency(earningsRemaining)} to go
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.32em] text-[#4534FF] dark:text-[#9DAAFF]">Galleries</h3>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    {deliveredGalleries} delivered · {pendingGalleries} pending ({galleryCompletion}% complete)
+                </p>
+                <div className="mt-4 flex items-center gap-3">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                        <div
+                            className="h-full rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF]"
+                            style={{ width: `${galleryCompletion}%` }}
+                        />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{galleryCompletion}%</span>
+                </div>
+                {pendingGalleryClients.length > 0 && (
+                    <p className="mt-3 text-xs uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">
+                        Pending: {pendingGalleryClients.join(' · ')}
+                    </p>
+                )}
+            </div>
+        </section>
+    );
 }
 
 type EarningsProgressProps = {
