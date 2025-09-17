@@ -290,6 +290,127 @@
             @apply border-dark text-dark;
         }
     }
+
+    /* CRM calendar overrides */
+    .crm-calendar .fc {
+        --fc-border-color: #e2e8f0;
+        --fc-page-bg-color: transparent;
+        --fc-neutral-bg-color: rgba(255, 255, 255, 0.88);
+        --fc-list-event-hover-bg-color: rgba(99, 102, 241, 0.08);
+        --fc-today-bg-color: rgba(99, 102, 241, 0.12);
+        font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .dark .crm-calendar .fc {
+        --fc-border-color: #1f2937;
+        --fc-neutral-bg-color: rgba(15, 23, 42, 0.9);
+        --fc-page-bg-color: transparent;
+        --fc-list-event-hover-bg-color: rgba(148, 163, 184, 0.1);
+        --fc-today-bg-color: rgba(99, 102, 241, 0.25);
+        color: #e2e8f0;
+    }
+
+    .crm-calendar .fc-toolbar {
+        @apply mb-4 flex flex-wrap items-center gap-3;
+    }
+
+    .crm-calendar .fc-toolbar-title {
+        @apply text-lg font-semibold text-slate-900 dark:text-slate-100;
+    }
+
+    .crm-calendar .fc-button {
+        @apply rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900;
+    }
+
+    .crm-calendar .fc-button:disabled {
+        @apply opacity-60;
+    }
+
+    .crm-calendar .fc-button.fc-button-active {
+        @apply border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 dark:border-indigo-400 dark:bg-indigo-500;
+    }
+
+    .crm-calendar .fc-button-group {
+        @apply inline-flex overflow-hidden rounded-full border border-slate-200 dark:border-slate-700;
+    }
+
+    .crm-calendar .fc-button-group .fc-button {
+        @apply border-none;
+    }
+
+    .crm-calendar .fc-col-header-cell-cushion {
+        @apply text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400;
+    }
+
+    .crm-calendar .fc-timegrid-slot-label-cushion {
+        @apply text-xs text-slate-400 dark:text-slate-500;
+    }
+
+    .crm-calendar .fc-scrollgrid {
+        border: none;
+    }
+
+    .crm-calendar .crm-event {
+        border-radius: 0.75rem;
+        border-width: 1px;
+        border-style: solid;
+        padding: 0.625rem 0.75rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .crm-calendar .crm-event-title {
+        @apply text-sm font-semibold;
+    }
+
+    .crm-calendar .crm-event-location {
+        font-size: 0.6875rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.85);
+    }
+
+    .crm-calendar .fc-daygrid-event,
+    .crm-calendar .fc-timegrid-event {
+        border: none;
+    }
+
+    .crm-calendar .fc-daygrid-day-frame {
+        @apply p-1 sm:p-2;
+    }
+
+    .crm-calendar .fc-timegrid-now-indicator-arrow,
+    .crm-calendar .fc-timegrid-now-indicator-line {
+        border-color: #6366f1;
+    }
+
+    .dark .crm-calendar .fc-timegrid-now-indicator-arrow,
+    .dark .crm-calendar .fc-timegrid-now-indicator-line {
+        border-color: #818cf8;
+    }
+
+    .crm-calendar .fc-list-event .crm-event {
+        @apply text-slate-900 dark:text-slate-100;
+        padding: 0;
+        box-shadow: none;
+        border-width: 0;
+    }
+
+    .crm-calendar .fc-list-event .crm-event-location {
+        @apply text-xs text-slate-500 dark:text-slate-400;
+    }
+
+    .crm-calendar .fc-list-event-graphic {
+        @apply pr-3;
+    }
+
+    .crm-calendar .fc-list-event-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 9999px;
+        border-width: 2px;
+    }
 }
 
 @layer utilities {
