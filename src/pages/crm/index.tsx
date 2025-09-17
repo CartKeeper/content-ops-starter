@@ -509,7 +509,7 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
             shootReminders: false,
             galleryAlerts: false
         });
-        notify('success', 'Auto layout applied. Earnings and workflow cards grouped together.');
+        notify('success', 'Auto layout applied. Earnings link with invoices while upcoming work stays focused.');
     }, [notify]);
 
     const createRecord = React.useCallback(
@@ -1583,9 +1583,12 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                                 title="Upcoming Shoots"
                                                 description="Stay ready for every session with a quick view of the week ahead."
                                                 action={
-                                                    <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
+                                                    <Link
+                                                        href="/bookings"
+                                                        className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]"
+                                                    >
                                                         Open calendar
-                                                    </button>
+                                                    </Link>
                                                 }
                                             >
                                                 <BookingList bookings={upcomingBookings} />
@@ -1597,9 +1600,12 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                                 title="Active Clients"
                                                 description="From loyal regulars to new leads, see who needs attention next."
                                                 action={
-                                                    <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
+                                                    <Link
+                                                        href="/clients"
+                                                        className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]"
+                                                    >
                                                         View all clients
-                                                    </button>
+                                                    </Link>
                                                 }
                                             >
                                                 <ClientTable clients={clients} />
@@ -1611,6 +1617,14 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                             <SectionCard
                                                 title="Open Invoices"
                                                 description="Collect payments faster with a focused list of outstanding balances."
+                                                action={
+                                                    <Link
+                                                        href="/invoices"
+                                                        className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]"
+                                                    >
+                                                        View all invoices
+                                                    </Link>
+                                                }
                                             >
                                                 <InvoiceTable
                                                     invoices={openInvoices}
