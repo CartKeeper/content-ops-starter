@@ -1,6 +1,7 @@
 import * as React from 'react';
 import type { GetStaticProps } from 'next';
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -17,6 +18,7 @@ import {
     SectionCard,
     StatCard,
     TaskList,
+    WorkspaceLayout,
     useCrmAuth,
     type BookingRecord,
     type BookingStatus,
@@ -27,7 +29,7 @@ import {
     type Timeframe
 } from '../../components/crm';
 import { useNetlifyIdentity } from '../../components/auth';
-import { tasks as defaultTasks } from '../../data/crm';
+import { adminUser, tasks as defaultTasks, type AdminUser } from '../../data/crm';
 import type { InvoiceStatus } from '../../types/invoice';
 import { readCmsCollection } from '../../utils/read-cms-collection';
 import { useAutoDismiss } from '../../utils/use-auto-dismiss';
@@ -771,19 +773,22 @@ function CrmDashboardWorkspace({
             <Head>
                 <title>{studioName} · Photography CRM</title>
             </Head>
-            <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
-                <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-10 lg:px-10">
-                    <header className="flex flex-col gap-6 border-b border-slate-200 pb-8 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-indigo-500 dark:text-indigo-300">
-                                Studio workspace
-                            </p>
-                            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                                {studioName} CRM overview
-                            </h1>
-                            <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                                Monitor shoots, nurture clients, and keep cash flow moving without leaving your control center.
-                            </p>
+            <WorkspaceLayout>
+                <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
+                    <header className="flex flex-col gap-6 border-b border-slate-200 pb-8 dark:border-slate-800">
+                        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-indigo-500 dark:text-indigo-300">
+                                    Studio workspace
+                                </p>
+                                <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+                                    {studioName} CRM overview
+                                </h1>
+                                <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                                    Monitor shoots, nurture clients, and keep cash flow moving without leaving your control center.
+                                </p>
+                            </div>
+                            <AdminProfileCard user={adminUser} />
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
                             <Link
@@ -812,7 +817,7 @@ function CrmDashboardWorkspace({
 
                     {feedback ? (
                         <div
-                            className={`mt-6 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                            className={`mt-8 rounded-2xl border px-4 py-3 text-sm font-medium ${
                                 feedback.type === 'success'
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200'
                                     : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200'
@@ -822,7 +827,7 @@ function CrmDashboardWorkspace({
                         </div>
                     ) : null}
 
-                    <section className="mt-8 grid gap-6 lg:grid-cols-4">
+                    <section className="mt-10 grid gap-6 lg:grid-cols-4">
                         <StatCard
                             title="Shoots scheduled"
                             value={`${metrics.scheduledThisWeek}`}
@@ -853,7 +858,7 @@ function CrmDashboardWorkspace({
                         />
                     </section>
 
-                    <section className="mt-8 grid gap-6 lg:grid-cols-[2fr,1fr]">
+                    <section className="mt-10 grid gap-6 lg:grid-cols-[2fr,1fr]">
                         <OverviewChart data={chartData} />
                         <DashboardCard
                             title="Studio signal"
@@ -959,8 +964,39 @@ function CrmDashboardWorkspace({
                         </div>
                     </div>
                 </div>
-            </div>
+            </WorkspaceLayout>
         </>
+    );
+}
+
+type AdminProfileCardProps = {
+    user: AdminUser;
+};
+
+function AdminProfileCard({ user }: AdminProfileCardProps) {
+    return (
+        <div className="flex w-full max-w-sm items-center gap-4 rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <Image
+                src={user.avatar}
+                alt={`${user.name} avatar`}
+                width={48}
+                height={48}
+                className="h-12 w-12 rounded-2xl bg-slate-100 object-cover dark:bg-slate-800"
+            />
+            <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{user.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{user.role}</p>
+                <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">{user.email}</p>
+                {user.phone ? (
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{user.phone}</p>
+                ) : null}
+            </div>
+            {user.status ? (
+                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+                    {user.status}
+                </span>
+            ) : null}
+        </div>
     );
 }
 

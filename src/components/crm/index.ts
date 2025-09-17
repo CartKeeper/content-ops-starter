@@ -15,3 +15,4 @@ export { OverviewChart } from './OverviewChart';
 export type { ChartPoint, Timeframe } from './OverviewChart';
 export { ApertureMark } from './ApertureMark';
 export { CrmAuthGuard, useCrmAuth } from './CrmAuthGuard';
+export { WorkspaceLayout, useWorkspaceLayout } from './WorkspaceLayout';

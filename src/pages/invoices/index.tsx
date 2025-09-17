@@ -7,7 +7,8 @@ import type { GetStaticProps } from 'next';
 import {
     CrmAuthGuard,
     InvoiceTable,
-    SectionCard
+    SectionCard,
+    WorkspaceLayout
 } from '../../components/crm';
 import { InvoiceBuilderModal, type InvoiceBuilderSubmitValues } from '../../components/crm/InvoiceBuilderModal';
 import { useNetlifyIdentity } from '../../components/auth';
@@ -337,8 +338,8 @@ function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
             <Head>
                 <title>Invoices · Studio Billing Workspace</title>
             </Head>
-            <main className="min-h-screen bg-slate-100 pb-16 transition-colors dark:bg-slate-950">
-                <div className="mx-auto w-full max-w-7xl px-6 pt-10">
+            <WorkspaceLayout>
+                <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
                     <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.32em] text-indigo-500 dark:text-indigo-300">
@@ -449,7 +450,7 @@ function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
                         />
                     </SectionCard>
                 </div>
-            </main>
+            </WorkspaceLayout>
 
             {isModalOpen ? (
                 <InvoiceBuilderModal
