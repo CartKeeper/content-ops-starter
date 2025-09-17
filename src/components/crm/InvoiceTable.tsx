@@ -37,8 +37,10 @@ export function InvoiceTable({
 }: InvoiceTableProps) {
     return (
         <div className="space-y-4">
-            {invoices.map((invoice) => {
-                const invoiceId = typeof invoice.id === 'string' && invoice.id.trim() ? invoice.id : 'invoice';
+            {invoices.map((invoice, index) => {
+                const trimmedInvoiceId = typeof invoice.id === 'string' ? invoice.id.trim() : '';
+                const invoiceKey = trimmedInvoiceId ? `invoice-${trimmedInvoiceId}` : `invoice-${index + 1}`;
+                const invoiceNumberLabel = trimmedInvoiceId || `#${String(index + 1).padStart(3, '0')}`;
                 const currency = typeof invoice.currency === 'string' && invoice.currency.trim().length === 3 ? invoice.currency : 'USD';
                 const project = invoice.project ?? 'New project';
                 const issueDateLabel = invoice.issueDate ? formatDate(invoice.issueDate) : '—';
@@ -50,13 +52,13 @@ export function InvoiceTable({
 
                 return (
                     <div
-                        key={invoiceId}
+                        key={invoiceKey}
                         className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
                     >
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    Invoice {invoiceId}
+                                    Invoice {invoiceNumberLabel}
                                 </p>
                                 <h3 className="text-base font-semibold text-slate-900 dark:text-white">{invoice.client}</h3>
                                 <p className="text-sm text-slate-500 dark:text-slate-400">{project}</p>
