@@ -95,6 +95,24 @@ export type ProjectRecord = {
     tags: string[];
 };
 
+export type AdminUser = {
+    name: string;
+    role: string;
+    email: string;
+    phone?: string;
+    avatar: string;
+    status?: string;
+};
+
+export const adminUser: AdminUser = {
+    name: 'Avery Logan',
+    role: 'Studio Admin',
+    email: 'avery@codex.studio',
+    phone: '+1 (415) 555-0114',
+    avatar: '/images/avatar1.svg',
+    status: 'Online'
+};
+
 export const clients: ClientRecord[] = [
     {
         id: 'cl-01',

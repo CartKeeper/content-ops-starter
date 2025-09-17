@@ -19,6 +19,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import {
     BookingList,
     CrmAuthGuard,
+    WorkspaceLayout,
     useCrmAuth,
     type BookingRecord,
     type BookingStatus
@@ -48,6 +49,10 @@ type CalendarEvent = EventInput & {
     end: Date;
     extendedProps: CalendarEventExtendedProps;
     classNames: string[];
+};
+
+type FullCalendarRef = {
+    getApi: () => { updateSize: () => void };
 };
 
 type ModalState =
@@ -89,11 +94,30 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
     const [feedback, setFeedback] = React.useState<FeedbackNotice | null>(null);
     const [isSyncing, setIsSyncing] = React.useState(false);
     const [lastSyncedAt, setLastSyncedAt] = React.useState<string | null>(null);
+    const calendarRef = React.useRef<FullCalendarRef | null>(null);
+    const handleSidebarChange = React.useCallback(() => {
+        if (!calendarRef.current) {
+            return;
+        }
+
+        const api = calendarRef.current.getApi();
+        window.setTimeout(() => api.updateSize(), 160);
+    }, []);
 
     const calendarEvents = React.useMemo<CalendarEvent[]>(
         () => bookings.map((booking) => createCalendarEvent(booking)),
         [bookings]
     );
+
+    React.useEffect(() => {
+        if (!calendarRef.current) {
+            return;
+        }
+
+        const api = calendarRef.current.getApi();
+        const handle = window.setTimeout(() => api.updateSize(), 120);
+        return () => window.clearTimeout(handle);
+    }, [calendarEvents]);
 
     const upcomingShoots = React.useMemo(() => buildUpcomingList(bookings), [bookings]);
 
@@ -397,8 +421,8 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
             <Head>
                 <title>Studio bookings calendar</title>
             </Head>
-            <div className="min-h-screen bg-slate-50 pb-16 dark:bg-slate-950">
-                <main className="mx-auto max-w-7xl px-6 py-12">
+            <WorkspaceLayout onSidebarChange={handleSidebarChange}>
+                <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
                     <header className="flex flex-wrap items-start justify-between gap-6">
                         <div className="space-y-3">
                             <span className="inline-flex items-center rounded-full border border-[#C5C0FF] bg-[#E9E7FF] px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-[#4534FF] dark:border-[#4E46C8] dark:bg-[#2A1F67] dark:text-[#AEB1FF]">
@@ -475,6 +499,7 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
                             </div>
                             <div className="crm-calendar h-[720px] rounded-2xl border border-slate-200 bg-white p-3 shadow-inner dark:border-slate-800 dark:bg-slate-950/60">
                                 <FullCalendar
+                                    ref={calendarRef}
                                     plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
                                     initialView="dayGridMonth"
                                     headerToolbar={{
@@ -521,8 +546,8 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
                             </section>
                         </aside>
                     </div>
-                </main>
-            </div>
+                </div>
+            </WorkspaceLayout>
             {modalState ? (
                 <QuickActionModal
                     type="booking"

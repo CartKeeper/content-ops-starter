@@ -9,6 +9,7 @@ import {
     SectionCard,
     StatCard,
     StatusPill,
+    WorkspaceLayout,
     useCrmAuth,
     type StatusTone
 } from '../../components/crm';
@@ -369,8 +370,8 @@ function DropboxAssetLibrary() {
             <Head>
                 <title>Dropbox Asset Library · Studio CRM</title>
             </Head>
-            <div className="min-h-screen bg-slate-50 pb-16 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
-                <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-10 px-6 py-10">
+            <WorkspaceLayout>
+                <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-10 sm:px-6 lg:px-10">
                     <header className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <p className="text-sm font-semibold uppercase tracking-[0.4em] text-[#4534FF] dark:text-[#9DAAFF]">
@@ -726,7 +727,7 @@ function DropboxAssetLibrary() {
                         </ul>
                     </SectionCard>
                 </div>
-            </div>
+            </WorkspaceLayout>
         </>
     );
 }

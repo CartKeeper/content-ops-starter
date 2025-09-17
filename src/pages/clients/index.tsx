@@ -4,7 +4,7 @@ import Link from 'next/link';
 import dayjs from 'dayjs';
 import type { GetStaticProps } from 'next';
 
-import { CrmAuthGuard, StatusPill } from '../../components/crm';
+import { CrmAuthGuard, StatusPill, WorkspaceLayout } from '../../components/crm';
 import { InvoiceBuilderModal, type InvoiceBuilderSubmitValues } from '../../components/crm/InvoiceBuilderModal';
 import { useNetlifyIdentity } from '../../components/auth';
 import { clients as baseClients, galleryCollection } from '../../data/crm';
@@ -443,8 +443,8 @@ function ClientsWorkspace({ invoices }: ClientsPageProps) {
             <Head>
                 <title>Clients · Studio Relationships &amp; Billing</title>
             </Head>
-            <main className="min-h-screen bg-slate-100 pb-16 transition-colors dark:bg-slate-950">
-                <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 pt-10 lg:flex-row">
+            <WorkspaceLayout>
+                <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-10 sm:px-6 lg:flex-row lg:px-10">
                     <aside className="lg:w-80">
                         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             <div className="flex items-center justify-between">
@@ -710,7 +710,7 @@ function ClientsWorkspace({ invoices }: ClientsPageProps) {
                         )}
                     </section>
                 </div>
-            </main>
+            </WorkspaceLayout>
 
             {isModalOpen ? (
                 <InvoiceBuilderModal

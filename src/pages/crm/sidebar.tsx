@@ -15,6 +15,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import {
     ClientTable,
     StatusPill,
+    WorkspaceLayout,
     type BookingRecord,
     type BookingStatus,
     type ClientRecord,
@@ -186,8 +187,8 @@ export default function SidebarWorkspace({ bookings, invoices }: PhotographySide
             <Head>
                 <title>Studio Sidebar Modules · Photography CRM</title>
             </Head>
-            <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
-                <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col">
+            <WorkspaceLayout>
+                <div className="mx-auto flex w-full max-w-7xl flex-col">
                     <header className="border-b border-slate-200 bg-white px-6 py-5 dark:border-slate-800 dark:bg-slate-900">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                             <div>
@@ -285,7 +286,7 @@ export default function SidebarWorkspace({ bookings, invoices }: PhotographySide
                         </main>
                     </div>
                 </div>
-            </div>
+            </WorkspaceLayout>
         </>
     );
 }
