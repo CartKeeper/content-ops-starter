@@ -78,6 +78,19 @@ export function UsersIcon(props: IconProps) {
     );
 }
 
+export function AddressBookIcon(props: IconProps) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <path d="M5 2h11a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+            <path d="M16 5h3v3h-3z" />
+            <path d="M16 11h3v3h-3z" />
+            <path d="M16 17h3v3h-3z" />
+            <circle cx="9" cy="9" r="2.5" />
+            <path d="M5.5 16.5c.5-2 2-3.5 3.5-3.5s3 1.5 3.5 3.5" />
+        </svg>
+    );
+}
+
 export function ReceiptIcon(props: IconProps) {
     return (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>

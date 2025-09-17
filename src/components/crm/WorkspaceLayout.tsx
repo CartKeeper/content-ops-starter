@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 
 import { ApertureMark } from './ApertureMark';
 import {
+    AddressBookIcon,
     CalendarIcon,
     CloseIcon,
     MenuIcon,
@@ -21,6 +22,7 @@ import { useThemeMode } from '../../utils/use-theme-mode';
 const navItems = [
     { href: '/crm', label: 'Dashboard', icon: SparklesIcon },
     { href: '/bookings', label: 'Calendar', icon: CalendarIcon },
+    { href: '/contacts', label: 'Contacts', icon: AddressBookIcon },
     { href: '/clients', label: 'Clients', icon: UsersIcon },
     { href: '/galleries', label: 'Galleries', icon: PhotoIcon },
     { href: '/invoices', label: 'Invoices', icon: ReceiptIcon },
