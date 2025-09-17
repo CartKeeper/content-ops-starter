@@ -5,17 +5,49 @@ import type { TaskRecord } from '../components/crm/TaskList';
 
 export type GalleryStatus = 'Delivered' | 'Pending';
 
+export type GalleryAsset = {
+    id: string;
+    fileName: string;
+    contentType: string;
+    size: number;
+    storageBucket: string;
+    storagePath: string;
+    publicUrl: string;
+    checksum?: string | null;
+    uploadedAt?: string;
+    duplicateOf?: string | null;
+    isDuplicate?: boolean;
+    clientId?: string | null;
+    projectId?: string | null;
+    projectCode?: string | null;
+    dropboxFileId?: string | null;
+    dropboxRevision?: string | null;
+};
+
+export type GalleryStorageSummary = {
+    assetCount: number;
+    totalBytes: number;
+    formattedTotal: string;
+};
+
 export type GalleryRecord = {
     id: string;
     client: string;
     shootType: string;
+    status: GalleryStatus;
     deliveryDueDate?: string;
     deliveredAt?: string;
     expiresAt?: string;
     reminderSentAt?: string;
-    status: GalleryStatus;
     projectId?: string;
+    projectCode?: string | null;
     coverImage?: string;
+    assets?: GalleryAsset[];
+    totalStorageBytes?: number;
+    totalStorageFormatted?: string;
+    storageSummary?: GalleryStorageSummary;
+    dropboxSyncCursor?: string | null;
+    dropboxFiles?: string[];
     customFields?: Record<string, string | boolean>;
 };
 
@@ -116,7 +148,11 @@ export const galleryCollection: GalleryRecord[] = [
         shootType: 'Engagement Session',
         deliveryDueDate: '2025-05-14',
         status: 'Pending',
-        coverImage: '/images/main-hero.jpg'
+        coverImage: '/images/main-hero.jpg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-02',
@@ -126,6 +162,10 @@ export const galleryCollection: GalleryRecord[] = [
         status: 'Pending',
         projectId: 'proj-02',
         coverImage: '/images/hero3.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
         customFields: {
             deliveryEmail: 'hello@harrisonandjune.com'
         }
@@ -139,6 +179,10 @@ export const galleryCollection: GalleryRecord[] = [
         status: 'Delivered',
         projectId: 'proj-03',
         coverImage: '/images/abstract-feature1.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
         customFields: {
             deliveryEmail: 'sona@patelcreative.co'
         }
@@ -150,7 +194,11 @@ export const galleryCollection: GalleryRecord[] = [
         deliveredAt: '2025-04-10',
         expiresAt: '2026-04-10',
         status: 'Delivered',
-        coverImage: '/images/abstract-feature2.svg'
+        coverImage: '/images/abstract-feature2.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-05',
@@ -161,6 +209,10 @@ export const galleryCollection: GalleryRecord[] = [
         status: 'Delivered',
         projectId: 'proj-01',
         coverImage: '/images/abstract-feature3.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
         customFields: {
             deliveryEmail: 'team@evergreenarchitects.com'
         }
@@ -172,7 +224,11 @@ export const galleryCollection: GalleryRecord[] = [
         deliveredAt: '2025-02-24',
         expiresAt: '2026-02-24',
         status: 'Delivered',
-        coverImage: '/images/hero2.svg'
+        coverImage: '/images/hero2.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-07',
@@ -181,7 +237,11 @@ export const galleryCollection: GalleryRecord[] = [
         deliveredAt: '2025-02-02',
         expiresAt: '2026-02-02',
         status: 'Delivered',
-        coverImage: '/images/hero.svg'
+        coverImage: '/images/hero.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' }
     },
     {
         id: 'gal-08',
@@ -191,6 +251,10 @@ export const galleryCollection: GalleryRecord[] = [
         expiresAt: '2025-12-18',
         status: 'Delivered',
         coverImage: '/images/abstract-background.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
         customFields: {
             deliveryEmail: 'projects@harborandco.com'
         },
@@ -204,6 +268,10 @@ export const galleryCollection: GalleryRecord[] = [
         expiresAt: '2025-11-23',
         status: 'Delivered',
         coverImage: '/images/background-grid.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
         customFields: {
             deliveryEmail: 'hello@lumen.studio'
         }
@@ -216,6 +284,10 @@ export const galleryCollection: GalleryRecord[] = [
         expiresAt: '2025-10-12',
         status: 'Delivered',
         coverImage: '/images/hero2.svg',
+        assets: [],
+        totalStorageBytes: 0,
+        totalStorageFormatted: '0 B',
+        storageSummary: { assetCount: 0, totalBytes: 0, formattedTotal: '0 B' },
         reminderSentAt: '2025-09-12T18:00:00.000Z'
     }
 ];
