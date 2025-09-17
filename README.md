@@ -13,6 +13,7 @@ Netlify starter that's made for customization with a flexible content model, com
 - [Building for production](#building-for-production)
 - [Setting Up Algolia Search](#setting-up-algolia-search)
 - [Configuring Supabase Storage](#configuring-supabase-storage)
+- [Core Codex Setup](#core-codex-setup)
 - [Next Steps](#next-steps)
 - [Support](#support)
 
@@ -125,6 +126,30 @@ const supabase = createClient(
 ```
 
 If you supplied a custom prefix while connecting the extension (for example `CRM_SUPABASE_DATABASE_URL`), use those prefixed names in your client code. The server-side utilities in this starter automatically detect environment variables that end with `SUPABASE_URL`, `SUPABASE_DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, or `SUPABASE_ANON_KEY`, even when they are prefixed.
+
+## Core Codex Setup
+
+This project now ships with a Codex-oriented content workflow that blends Git-based publishing with Netlify Identity and dynamic serverless utilities.
+
+### Visual editing with Decap CMS
+
+- Navigate to `/admin/` to access Decap CMS (formerly Netlify CMS). The configuration at `public/admin/config.yml` exposes pages, blog posts, CRM datasets, and design data directly from the `content/` directory.
+- Media uploads are stored in `public/images/uploads`, ensuring all assets remain version controlled alongside Markdown and JSON content.
+- To connect Netlify Identity with the CMS, enable **Identity** and **Git Gateway** for your Netlify site. Editors can then authenticate with their Netlify Identity account and commit updates back to GitHub.
+
+### Authentication with Netlify Identity
+
+- The `NetlifyIdentityProvider` wraps the Next.js application and exposes the current user, roles, and helper actions via `useNetlifyIdentity()`.
+- `CrmAuthGuard` now prefers Netlify Identity. Users with the `photographer` role can open the private CRM, while other roles see a friendly access prompt.
+- Invite teammates from the Netlify dashboard and assign either `photographer` (studio staff) or `client` (gallery access) roles. The in-app account menu signs users out of Identity so they can switch roles quickly.
+
+### Dynamic invoices and payments
+
+- `netlify/functions/generate-invoice-pdf.ts` renders polished PDF invoices on demand using `pdfkit`. The CRM UI calls this function and streams the file to the browser.
+- `netlify/functions/create-checkout-session.ts` creates Stripe Checkout sessions for outstanding invoices. The CRM updates the payment link and opens Stripe in a new tab.
+- Provide a `STRIPE_SECRET_KEY` environment variable before deploying. Identity tokens are forwarded automatically so only authenticated photographers can invoke these Netlify Functions.
+
+Together these additions connect Codex to GitHub for structured content, secure authentication, and practical automation for invoicing and payments.
 
 ## Next Steps
 

@@ -1,0 +1,374 @@
+backend:
+    name: git-gateway
+    branch: main
+    commit_messages:
+        create: 'Create {{collection}} “{{slug}}”'
+        update: 'Update {{collection}} “{{slug}}”'
+        delete: 'Delete {{collection}} “{{slug}}”'
+        uploadMedia: 'Upload “{{path}}”'
+        deleteMedia: 'Delete “{{path}}”'
+publish_mode: editorial_workflow
+media_folder: public/images/uploads
+public_folder: /images/uploads
+slug:
+    clean_accents: true
+    encoding: unicode
+    sanitize_replacement: '-'
+collections:
+    - name: pages
+      label: Site Pages
+      label_singular: Page
+      folder: content/pages
+      create: true
+      extension: md
+      format: frontmatter
+      nested:
+          depth: 2
+      preview_path: '{{slug}}'
+      filter:
+          field: type
+          value: PageLayout
+      fields:
+          - label: Title
+            name: title
+            widget: string
+          - label: Permalink
+            name: slug
+            widget: string
+          - label: Layout Type
+            name: type
+            widget: hidden
+            default: PageLayout
+          - label: Sections JSON
+            name: sections
+            widget: json
+            required: false
+            hint: >-
+                Edit the structured sections array as JSON. Keeping the keys that the front-end expects ensures
+                layout components render correctly.
+          - label: Theme Colors
+            name: colors
+            widget: string
+            required: false
+          - label: Layout Styles
+            name: styles
+            widget: json
+            required: false
+          - label: SEO
+            name: seo
+            widget: object
+            required: false
+            fields:
+                - { label: Meta Title, name: metaTitle, widget: string, required: false }
+                - { label: Meta Description, name: metaDescription, widget: text, required: false }
+                - { label: Social Image, name: socialImage, widget: string, required: false }
+                - label: Entry Type
+                  name: type
+                  widget: hidden
+                  default: Seo
+          - label: Page Body
+            name: body
+            widget: markdown
+            required: false
+    - name: blog
+      label: Blog Posts
+      folder: content/pages/blog
+      create: true
+      extension: md
+      format: frontmatter
+      preview_path: 'blog/{{slug}}'
+      filter:
+          field: type
+          value: PostLayout
+      fields:
+          - { label: Title, name: title, widget: string }
+          - { label: Slug, name: slug, widget: string }
+          - label: Layout Type
+            name: type
+            widget: hidden
+            default: PostLayout
+          - label: Publish Date
+            name: date
+            widget: datetime
+            date_format: 'YYYY-MM-DD'
+            time_format: false
+          - { label: Excerpt, name: excerpt, widget: text, required: false }
+          - label: Featured Image
+            name: featuredImage
+            widget: object
+            required: false
+            fields:
+                - { label: Image, name: url, widget: string }
+                - { label: Alt Text, name: altText, widget: string, required: false }
+                - { label: Block Type, name: type, widget: hidden, default: ImageBlock }
+                - { label: Styles, name: styles, widget: json, required: false }
+          - { label: Bottom Sections, name: bottomSections, widget: json, required: false }
+          - { label: Feature on homepage, name: isFeatured, widget: boolean, default: false }
+          - { label: Draft, name: isDraft, widget: boolean, default: false }
+          - label: SEO
+            name: seo
+            widget: object
+            required: false
+            fields:
+                - { label: Meta Title, name: metaTitle, widget: string, required: false }
+                - { label: Meta Description, name: metaDescription, widget: text, required: false }
+                - { label: Social Image, name: socialImage, widget: string, required: false }
+                - { label: Entry Type, name: type, widget: hidden, default: Seo }
+          - { label: Palette, name: colors, widget: string, required: false }
+          - { label: Layout Styles, name: styles, widget: json, required: false }
+          - { label: Author Reference, name: author, widget: string, required: false, hint: 'Path to a person JSON entry (e.g. content/data/person4.json).' }
+          - { label: Body, name: body, widget: markdown }
+    - name: people
+      label: Team Members
+      folder: content/data
+      format: json
+      create: true
+      extension: json
+      filter:
+          field: type
+          value: Person
+      slug: '{{name | slugify}}'
+      fields:
+          - { label: Entry Type, name: type, widget: hidden, default: Person }
+          - { label: Name, name: name, widget: string }
+          - { label: Role, name: role, widget: string, required: false }
+          - { label: Bio, name: bio, widget: text, required: false }
+          - label: Portrait
+            name: image
+            widget: object
+            required: false
+            fields:
+                - { label: Image, name: url, widget: image, required: false }
+                - { label: Alt Text, name: altText, widget: string, required: false }
+                - { label: Block Type, name: type, widget: hidden, default: ImageBlock }
+                - { label: Additional Styles, name: styles, widget: json, required: false }
+          - { label: Element ID, name: elementId, widget: string, required: false }
+          - { label: Palette, name: colors, widget: string, required: false }
+          - { label: Styles, name: styles, widget: json, required: false }
+    - name: site
+      label: Site Settings
+      files:
+          - label: Global Navigation
+            name: header
+            file: content/data/header.json
+            format: json
+            fields:
+                - label: Logo
+                  name: logo
+                  widget: object
+                  fields:
+                      - { label: Image, name: url, widget: image }
+                      - { label: Alt Text, name: altText, widget: string, required: false }
+                      - { label: Block Type, name: type, widget: hidden, default: ImageBlock }
+                      - { label: Styles, name: styles, widget: json, required: false }
+                - label: Primary Navigation
+                  name: primaryLinks
+                  widget: list
+                  types:
+                      - label: Link
+                        name: link
+                        widget: object
+                        fields:
+                            - { label: Label, name: label, widget: string }
+                            - { label: Alt Text, name: altText, widget: string, required: false }
+                            - { label: URL, name: url, widget: string }
+                            - { label: Icon, name: icon, widget: string, required: false }
+                            - { label: Icon Position, name: iconPosition, widget: string, required: false }
+                            - { label: Style, name: style, widget: string, required: false }
+                            - { label: Entry Type, name: type, widget: hidden, default: Link }
+                      - label: Dropdown
+                        name: subnav
+                        widget: object
+                        fields:
+                            - { label: Label, name: label, widget: string }
+                            - { label: Label Style, name: labelStyle, widget: string, required: false }
+                            - { label: Entry Type, name: type, widget: hidden, default: SubNav }
+                            - label: Nested Links
+                              name: links
+                              widget: list
+                              fields:
+                                  - { label: Label, name: label, widget: string }
+                                  - { label: Alt Text, name: altText, widget: string, required: false }
+                                  - { label: URL, name: url, widget: string }
+                                  - { label: Icon, name: icon, widget: string, required: false }
+                                  - { label: Icon Position, name: iconPosition, widget: string, required: false }
+                                  - { label: Style, name: style, widget: string, required: false }
+                                  - { label: Entry Type, name: type, widget: hidden, default: Link }
+                - label: Secondary Actions
+                  name: secondaryLinks
+                  widget: list
+                  fields:
+                      - { label: Label, name: label, widget: string }
+                      - { label: Alt Text, name: altText, widget: string, required: false }
+                      - { label: URL, name: url, widget: string }
+                      - { label: Icon, name: icon, widget: string, required: false }
+                      - { label: Icon Position, name: iconPosition, widget: string, required: false }
+                      - { label: Style, name: style, widget: string, required: false }
+                      - { label: Entry Type, name: type, widget: hidden, default: Button }
+                - { label: Variant, name: variant, widget: string, required: false }
+                - { label: Palette, name: colors, widget: string, required: false }
+                - { label: Entry Type, name: type, widget: hidden, default: Header }
+          - label: Footer
+            name: footer
+            file: content/data/footer.json
+            format: json
+            fields:
+                - label: Logo
+                  name: logo
+                  widget: object
+                  fields:
+                      - { label: Image, name: url, widget: image }
+                      - { label: Alt Text, name: altText, widget: string, required: false }
+                      - { label: Block Type, name: type, widget: hidden, default: ImageBlock }
+                - { label: Description, name: text, widget: text, required: false }
+                - label: Primary Links Group
+                  name: primaryLinks
+                  widget: object
+                  fields:
+                      - { label: Heading, name: title, widget: string }
+                      - { label: Entry Type, name: type, widget: hidden, default: FooterLinksGroup }
+                      - label: Links
+                        name: links
+                        widget: list
+                        fields:
+                            - { label: Label, name: label, widget: string }
+                            - { label: Alt Text, name: altText, widget: string, required: false }
+                            - { label: URL, name: url, widget: string }
+                            - { label: Icon, name: icon, widget: string, required: false }
+                            - { label: Icon Position, name: iconPosition, widget: string, required: false }
+                            - { label: Style, name: style, widget: string, required: false }
+                            - { label: Entry Type, name: type, widget: hidden, default: Link }
+                - label: Secondary Links Group
+                  name: secondaryLinks
+                  widget: object
+                  fields:
+                      - { label: Heading, name: title, widget: string }
+                      - { label: Entry Type, name: type, widget: hidden, default: FooterLinksGroup }
+                      - label: Links
+                        name: links
+                        widget: list
+                        fields:
+                            - { label: Label, name: label, widget: string }
+                            - { label: Alt Text, name: altText, widget: string, required: false }
+                            - { label: URL, name: url, widget: string }
+                            - { label: Icon, name: icon, widget: string, required: false }
+                            - { label: Icon Position, name: iconPosition, widget: string, required: false }
+                            - { label: Style, name: style, widget: string, required: false }
+                            - { label: Entry Type, name: type, widget: hidden, default: Link }
+                - label: Social Links
+                  name: socialLinks
+                  widget: list
+                  fields:
+                      - { label: Alt Text, name: altText, widget: string, required: false }
+                      - { label: URL, name: url, widget: string }
+                      - { label: Icon, name: icon, widget: string }
+                      - { label: Entry Type, name: type, widget: hidden, default: Social }
+                - label: Legal Links
+                  name: legalLinks
+                  widget: list
+                  fields:
+                      - { label: Label, name: label, widget: string }
+                      - { label: URL, name: url, widget: string }
+                      - { label: Icon, name: icon, widget: string, required: false }
+                      - { label: Icon Position, name: iconPosition, widget: string, required: false }
+                      - { label: Style, name: style, widget: string, required: false }
+                      - { label: Entry Type, name: type, widget: hidden, default: Link }
+                - { label: Copyright Text, name: copyrightText, widget: text, required: false }
+                - { label: Palette, name: colors, widget: string, required: false }
+                - { label: Entry Type, name: type, widget: hidden, default: Footer }
+          - label: Site Configuration
+            name: site
+            file: content/data/site.json
+            format: json
+            fields:
+                - { label: Favicon, name: favicon, widget: string, required: false }
+                - { label: Default Social Image, name: defaultSocialImage, widget: string, required: false }
+                - { label: Header Data File, name: header, widget: string }
+                - { label: Footer Data File, name: footer, widget: string }
+                - { label: Title Suffix, name: titleSuffix, widget: string, required: false }
+                - { label: Entry Type, name: type, widget: hidden, default: Config }
+    - name: crm
+      label: Studio CRM
+      files:
+          - label: Bookings
+            name: bookings
+            file: content/data/crm-bookings.json
+            format: json
+            fields:
+                - { label: Collection Type, name: type, widget: hidden, default: CrmBookings }
+                - label: Booking Records
+                  name: items
+                  widget: list
+                  fields:
+                      - { label: ID, name: id, widget: string }
+                      - { label: Client, name: client, widget: string }
+                      - { label: Shoot Type, name: shootType, widget: string }
+                      - { label: Date, name: date, widget: datetime, date_format: 'YYYY-MM-DD', time_format: false }
+                      - { label: Start Time, name: startTime, widget: string, required: false }
+                      - { label: End Time, name: endTime, widget: string, required: false }
+                      - { label: Location, name: location, widget: string, required: false }
+                      - { label: Status, name: status, widget: string }
+          - label: Galleries
+            name: galleries
+            file: content/data/crm-galleries.json
+            format: json
+            fields:
+                - { label: Collection Type, name: type, widget: hidden, default: CrmGalleries }
+                - label: Gallery Records
+                  name: items
+                  widget: list
+                  fields:
+                      - { label: ID, name: id, widget: string }
+                      - { label: Client, name: client, widget: string }
+                      - { label: Shoot Type, name: shootType, widget: string }
+                      - { label: Status, name: status, widget: string }
+                      - { label: Cover Image, name: coverImage, widget: string, required: false }
+                      - { label: Delivery Due Date, name: deliveryDueDate, widget: datetime, required: false, date_format: 'YYYY-MM-DD', time_format: false }
+                      - { label: Delivered At, name: deliveredAt, widget: datetime, required: false }
+                      - { label: Expires At, name: expiresAt, widget: datetime, required: false }
+                      - { label: Storage Summary, name: storageSummary, widget: json, required: false }
+                      - { label: Portal Settings, name: portalSettings, widget: json, required: false }
+                      - { label: Assets, name: assets, widget: json, required: false }
+                      - { label: Custom Fields, name: customFields, widget: json, required: false }
+          - label: Invoices
+            name: invoices
+            file: content/data/crm-invoices.json
+            format: json
+            fields:
+                - { label: Collection Type, name: type, widget: hidden, default: CrmInvoices }
+                - label: Invoice Records
+                  name: items
+                  widget: list
+                  fields:
+                      - { label: ID, name: id, widget: string }
+                      - { label: Client, name: client, widget: string }
+                      - { label: Client Email, name: clientEmail, widget: string, required: false }
+                      - { label: Project, name: project, widget: string }
+                      - { label: Issue Date, name: issueDate, widget: datetime, date_format: 'YYYY-MM-DD', time_format: false }
+                      - { label: Due Date, name: dueDate, widget: datetime, date_format: 'YYYY-MM-DD', time_format: false }
+                      - { label: Status, name: status, widget: string }
+                      - { label: Currency, name: currency, widget: string, default: USD }
+                      - { label: Amount, name: amount, widget: number, value_type: float }
+                      - { label: Tax Rate, name: taxRate, widget: number, value_type: float, min: 0, max: 1, step: 0.001 }
+                      - label: Line Items
+                        name: lineItems
+                        widget: list
+                        fields:
+                            - { label: ID, name: id, widget: string }
+                            - { label: Description, name: description, widget: string }
+                            - { label: Quantity, name: quantity, widget: number, value_type: int, min: 1 }
+                            - { label: Unit Price, name: unitPrice, widget: number, value_type: float }
+                            - { label: Total, name: total, widget: number, value_type: float }
+                      - label: Totals
+                        name: totals
+                        widget: object
+                        fields:
+                            - { label: Subtotal, name: subtotal, widget: number, value_type: float }
+                            - { label: Tax Total, name: taxTotal, widget: number, value_type: float }
+                            - { label: Invoice Total, name: total, widget: number, value_type: float }
+                      - { label: Notes, name: notes, widget: text, required: false }
+                      - { label: Template, name: template, widget: string }
+                      - { label: PDF URL, name: pdfUrl, widget: string, required: false }
+                      - { label: Payment Link, name: paymentLink, widget: string, required: false }
+                      - { label: Last Sent At, name: lastSentAt, widget: datetime, required: false }
+                      - { label: Custom Fields, name: customFields, widget: json, required: false }

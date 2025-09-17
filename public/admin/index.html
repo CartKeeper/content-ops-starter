@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Codex Studio CMS</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                color-scheme: light dark;
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                background: #0f172a;
+                color: #e2e8f0;
+            }
+
+            body {
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: radial-gradient(circle at 20% 20%, rgba(77, 229, 255, 0.15), transparent 55%),
+                    radial-gradient(circle at 80% 30%, rgba(93, 59, 255, 0.2), transparent 60%),
+                    #0f172a;
+            }
+
+            .loading {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+                padding: 3rem 2rem;
+                border-radius: 1.5rem;
+                border: 1px solid rgba(148, 163, 184, 0.2);
+                background: rgba(15, 23, 42, 0.75);
+                box-shadow: 0 25px 60px -25px rgba(15, 23, 42, 0.55);
+                backdrop-filter: blur(12px);
+            }
+
+            .loading svg {
+                width: 3rem;
+                height: 3rem;
+                color: #4de5ff;
+            }
+
+            .loading p {
+                margin: 0;
+                font-size: 0.95rem;
+                line-height: 1.6;
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="loading" id="cms-loading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path
+                    d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364 6.364-2.121-2.121M8.757 8.757 6.636 6.636m12.728 0-2.121 2.121M8.757 15.243 6.636 17.364"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                />
+            </svg>
+            <p>Loading Codex Visual CMS&hellip;</p>
+        </div>
+
+        <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+        <script src="https://unpkg.com/decap-cms@^3.4.0/dist/decap-cms.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const loading = document.getElementById('cms-loading');
+                if (loading) {
+                    const observer = new MutationObserver(() => {
+                        if (document.querySelector('#nc-root')) {
+                            loading.remove();
+                            observer.disconnect();
+                        }
+                    });
+
+                    observer.observe(document.body, { childList: true, subtree: true });
+                }
+            });
+
+            if (window.netlifyIdentity) {
+                window.netlifyIdentity.on('init', (user) => {
+                    if (!user) {
+                        window.netlifyIdentity.on('login', () => {
+                            document.location.reload();
+                        });
+                    }
+                });
+            }
+        </script>
+    </body>
+</html>
