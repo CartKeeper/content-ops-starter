@@ -102,6 +102,17 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
                     console.error('Netlify Identity error', error);
                     setLastError(normalized);
                     setIsReady(true);
+
+                    if (isIdentityConfigurationError(normalized)) {
+                        try {
+                            identity.close();
+                        } catch (closeError) {
+                            console.warn('Failed to close Netlify Identity widget after configuration error', closeError);
+                        }
+                        widgetRef.current = null;
+                        setHasWidget(false);
+                        setUser(null);
+                    }
                 };
 
                 identity.on('init', handleInit);
@@ -234,6 +245,19 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
 
 export function useNetlifyIdentity(): IdentityContextValue {
     return React.useContext(NetlifyIdentityContext);
+}
+
+function isIdentityConfigurationError(message: string | null): boolean {
+    if (!message) {
+        return false;
+    }
+
+    const normalizedMessage = message.toLowerCase();
+    return (
+        normalizedMessage.includes('failed to load settings') ||
+        normalizedMessage.includes('/.netlify/identity') ||
+        normalizedMessage.includes('identity settings')
+    );
 }
 
 function normalizeErrorMessage(error: unknown): string | null {
