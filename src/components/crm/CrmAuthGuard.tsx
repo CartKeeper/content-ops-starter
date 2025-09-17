@@ -36,8 +36,8 @@ export function CrmAuthGuard({ children, title, description }: CrmAuthGuardProps
     const identityGuardEnabled = identity.hasWidget;
     const passcodeGuardEnabled = guardIsEnabled && !identityGuardEnabled;
 
-    const [isAuthenticated, setIsAuthenticated] = React.useState<boolean>(!passcodeGuardEnabled);
-    const [isReady, setIsReady] = React.useState<boolean>(!passcodeGuardEnabled);
+    const [isAuthenticated, setIsAuthenticated] = React.useState<boolean>(() => !guardIsEnabled);
+    const [isReady, setIsReady] = React.useState<boolean>(() => !guardIsEnabled);
     const [accessCode, setAccessCode] = React.useState('');
     const [error, setError] = React.useState<string | null>(null);
 
@@ -48,6 +48,91 @@ export function CrmAuthGuard({ children, title, description }: CrmAuthGuardProps
             signOut: identity.logout
         }),
         [identity.isAuthenticated, identity.isPhotographer, identity.logout]
+    );
+
+    React.useEffect(() => {
+        if (identityGuardEnabled) {
+            return;
+        }
+
+        if (!passcodeGuardEnabled) {
+            setIsReady(true);
+            setIsAuthenticated(true);
+            return;
+        }
+
+        if (typeof window === 'undefined') {
+            setIsReady(true);
+            return;
+        }
+
+        try {
+            const stored = window.localStorage.getItem(STORAGE_KEY);
+            if (stored && stored === RESOLVED_ACCESS_CODE) {
+                setIsAuthenticated(true);
+            }
+        } catch (storageError) {
+            console.warn('CRM auth guard: unable to read stored access code', storageError);
+        } finally {
+            setIsReady(true);
+        }
+    }, [identityGuardEnabled, passcodeGuardEnabled]);
+
+    const handleSubmit = React.useCallback(
+        (event: React.FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+
+            if (!passcodeGuardEnabled) {
+                setIsAuthenticated(true);
+                return;
+            }
+
+            const normalizedInput = accessCode.trim();
+
+            if (normalizedInput && normalizedInput === RESOLVED_ACCESS_CODE) {
+                if (typeof window !== 'undefined') {
+                    try {
+                        window.localStorage.setItem(STORAGE_KEY, RESOLVED_ACCESS_CODE);
+                    } catch (storageError) {
+                        console.warn('CRM auth guard: unable to persist access code', storageError);
+                    }
+                }
+
+                setIsAuthenticated(true);
+                setError(null);
+                setAccessCode('');
+            } else {
+                setError('The access code is incorrect.');
+            }
+        },
+        [accessCode]
+    );
+
+    const handleSignOut = React.useCallback(() => {
+        if (!passcodeGuardEnabled) {
+            return;
+        }
+
+        if (typeof window !== 'undefined') {
+            try {
+                window.localStorage.removeItem(STORAGE_KEY);
+            } catch (storageError) {
+                console.warn('CRM auth guard: unable to clear stored access code', storageError);
+            }
+        }
+
+        setIsAuthenticated(false);
+        setAccessCode('');
+        setError(null);
+    }, [passcodeGuardEnabled]);
+
+    const contextValue = React.useMemo<CrmAuthContextValue>(
+        () => ({
+            isAuthenticated: passcodeGuardEnabled ? isAuthenticated : true,
+            guardEnabled: passcodeGuardEnabled,
+            signOut: handleSignOut
+        }),
+        [handleSignOut, isAuthenticated, passcodeGuardEnabled]
     );
 
     if (identityGuardEnabled) {
@@ -133,87 +218,6 @@ export function CrmAuthGuard({ children, title, description }: CrmAuthGuardProps
             </div>
         );
     }
-
-    React.useEffect(() => {
-        if (!passcodeGuardEnabled) {
-            setIsReady(true);
-            setIsAuthenticated(true);
-            return;
-        }
-
-        if (typeof window === 'undefined') {
-            setIsReady(true);
-            return;
-        }
-
-        try {
-            const stored = window.localStorage.getItem(STORAGE_KEY);
-            if (stored && stored === RESOLVED_ACCESS_CODE) {
-                setIsAuthenticated(true);
-            }
-        } catch (storageError) {
-            console.warn('CRM auth guard: unable to read stored access code', storageError);
-        } finally {
-            setIsReady(true);
-        }
-    }, [passcodeGuardEnabled]);
-
-    const handleSubmit = React.useCallback(
-        (event: React.FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-
-            if (!passcodeGuardEnabled) {
-                setIsAuthenticated(true);
-                return;
-            }
-
-            const normalizedInput = accessCode.trim();
-
-            if (normalizedInput && normalizedInput === RESOLVED_ACCESS_CODE) {
-                if (typeof window !== 'undefined') {
-                    try {
-                        window.localStorage.setItem(STORAGE_KEY, RESOLVED_ACCESS_CODE);
-                    } catch (storageError) {
-                        console.warn('CRM auth guard: unable to persist access code', storageError);
-                    }
-                }
-
-                setIsAuthenticated(true);
-                setError(null);
-                setAccessCode('');
-            } else {
-                setError('The access code is incorrect.');
-            }
-        },
-        [accessCode]
-    );
-
-    const handleSignOut = React.useCallback(() => {
-        if (!passcodeGuardEnabled) {
-            return;
-        }
-
-        if (typeof window !== 'undefined') {
-            try {
-                window.localStorage.removeItem(STORAGE_KEY);
-            } catch (storageError) {
-                console.warn('CRM auth guard: unable to clear stored access code', storageError);
-            }
-        }
-
-        setIsAuthenticated(false);
-        setAccessCode('');
-        setError(null);
-    }, []);
-
-    const contextValue = React.useMemo<CrmAuthContextValue>(
-        () => ({
-            isAuthenticated: passcodeGuardEnabled ? isAuthenticated : true,
-            guardEnabled: passcodeGuardEnabled,
-            signOut: handleSignOut
-        }),
-        [handleSignOut, isAuthenticated, passcodeGuardEnabled]
-    );
 
     if (!passcodeGuardEnabled) {
         return <CrmAuthContext.Provider value={contextValue}>{children}</CrmAuthContext.Provider>;
