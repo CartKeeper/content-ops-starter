@@ -2,125 +2,100 @@
     "type": "CrmBookings",
     "items": [
         {
-            "id": "bk-01",
             "client": "Evelyn Sanders",
-            "shootType": "Engagement Session",
             "date": "2025-05-11",
-            "startTime": "3:00 PM",
-            "endTime": "5:00 PM",
+            "time": "3:00 PM – 5:00 PM",
             "location": "Golden Gate Park",
+            "shoot_type": "Engagement Session",
             "status": "Confirmed"
         },
         {
-            "id": "bk-02",
             "client": "Harrison & June",
-            "shootType": "Wedding Weekend",
             "date": "2025-05-18",
-            "startTime": "11:00 AM",
-            "endTime": "8:00 PM",
+            "time": "11:00 AM – 8:00 PM",
             "location": "Terranea Resort",
+            "shoot_type": "Wedding Weekend",
             "status": "Pending"
         },
         {
-            "id": "bk-03",
             "client": "Sona Patel",
-            "shootType": "Brand Lifestyle",
             "date": "2025-05-21",
-            "startTime": "9:00 AM",
-            "endTime": "12:00 PM",
+            "time": "9:00 AM – 12:00 PM",
             "location": "Downtown Studio",
+            "shoot_type": "Brand Lifestyle",
             "status": "Editing"
         },
         {
-            "id": "bk-04",
             "client": "Fern & Pine Studio",
-            "shootType": "Lookbook Launch",
             "date": "2025-06-08",
-            "startTime": "10:00 AM",
-            "endTime": "2:00 PM",
+            "time": "10:00 AM – 2:00 PM",
             "location": "Mission District Loft",
+            "shoot_type": "Lookbook Launch",
             "status": "Pending"
         },
         {
-            "id": "bk-05",
             "client": "Evergreen Architects",
-            "shootType": "Team Headshots",
             "date": "2025-05-29",
-            "startTime": "1:00 PM",
-            "endTime": "4:00 PM",
+            "time": "1:00 PM – 4:00 PM",
             "location": "Financial District HQ",
+            "shoot_type": "Team Headshots",
             "status": "Confirmed"
         },
         {
-            "id": "bk-06",
             "client": "Evergreen Architects",
-            "shootType": "Site Progress",
             "date": "2025-03-16",
-            "startTime": "8:00 AM",
-            "endTime": "11:00 AM",
+            "time": "8:00 AM – 11:00 AM",
             "location": "Oakland Waterfront",
+            "shoot_type": "Site Progress",
             "status": "Confirmed"
         },
         {
-            "id": "bk-07",
             "client": "Atlas Fitness",
-            "shootType": "Campaign Refresh",
             "date": "2025-02-19",
-            "startTime": "7:00 AM",
-            "endTime": "10:00 AM",
+            "time": "7:00 AM – 10:00 AM",
             "location": "SOMA Studio",
+            "shoot_type": "Campaign Refresh",
             "status": "Editing"
         },
         {
-            "id": "bk-08",
             "client": "Violet & Thread",
-            "shootType": "Spring Collection",
             "date": "2025-01-27",
-            "startTime": "9:00 AM",
-            "endTime": "1:00 PM",
+            "time": "9:00 AM – 1:00 PM",
             "location": "Dogpatch Warehouse",
+            "shoot_type": "Spring Collection",
             "status": "Confirmed"
         },
         {
-            "id": "bk-09",
             "client": "Harbor & Co",
-            "shootType": "Product Launch",
             "date": "2024-12-03",
-            "startTime": "10:00 AM",
-            "endTime": "12:00 PM",
+            "time": "10:00 AM – 12:00 PM",
             "location": "Sausalito Studio",
+            "shoot_type": "Product Launch",
             "status": "Confirmed"
         },
         {
-            "id": "bk-10",
             "client": "Lumen Studio",
-            "shootType": "Agency Portfolio",
             "date": "2024-11-18",
-            "startTime": "1:00 PM",
-            "endTime": "5:00 PM",
+            "time": "1:00 PM – 5:00 PM",
             "location": "North Beach Loft",
+            "shoot_type": "Agency Portfolio",
             "status": "Editing"
         },
         {
-            "id": "bk-11",
             "client": "Beacon Realty",
-            "shootType": "Property Showcase",
             "date": "2024-10-09",
-            "startTime": "9:30 AM",
-            "endTime": "12:30 PM",
+            "time": "9:30 AM – 12:30 PM",
             "location": "Pacific Heights Residence",
+            "shoot_type": "Property Showcase",
             "status": "Confirmed"
         },
         {
-            "id": "bk-12",
             "client": "Sona Patel",
-            "shootType": "Holiday Campaign",
             "date": "2024-09-14",
-            "startTime": "2:00 PM",
-            "endTime": "6:00 PM",
+            "time": "2:00 PM – 6:00 PM",
             "location": "Marin Headlands",
+            "shoot_type": "Holiday Campaign",
             "status": "Confirmed"
         }
     ]
 }
-

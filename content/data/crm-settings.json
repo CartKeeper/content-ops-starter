@@ -1,0 +1,24 @@
+{
+    "type": "CrmSettings",
+    "brand_logo": "/images/logo.svg",
+    "brand_colors": [
+        "#1A3A32",
+        "#F3E7DC",
+        "#C1916B"
+    ],
+    "notification_prefs": {
+        "booking_updates": "email",
+        "invoice_reminders": "email,sms",
+        "gallery_deliveries": "email"
+    },
+    "custom_fields": [
+        {
+            "label": "Client Portal URL",
+            "value": "https://studio.codexcollections.com/portal"
+        },
+        {
+            "label": "Support Email",
+            "value": "hello@codexcollections.com"
+        }
+    ]
+}

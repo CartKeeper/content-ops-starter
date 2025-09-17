@@ -1,0 +1,60 @@
+{
+    "type": "CrmClients",
+    "items": [
+        {
+            "name": "Evelyn Sanders",
+            "email": "evelyn@wanderlight.co",
+            "phone": "+1 (415) 555-0134",
+            "address": "2410 Balboa Street, San Francisco, CA 94121",
+            "notes": "Prefers weekend sessions and printed deliverables.",
+            "related_projects": [
+                "Engagement Session",
+                "Wedding Weekend"
+            ]
+        },
+        {
+            "name": "Evergreen Architects",
+            "email": "studio@evergreenarchitects.com",
+            "phone": "+1 (628) 555-0180",
+            "address": "88 Mission Street, Suite 2300, San Francisco, CA 94105",
+            "notes": "Retainer client with quarterly branding refresh shoots.",
+            "related_projects": [
+                "Team Headshots",
+                "Site Progress"
+            ]
+        },
+        {
+            "name": "Sona Patel",
+            "email": "sona@patelcreative.co",
+            "phone": "+1 (510) 555-0198",
+            "address": "1422 Linden Street, Oakland, CA 94607",
+            "notes": "Requests sneak peeks within 48 hours for social posts.",
+            "related_projects": [
+                "Brand Lifestyle",
+                "Campaign Phase 2"
+            ]
+        },
+        {
+            "name": "Harbor & Co",
+            "email": "hello@harborandco.com",
+            "phone": "+1 (650) 555-0110",
+            "address": "901 Bridgeway, Sausalito, CA 94965",
+            "notes": "Coastal apparel brand focused on e-commerce collections.",
+            "related_projects": [
+                "Product Launch",
+                "Holiday Campaign"
+            ]
+        },
+        {
+            "name": "Atlas Fitness",
+            "email": "team@atlasfit.com",
+            "phone": "+1 (628) 555-0154",
+            "address": "55 Spear Street, San Francisco, CA 94105",
+            "notes": "Needs monthly content drops for membership promotions.",
+            "related_projects": [
+                "Campaign Refresh",
+                "Brand Campaign"
+            ]
+        }
+    ]
+}
