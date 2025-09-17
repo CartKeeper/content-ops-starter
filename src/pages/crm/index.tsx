@@ -68,6 +68,14 @@ type FeedbackNotice = {
 
 type DashboardLayoutPreset = 'earnings' | 'insights' | 'custom';
 type PrimaryPanelId = 'earnings' | 'overview' | 'profile';
+type SecondaryPanelId =
+    | 'upcomingShoots'
+    | 'activeClients'
+    | 'openInvoices'
+    | 'studioTasks'
+    | 'topClients'
+    | 'shootReminders'
+    | 'galleryAlerts';
 
 type LayoutOption = {
     id: DashboardLayoutPreset;
@@ -79,6 +87,8 @@ type StoredLayoutConfig = {
     preset: DashboardLayoutPreset;
     order: PrimaryPanelId[];
     visibility: Record<PrimaryPanelId, boolean>;
+    secondaryVisibility?: Record<SecondaryPanelId, boolean>;
+    customizationLocked?: boolean;
 };
 
 type PrimaryPanelDefinition = {
@@ -89,6 +99,25 @@ type PrimaryPanelDefinition = {
 };
 
 const primaryPanelIds: PrimaryPanelId[] = ['earnings', 'overview', 'profile'];
+const secondaryPanelIds: SecondaryPanelId[] = [
+    'upcomingShoots',
+    'activeClients',
+    'openInvoices',
+    'studioTasks',
+    'topClients',
+    'shootReminders',
+    'galleryAlerts'
+];
+
+function buildDefaultSecondaryVisibility(): Record<SecondaryPanelId, boolean> {
+    return secondaryPanelIds.reduce(
+        (accumulator, panelId) => {
+            accumulator[panelId] = true;
+            return accumulator;
+        },
+        {} as Record<SecondaryPanelId, boolean>
+    );
+}
 
 const panelLayoutPresets: Record<Exclude<DashboardLayoutPreset, 'custom'>, PrimaryPanelId[]> = {
     earnings: ['earnings', 'overview', 'profile'],
@@ -142,6 +171,10 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
             {} as Record<PrimaryPanelId, boolean>
         )
     );
+    const [secondaryPanelVisibility, setSecondaryPanelVisibility] = React.useState<
+        Record<SecondaryPanelId, boolean>
+    >(() => buildDefaultSecondaryVisibility());
+    const [isCustomizationLocked, setIsCustomizationLocked] = React.useState(false);
 
     React.useEffect(() => {
         if (!feedback || typeof window === 'undefined') {
@@ -228,8 +261,24 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                 });
             }
 
+            if (parsed.secondaryVisibility) {
+                setSecondaryPanelVisibility((previous) => {
+                    const next: Record<SecondaryPanelId, boolean> = { ...previous };
+                    secondaryPanelIds.forEach((panelId) => {
+                        if (typeof parsed.secondaryVisibility?.[panelId] === 'boolean') {
+                            next[panelId] = parsed.secondaryVisibility[panelId];
+                        }
+                    });
+                    return next;
+                });
+            }
+
             if (parsed.preset && layoutOptions.some((option) => option.id === parsed.preset)) {
                 setLayoutPreset(parsed.preset);
+            }
+
+            if (typeof parsed.customizationLocked === 'boolean') {
+                setIsCustomizationLocked(parsed.customizationLocked);
             }
         } catch (error) {
             console.warn('Unable to read stored dashboard layout', error);
@@ -244,7 +293,9 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
         const payload: StoredLayoutConfig = {
             preset: layoutPreset,
             order: customPanelOrder,
-            visibility: customPanelVisibility
+            visibility: customPanelVisibility,
+            secondaryVisibility: secondaryPanelVisibility,
+            customizationLocked: isCustomizationLocked
         };
 
         try {
@@ -252,7 +303,13 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
         } catch (error) {
             console.warn('Unable to persist dashboard layout', error);
         }
-    }, [layoutPreset, customPanelOrder, customPanelVisibility]);
+    }, [
+        layoutPreset,
+        customPanelOrder,
+        customPanelVisibility,
+        secondaryPanelVisibility,
+        isCustomizationLocked
+    ]);
 
     const toggleDarkMode = () => {
         setIsDarkMode((previous) => (previous === null ? true : !previous));
@@ -302,6 +359,12 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                 {} as Record<PrimaryPanelId, boolean>
             )
         );
+        setSecondaryPanelVisibility(buildDefaultSecondaryVisibility());
+        setIsCustomizationLocked(false);
+    }, []);
+
+    const handleToggleSecondaryPanelVisibility = React.useCallback((panelId: SecondaryPanelId) => {
+        setSecondaryPanelVisibility((previous) => ({ ...previous, [panelId]: previous[panelId] === false }));
     }, []);
 
     const clientOptions = React.useMemo(
@@ -424,6 +487,30 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
     const notify = React.useCallback((type: 'success' | 'error', message: string) => {
         setFeedback({ id: `${Date.now()}`, type, message });
     }, []);
+
+    const handleLockLayout = React.useCallback(() => {
+        setIsCustomizationLocked(true);
+        notify('success', 'Layout locked. Customize options hidden.');
+    }, [notify]);
+
+    const handleUnlockLayout = React.useCallback(() => {
+        setIsCustomizationLocked(false);
+    }, []);
+
+    const handleAutoLayout = React.useCallback(() => {
+        setCustomPanelOrder(['earnings', 'overview', 'profile']);
+        setCustomPanelVisibility({ earnings: true, overview: true, profile: true });
+        setSecondaryPanelVisibility({
+            upcomingShoots: true,
+            activeClients: true,
+            openInvoices: true,
+            studioTasks: true,
+            topClients: false,
+            shootReminders: false,
+            galleryAlerts: false
+        });
+        notify('success', 'Auto layout applied. Earnings and workflow cards grouped together.');
+    }, [notify]);
 
     const createRecord = React.useCallback(
         async <T,>(resource: 'bookings' | 'invoices' | 'galleries', payload: Record<string, unknown>) => {
@@ -900,6 +987,43 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
         ]
     );
 
+    const secondaryPanelDefinitions = React.useMemo<
+        Record<SecondaryPanelId, { title: string; description: string }>
+    >(
+        () => ({
+            upcomingShoots: {
+                title: 'Upcoming Shoots',
+                description: 'Stay ready for every session with a quick view of the week ahead.'
+            },
+            activeClients: {
+                title: 'Active Clients',
+                description: "From loyal regulars to new leads, see who needs attention next."
+            },
+            openInvoices: {
+                title: 'Open Invoices',
+                description: 'Collect payments faster with a focused list of outstanding balances.'
+            },
+            studioTasks: {
+                title: 'Studio Tasks',
+                description: 'Keep production moving with next actions across your team.'
+            },
+            topClients: {
+                title: 'Top Clients by Revenue',
+                description: "Spot the relationships fueling your studio's growth."
+            },
+            shootReminders: {
+                title: 'Upcoming Shoot Reminders',
+                description: 'Prep details for the next client milestones.'
+            },
+            galleryAlerts: {
+                title: 'Gallery Delivery & Expiration',
+                description:
+                    'Keep post-production commitments on schedule and alert clients before galleries expire.'
+            }
+        }),
+        []
+    );
+
     const topClientsByRevenue = React.useMemo(
         () => {
             const revenueByClient = new Map<
@@ -1205,7 +1329,7 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                             Command Dashboard
                                         </p>
                                         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                                            APERTURE Studio CRM
+                                            Command Dashboard
                                         </h1>
                                         <p className="mt-3 max-w-2xl text-base text-slate-600 dark:text-slate-300">
                                             Guide your studio with the earnings-first dashboard you loved—now paired with customizable layout presets, real-time revenue graphs, and workflow automation accents.
@@ -1245,32 +1369,64 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                                         {action.label}
                                                     </button>
                                                 ))}
+                                                {layoutPreset === 'custom' && isCustomizationLocked ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleUnlockLayout}
+                                                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-[#5D3BFF] hover:text-[#5D3BFF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4DE5FF] focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-[#4DE5FF] dark:hover:text-[#4DE5FF] dark:focus-visible:ring-offset-slate-900"
+                                                    >
+                                                        Customize cards
+                                                    </button>
+                                                ) : null}
                                             </div>
                                         </div>
-                                        {activeLayoutDescription ? (
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 lg:text-right">
-                                                {activeLayoutDescription}
-                                            </p>
-                                        ) : null}
+                                        <div className="flex flex-col items-start gap-1 lg:items-end">
+                                            {activeLayoutDescription ? (
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 lg:text-right">
+                                                    {activeLayoutDescription}
+                                                </p>
+                                            ) : null}
+                                            {layoutPreset === 'custom' && isCustomizationLocked ? (
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 lg:text-right">
+                                                    Layout locked. Select “Customize cards” to make updates.
+                                                </p>
+                                            ) : null}
+                                        </div>
                                     </div>
                                 </header>
 
-                                {layoutPreset === 'custom' ? (
+                                {layoutPreset === 'custom' && !isCustomizationLocked ? (
                                     <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm shadow-sm transition dark:border-slate-800 dark:bg-slate-900">
-                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                             <div>
                                                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Customize your overview</h2>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                    Toggle modules and reorder them to craft a layout that matches your studio workflow.
+                                                    Check the cards you want to keep and arrange their order to match your studio workflow.
                                                 </p>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={handleResetLayout}
-                                                className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-[#5D3BFF] hover:text-[#5D3BFF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4DE5FF] focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-300 dark:hover:border-[#4DE5FF] dark:hover:text-[#4DE5FF] dark:focus-visible:ring-offset-slate-900"
-                                            >
-                                                Reset layout
-                                            </button>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAutoLayout}
+                                                    className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4DE5FF] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                                                >
+                                                    Auto layout
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleResetLayout}
+                                                    className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-[#5D3BFF] hover:text-[#5D3BFF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4DE5FF] focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-300 dark:hover:border-[#4DE5FF] dark:hover:text-[#4DE5FF] dark:focus-visible:ring-offset-slate-900"
+                                                >
+                                                    Reset layout
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLockLayout}
+                                                    className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-[#22c55e] hover:text-[#16a34a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4DE5FF] focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-300 dark:hover:border-emerald-400 dark:hover:text-emerald-300 dark:focus-visible:ring-offset-slate-900"
+                                                >
+                                                    Lock layout
+                                                </button>
+                                            </div>
                                         </div>
                                         <div className="mt-4 space-y-3">
                                             {customPanelOrder.map((panelId, index) => {
@@ -1317,6 +1473,41 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                                     </div>
                                                 );
                                             })}
+                                        </div>
+                                        <div className="mt-6 space-y-4 border-t border-slate-200 pt-6 dark:border-slate-800">
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Workspace cards</h3>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                    Choose which dashboard cards stay visible across your workspace grid.
+                                                </p>
+                                            </div>
+                                            <div className="grid gap-3 sm:grid-cols-2">
+                                                {secondaryPanelIds.map((panelId) => {
+                                                    const definition = secondaryPanelDefinitions[panelId];
+                                                    const isVisible = secondaryPanelVisibility[panelId] !== false;
+                                                    return (
+                                                        <label
+                                                            key={panelId}
+                                                            className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-left shadow-sm transition hover:border-[#5D3BFF] hover:shadow-md dark:border-slate-700 dark:bg-slate-900/60 dark:hover:border-[#4DE5FF]"
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isVisible}
+                                                                onChange={() => handleToggleSecondaryPanelVisibility(panelId)}
+                                                                className="mt-1 h-4 w-4 rounded border-slate-300 text-[#5D3BFF] focus:outline-none focus:ring-2 focus:ring-[#4DE5FF] dark:border-slate-600"
+                                                            />
+                                                            <span>
+                                                                <span className="block font-semibold text-slate-900 dark:text-white">
+                                                                    {definition.title}
+                                                                </span>
+                                                                <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                                                                    {definition.description}
+                                                                </span>
+                                                            </span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     </section>
                                 ) : null}
@@ -1387,99 +1578,110 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
 
                                 <div className="grid gap-6 lg:grid-cols-3">
                                     <div className="space-y-6 lg:col-span-2">
-                                        <SectionCard
-                                            title="Upcoming Shoots"
-                                            description="Stay ready for every session with a quick view of the week ahead."
-                                            action={
-                                                <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
-                                                    Open calendar
-                                                </button>
-                                            }
-                                        >
-                                            <BookingList bookings={upcomingBookings} />
-                                        </SectionCard>
+                                        {secondaryPanelVisibility.upcomingShoots !== false ? (
+                                            <SectionCard
+                                                title="Upcoming Shoots"
+                                                description="Stay ready for every session with a quick view of the week ahead."
+                                                action={
+                                                    <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
+                                                        Open calendar
+                                                    </button>
+                                                }
+                                            >
+                                                <BookingList bookings={upcomingBookings} />
+                                            </SectionCard>
+                                        ) : null}
 
-                                        <SectionCard
-                                            title="Active Clients"
-                                            description="From loyal regulars to new leads, see who needs attention next."
-                                            action={
-                                                <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
-                                                    View all clients
-                                                </button>
-                                            }
-                                        >
-                                            <ClientTable clients={clients} />
-                                        </SectionCard>
+                                        {secondaryPanelVisibility.activeClients !== false ? (
+                                            <SectionCard
+                                                title="Active Clients"
+                                                description="From loyal regulars to new leads, see who needs attention next."
+                                                action={
+                                                    <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
+                                                        View all clients
+                                                    </button>
+                                                }
+                                            >
+                                                <ClientTable clients={clients} />
+                                            </SectionCard>
+                                        ) : null}
                                     </div>
                                     <div className="space-y-6">
-                                        <SectionCard
-                                            title="Open Invoices"
-                                            description="Collect payments faster with a focused list of outstanding balances."
-                                        >
-                                            <InvoiceTable
-                                                invoices={openInvoices}
-                                                onUpdateStatus={handleUpdateInvoiceStatus}
-                                                onGeneratePdf={handleGenerateInvoicePdf}
-                                                onCreateCheckout={handleCreateCheckoutSession}
-                                                generatingInvoiceId={pdfInvoiceId}
-                                                checkoutInvoiceId={checkoutInvoiceId}
-                                            />
-                                        </SectionCard>
+                                        {secondaryPanelVisibility.openInvoices !== false ? (
+                                            <SectionCard
+                                                title="Open Invoices"
+                                                description="Collect payments faster with a focused list of outstanding balances."
+                                            >
+                                                <InvoiceTable
+                                                    invoices={openInvoices}
+                                                    onUpdateStatus={handleUpdateInvoiceStatus}
+                                                    onGeneratePdf={handleGenerateInvoicePdf}
+                                                    onCreateCheckout={handleCreateCheckoutSession}
+                                                    generatingInvoiceId={pdfInvoiceId}
+                                                    checkoutInvoiceId={checkoutInvoiceId}
+                                                />
+                                            </SectionCard>
+                                        ) : null}
 
-                                        <SectionCard
-                                            title="Studio Tasks"
-                                            description="Keep production moving with next actions across your team."
-                                            action={
-                                                <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
-                                                    Create task
-                                                </button>
-                                            }
-                                        >
-                                            <TaskList tasks={tasks} />
-                                        </SectionCard>
+                                        {secondaryPanelVisibility.studioTasks !== false ? (
+                                            <SectionCard
+                                                title="Studio Tasks"
+                                                description="Keep production moving with next actions across your team."
+                                                action={
+                                                    <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
+                                                        Create task
+                                                    </button>
+                                                }
+                                            >
+                                                <TaskList tasks={tasks} />
+                                            </SectionCard>
+                                        ) : null}
                                     </div>
                                 </div>
 
                                 <div className="grid gap-6 lg:grid-cols-3">
-                                    <SectionCard
-                                        title="Top Clients by Revenue"
-                                        description="Spot the relationships fueling your studio's growth."
-                                    >
-                                        {topClientsByRevenue.length > 0 ? (
-                                            <ul className="space-y-4">
-                                                {topClientsByRevenue.map((client) => (
-                                                    <li key={client.name} className="flex items-center justify-between gap-4">
-                                                        <div>
-                                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                                                                {client.name}
-                                                            </p>
-                                                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                                {client.statusLabel} · {client.projects}{' '}
-                                                                {client.projects === 1 ? 'project' : 'projects'}
-                                                            </p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                                                                {formatCurrency(client.total)}
-                                                            </p>
-                                                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                                {client.lastInvoiceLabel
-                                                                    ? `Last invoice ${client.lastInvoiceLabel}`
-                                                                    : 'No invoices yet'}
-                                                            </p>
-                                                        </div>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-sm text-slate-500 dark:text-slate-400">No invoice data yet.</p>
-                                        )}
-                                    </SectionCard>
+                                    {secondaryPanelVisibility.topClients !== false ? (
+                                        <SectionCard
+                                            title="Top Clients by Revenue"
+                                            description="Spot the relationships fueling your studio's growth."
+                                        >
+                                            {topClientsByRevenue.length > 0 ? (
+                                                <ul className="space-y-4">
+                                                    {topClientsByRevenue.map((client) => (
+                                                        <li key={client.name} className="flex items-center justify-between gap-4">
+                                                            <div>
+                                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                    {client.name}
+                                                                </p>
+                                                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                                    {client.statusLabel} · {client.projects}{' '}
+                                                                    {client.projects === 1 ? 'project' : 'projects'}
+                                                                </p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                    {formatCurrency(client.total)}
+                                                                </p>
+                                                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                                    {client.lastInvoiceLabel
+                                                                        ? `Last invoice ${client.lastInvoiceLabel}`
+                                                                        : 'No invoices yet'}
+                                                                </p>
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-sm text-slate-500 dark:text-slate-400">No invoice data yet.</p>
+                                            )}
+                                        </SectionCard>
+                                    ) : null}
 
-                                    <SectionCard
-                                        title="Upcoming Shoot Reminders"
-                                        description="Prep details for the next client milestones."
-                                    >
+                                    {secondaryPanelVisibility.shootReminders !== false ? (
+                                        <SectionCard
+                                            title="Upcoming Shoot Reminders"
+                                            description="Prep details for the next client milestones."
+                                        >
                                         {upcomingShootReminders.length > 0 ? (
                                             <ul className="space-y-4">
                                                 {upcomingShootReminders.map((reminder) => (
@@ -1524,15 +1726,17 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                                 No upcoming shoots scheduled.
                                             </p>
                                         )}
-                                    </SectionCard>
+                                        </SectionCard>
+                                    ) : null}
 
-                                    <SectionCard
-                                        title="Gallery Delivery &amp; Expiration"
-                                        description="Keep post-production commitments on schedule and alert clients before galleries expire."
-                                    >
-                                        {galleryLifecycleAlerts.length > 0 ? (
-                                            <ul className="space-y-4">
-                                                {galleryLifecycleAlerts.map((alert) => {
+                                    {secondaryPanelVisibility.galleryAlerts !== false ? (
+                                        <SectionCard
+                                            title="Gallery Delivery &amp; Expiration"
+                                            description="Keep post-production commitments on schedule and alert clients before galleries expire."
+                                        >
+                                            {galleryLifecycleAlerts.length > 0 ? (
+                                                <ul className="space-y-4">
+                                                    {galleryLifecycleAlerts.map((alert) => {
                                                     const toneClass = galleryLifecycleToneClass[alert.tone];
                                                     const badgeClass = [
                                                         'inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold',
@@ -1588,7 +1792,8 @@ function PhotographyCrmDashboard({ bookings, invoices }: PhotographyCrmDashboard
                                                 No upcoming deliveries or expirations.
                                             </p>
                                         )}
-                                    </SectionCard>
+                                        </SectionCard>
+                                    ) : null}
                                 </div>
                             </div>
                         </main>
