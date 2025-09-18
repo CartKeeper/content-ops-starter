@@ -92,7 +92,7 @@ export function InvoiceTable({
                                         href={invoice.pdfUrl}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-[#4534FF] transition hover:bg-slate-100 dark:border-slate-700 dark:text-[#9DAAFF] dark:hover:bg-slate-800"
+                                        className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-slate-700 dark:text-indigo-300 dark:hover:border-indigo-400 dark:hover:bg-slate-800"
                                     >
                                         Download PDF
                                     </a>

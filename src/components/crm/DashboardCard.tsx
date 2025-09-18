@@ -16,48 +16,44 @@ type DashboardCardProps = {
 const trendBadgeClassNames = (isPositive?: boolean) =>
     classNames(
         'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em]',
-        isPositive === false
-            ? 'bg-rose-100 text-rose-600 dark:bg-[rgba(255,159,216,0.18)] dark:text-[#FF9FD8]'
-            : 'bg-emerald-100 text-emerald-600 dark:bg-[rgba(99,232,255,0.18)] dark:text-[#63E8FF]'
+        isPositive === false ? 'bg-white/15 text-rose-100' : 'bg-white/20 text-emerald-100'
     );
 
 export function DashboardCard({ title, value, trend, className, children }: DashboardCardProps) {
     return (
         <article
             className={classNames(
-                'group relative flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200/70 bg-transparent p-6 shadow-lg shadow-slate-900/5 transition duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:border-white/10 dark:shadow-[0_45px_110px_-50px_rgba(2,8,20,0.85)]',
+                'relative flex h-full flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-sky-600 to-cyan-500 p-6 text-white shadow-xl shadow-indigo-900/30',
                 className
             )}
         >
             <div
-                className="pointer-events-none absolute inset-0 rounded-3xl bg-white/85 backdrop-blur-sm transition duration-500 group-hover:bg-white/95 dark:hidden"
+                className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-white/20 blur-3xl"
                 aria-hidden="true"
             />
             <div
-                className="pointer-events-none absolute inset-0 hidden rounded-3xl opacity-95 transition duration-500 dark:block"
+                className="pointer-events-none absolute bottom-0 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-white/10 blur-3xl"
                 aria-hidden="true"
-                style={{ background: 'radial-gradient(circle at top, rgba(63, 76, 204, 0.24), rgba(7, 11, 23, 0.92))' }}
             />
-            <div
-                className="pointer-events-none absolute inset-0 hidden rounded-3xl opacity-35 transition duration-500 group-hover:opacity-60 dark:block"
-                aria-hidden="true"
-                style={{ background: 'linear-gradient(135deg, rgba(148, 163, 184, 0.12) 0%, rgba(148, 163, 184, 0) 55%)' }}
-            />
-            <div className="relative z-10 flex h-full flex-col">
-                <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{title}</p>
-                <p className="mt-3 text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">{value}</p>
-                {trend && (
-                    <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-                        <span className={trendBadgeClassNames(trend.isPositive)}>{trend.value}</span>
-                        {trend.label ? (
-                            <span className="ml-3 text-xs font-semibold uppercase tracking-[0.28em] text-slate-400 dark:text-slate-500">
-                                {trend.label}
-                            </span>
-                        ) : null}
-                    </p>
-                )}
+            <div className="relative z-10 flex h-full flex-col justify-between">
+                <div>
+                    <p className="text-sm font-medium text-white/80">{title}</p>
+                    <p className="mt-3 text-4xl font-semibold tracking-tight text-white">{value}</p>
+                    {trend && (
+                        <p className="mt-4 text-sm text-white/80">
+                            <span className={trendBadgeClassNames(trend.isPositive)}>{trend.value}</span>
+                            {trend.label ? (
+                                <span className="ml-3 text-xs font-semibold uppercase tracking-[0.28em] text-white/60">
+                                    {trend.label}
+                                </span>
+                            ) : null}
+                        </p>
+                    )}
+                </div>
                 {children && (
-                    <div className="mt-5 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{children}</div>
+                    <div className="mt-6 rounded-2xl bg-white/10 p-4 text-sm leading-relaxed text-white/85 backdrop-blur-sm">
+                        {children}
+                    </div>
                 )}
             </div>
         </article>

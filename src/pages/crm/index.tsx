@@ -775,49 +775,49 @@ function CrmDashboardWorkspace({
             </Head>
             <WorkspaceLayout>
                 <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
-                    <header className="flex flex-col gap-6 border-b border-slate-200 pb-8 dark:border-slate-800">
+                    <header className="rounded-3xl border border-slate-200 bg-white/90 px-6 py-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-[0.4em] text-indigo-500 dark:text-indigo-300">
-                                    Studio workspace
+                                    Workspace snapshot
                                 </p>
                                 <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                                    {studioName} CRM overview
+                                    {studioName} dashboard
                                 </h1>
                                 <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                                    Monitor shoots, nurture clients, and keep cash flow moving without leaving your control center.
+                                    Monitor bookings, revenue momentum, and client health with a refreshed Tabler-inspired layout.
                                 </p>
+                                <div className="mt-5 flex flex-wrap items-center gap-3">
+                                    <Link
+                                        href="/bookings"
+                                        className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                                    >
+                                        Plan a shoot
+                                    </Link>
+                                    <Link
+                                        href="/invoices"
+                                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300"
+                                    >
+                                        Review billing
+                                    </Link>
+                                    {guardEnabled ? (
+                                        <button
+                                            type="button"
+                                            onClick={signOut}
+                                            className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-500 transition hover:border-slate-400 hover:text-slate-700 dark:border-slate-600 dark:text-slate-300"
+                                        >
+                                            Sign out
+                                        </button>
+                                    ) : null}
+                                </div>
                             </div>
                             <AdminProfileCard user={adminUser} />
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <Link
-                                href="/bookings"
-                                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-[#4534FF] transition hover:border-[#4534FF] hover:text-[#2D1EAF] dark:border-slate-700 dark:bg-slate-900 dark:text-[#9DAAFF] dark:hover:border-[#9DAAFF]"
-                            >
-                                Open calendar
-                            </Link>
-                            <Link
-                                href="/clients"
-                                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                            >
-                                Manage clients
-                            </Link>
-                            {guardEnabled ? (
-                                <button
-                                    type="button"
-                                    onClick={signOut}
-                                    className="inline-flex items-center justify-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-600 dark:text-slate-300"
-                                >
-                                    Sign out
-                                </button>
-                            ) : null}
                         </div>
                     </header>
 
                     {feedback ? (
                         <div
-                            className={`mt-8 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                            className={`mt-8 rounded-2xl border px-4 py-3 text-sm font-medium shadow-sm ${
                                 feedback.type === 'success'
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200'
                                     : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200'
@@ -827,7 +827,7 @@ function CrmDashboardWorkspace({
                         </div>
                     ) : null}
 
-                    <section className="mt-10 grid gap-6 lg:grid-cols-4">
+                    <section className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
                         <StatCard
                             title="Shoots scheduled"
                             value={`${metrics.scheduledThisWeek}`}
@@ -858,7 +858,7 @@ function CrmDashboardWorkspace({
                         />
                     </section>
 
-                    <section className="mt-10 grid gap-6 lg:grid-cols-[2fr,1fr]">
+                    <section className="mt-10 grid gap-6 lg:grid-cols-[3fr,2fr]">
                         <OverviewChart data={chartData} />
                         <DashboardCard
                             title="Studio signal"
@@ -870,8 +870,8 @@ function CrmDashboardWorkspace({
                             }}
                         >
                             <p>
-                                {metrics.activeClientCount} active clients and {upcomingBookings.length} upcoming shoots are keeping the
-                                studio humming. The support team is tracking {openInvoices.length} outstanding invoices.
+                                {metrics.activeClientCount} active clients and {upcomingBookings.length} upcoming shoots keep momentum high.
+                                Finance is watching {openInvoices.length} open invoices this cycle.
                             </p>
                             {settings?.custom_fields && settings.custom_fields.length > 0 ? (
                                 <ul className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-300">
@@ -895,7 +895,7 @@ function CrmDashboardWorkspace({
                                     action={
                                         <Link
                                             href="/bookings"
-                                            className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]"
+                                            className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200"
                                         >
                                             Open calendar
                                         </Link>
@@ -912,7 +912,7 @@ function CrmDashboardWorkspace({
                                     action={
                                         <Link
                                             href="/clients"
-                                            className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]"
+                                            className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200"
                                         >
                                             View all clients
                                         </Link>
@@ -931,7 +931,7 @@ function CrmDashboardWorkspace({
                                     action={
                                         <Link
                                             href="/invoices"
-                                            className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]"
+                                            className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200"
                                         >
                                             View all invoices
                                         </Link>
@@ -953,7 +953,7 @@ function CrmDashboardWorkspace({
                                     title="Studio Tasks"
                                     description="Keep production moving with next actions across your team."
                                     action={
-                                        <button className="text-sm font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">
+                                        <button className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200">
                                             Create task
                                         </button>
                                     }
@@ -975,14 +975,16 @@ type AdminProfileCardProps = {
 
 function AdminProfileCard({ user }: AdminProfileCardProps) {
     return (
-        <div className="flex w-full max-w-sm items-center gap-4 rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <Image
-                src={user.avatar}
-                alt={`${user.name} avatar`}
-                width={48}
-                height={48}
-                className="h-12 w-12 rounded-2xl bg-slate-100 object-cover dark:bg-slate-800"
-            />
+        <div className="flex w-full max-w-sm items-center gap-4 rounded-3xl border border-slate-200 bg-slate-50 px-5 py-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/60">
+            <span className="relative inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+                <Image
+                    src={user.avatar}
+                    alt={`${user.name} avatar`}
+                    width={48}
+                    height={48}
+                    className="h-full w-full object-cover"
+                />
+            </span>
             <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">{user.name}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{user.role}</p>
@@ -992,7 +994,7 @@ function AdminProfileCard({ user }: AdminProfileCardProps) {
                 ) : null}
             </div>
             {user.status ? (
-                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
                     {user.status}
                 </span>
             ) : null}
