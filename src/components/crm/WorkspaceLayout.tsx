@@ -894,41 +894,41 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                         );
                                     })}
                                 </nav>
-                                <div
-                                    className="crm-page-quick-actions"
-                                    role="group"
-                                    aria-label="Command center quick actions"
-                                >
-                                    <div className="crm-page-action-grid">
-                                        <Link
-                                            href="/bookings"
-                                            className="btn btn-primary d-inline-flex align-items-center gap-2"
-                                        >
-                                            <CalendarIcon className="icon" aria-hidden />
-                                            New booking
-                                        </Link>
-                                        <Link
-                                            href="/bookings"
-                                            className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
-                                        >
-                                            <CheckIcon className="icon" aria-hidden />
-                                            Quick set up
-                                        </Link>
-                                        <Link
-                                            href="/bookings"
-                                            className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
-                                        >
-                                            <PhotoIcon className="icon" aria-hidden />
-                                            Plan a shoot
-                                        </Link>
-                                        <Link
-                                            href="/invoices"
-                                            className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
-                                        >
-                                            <ReceiptIcon className="icon" aria-hidden />
-                                            Review billing
-                                        </Link>
-                                    </div>
+                            </div>
+                            <div
+                                className="crm-page-quick-actions"
+                                role="group"
+                                aria-label="Command center quick actions"
+                            >
+                                <div className="crm-page-action-grid">
+                                    <Link
+                                        href="/bookings"
+                                        className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+                                    >
+                                        <PhotoIcon className="icon" aria-hidden />
+                                        Plan a shoot
+                                    </Link>
+                                    <Link
+                                        href="/invoices"
+                                        className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+                                    >
+                                        <ReceiptIcon className="icon" aria-hidden />
+                                        Review billing
+                                    </Link>
+                                    <Link
+                                        href="/bookings"
+                                        className="btn btn-primary d-inline-flex align-items-center gap-2"
+                                    >
+                                        <CalendarIcon className="icon" aria-hidden />
+                                        New booking
+                                    </Link>
+                                    <Link
+                                        href="/bookings"
+                                        className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+                                    >
+                                        <CheckIcon className="icon" aria-hidden />
+                                        Quick set up
+                                    </Link>
                                 </div>
                             </div>
                         </div>
