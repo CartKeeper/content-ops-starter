@@ -781,19 +781,13 @@ function CrmDashboardWorkspace({
                             <div className="text-secondary mt-2">
                                 Monitor bookings, revenue momentum, and client health with a refreshed Tabler-inspired layout.
                             </div>
-                            <div className="mt-3 d-flex flex-wrap gap-2">
-                                <Link href="/bookings" className="btn btn-primary">
-                                    Plan a shoot
-                                </Link>
-                                <Link href="/invoices" className="btn btn-outline-primary">
-                                    Review billing
-                                </Link>
-                                {guardEnabled ? (
+                            {guardEnabled ? (
+                                <div className="mt-3 d-flex flex-wrap gap-2">
                                     <button type="button" onClick={signOut} className="btn btn-outline-secondary">
                                         Sign out
                                     </button>
-                                ) : null}
-                            </div>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                 </div>
