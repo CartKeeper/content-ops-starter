@@ -1,0 +1,65 @@
+{
+    "type": "CrmContacts",
+    "items": [
+        {
+            "id": "contact-avery-cooper",
+            "owner_user_id": "demo-user-001",
+            "first_name": "Avery",
+            "last_name": "Cooper",
+            "email": "avery.cooper@example.com",
+            "phone": "+1 (415) 555-0176",
+            "notes": "Met at the architecture expo and requested a concept deck for their spring launch.",
+            "created_at": "2025-03-12T18:24:00.000Z",
+            "updated_at": "2025-04-28T15:02:00.000Z",
+            "address": "872 Market Street",
+            "city": "San Francisco",
+            "state": "CA",
+            "business": "Cooper Creative"
+        },
+        {
+            "id": "contact-emilia-cho",
+            "owner_user_id": "demo-user-001",
+            "first_name": "Emilia",
+            "last_name": "Cho",
+            "email": "emilia@harborandco.com",
+            "phone": "+1 (650) 555-0138",
+            "notes": "Requested pricing for a bi-monthly e-commerce refresh. Prefers weekday morning shoots.",
+            "created_at": "2025-04-04T16:10:00.000Z",
+            "updated_at": "2025-04-22T21:45:00.000Z",
+            "address": "901 Bridgeway",
+            "city": "Sausalito",
+            "state": "CA",
+            "business": "Harbor & Co"
+        },
+        {
+            "id": "contact-julian-ross",
+            "owner_user_id": null,
+            "first_name": "Julian",
+            "last_name": "Ross",
+            "email": "julian@evergreenarchitects.com",
+            "phone": "+1 (628) 555-0180",
+            "notes": "Tour scheduled for May 9. Wants drone coverage options and on-site tethering.",
+            "created_at": "2025-04-18T09:32:00.000Z",
+            "updated_at": "2025-04-29T18:05:00.000Z",
+            "address": "88 Mission Street, Suite 2300",
+            "city": "San Francisco",
+            "state": "CA",
+            "business": "Evergreen Architects"
+        },
+        {
+            "id": "contact-leah-montoya",
+            "owner_user_id": "demo-user-002",
+            "first_name": "Leah",
+            "last_name": "Montoya",
+            "email": null,
+            "phone": "+1 (510) 555-0144",
+            "notes": "Wedding inquiry via Instagram. Follow up with gallery samples and contract outline.",
+            "created_at": "2025-04-24T14:20:00.000Z",
+            "updated_at": "2025-04-24T14:20:00.000Z",
+            "address": "1422 Linden Street",
+            "city": "Oakland",
+            "state": "CA",
+            "business": null
+        }
+    ]
+}
