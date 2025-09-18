@@ -20,7 +20,7 @@ export function TaskList({ tasks }: { tasks: TaskRecord[] }) {
                         type="checkbox"
                         checked={task.completed}
                         readOnly
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-[#5D3BFF] focus:ring-[#4DE5FF] dark:border-slate-600 dark:bg-slate-900"
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-300 dark:border-slate-600 dark:bg-slate-900 dark:text-indigo-300 dark:focus:ring-indigo-500/40"
                     />
                     <div className="flex-1">
                         <p className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</p>
@@ -30,7 +30,9 @@ export function TaskList({ tasks }: { tasks: TaskRecord[] }) {
                         </p>
                     </div>
                     {!task.completed && (
-                        <button className="text-xs font-semibold text-[#4534FF] transition hover:text-[#5E6CFF] dark:text-[#9DAAFF] dark:hover:text-[#B8C5FF]">Open</button>
+                        <button className="text-xs font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200">
+                            Open
+                        </button>
                     )}
                 </li>
             ))}
