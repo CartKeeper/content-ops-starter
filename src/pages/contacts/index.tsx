@@ -5,7 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import classNames from 'classnames';
 import dayjs from 'dayjs';
 
-import { CrmAuthGuard, WorkspaceLayout, ContactCard, DashboardCard } from '../../components/crm';
+import { CrmAuthGuard, WorkspaceLayout, ContactsTable, ContactModal, DashboardCard } from '../../components/crm';
 import { useNetlifyIdentity } from '../../components/auth';
 import type { ContactRecord, ConvertContactResponse } from '../../types/contact';
 import { getContactName } from '../../types/contact';
@@ -28,10 +28,11 @@ type ContactFormState = {
     city: string;
     state: string;
     business: string;
+    status: 'lead' | 'active' | 'client';
 };
 
 type ContactsApiResponse = {
-    data?: ContactRecord[];
+    data?: ContactRecord | ContactRecord[];
     error?: string;
 };
 
@@ -52,7 +53,8 @@ const INITIAL_FORM: ContactFormState = {
     address: '',
     city: '',
     state: '',
-    business: ''
+    business: '',
+    status: 'lead'
 };
 
 const inputClassName =
@@ -89,12 +91,15 @@ function ContactsWorkspace() {
         ...INITIAL_FORM,
         owner_user_id: identity.user?.id ?? ''
     }));
+    const [editingContactId, setEditingContactId] = React.useState<string | null>(null);
     const [conversionTarget, setConversionTarget] = React.useState<string | null>(null);
     const [conversionResult, setConversionResult] = React.useState<
         { contact: ContactRecord; result: ConvertContactResponse } | null
     >(null);
     const [searchTerm, setSearchTerm] = React.useState<string>('');
     const [activeFilter, setActiveFilter] = React.useState<ContactFilter>('all');
+    const [isContactModalOpen, setIsContactModalOpen] = React.useState<boolean>(false);
+    const [selectedContactId, setSelectedContactId] = React.useState<string | null>(null);
 
     useAutoDismiss(feedback, () => setFeedback(null));
 
@@ -112,7 +117,13 @@ function ContactsWorkspace() {
                 throw new Error(payload.error ?? 'Unable to load contacts');
             }
 
-            setContacts(Array.isArray(payload.data) ? payload.data : []);
+            const records = Array.isArray(payload.data) ? payload.data : [];
+            setContacts(
+                records.map((contact) => ({
+                    ...contact,
+                    status: contact.status ?? 'lead'
+                }))
+            );
         } catch (error) {
             console.error('Failed to load contacts', error);
             notify('error', error instanceof Error ? error.message : 'Unable to load contacts');
@@ -125,16 +136,17 @@ function ContactsWorkspace() {
         void loadContacts();
     }, [loadContacts]);
 
-    const handleFormChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleFormChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = event.target;
         setFormState((previous) => ({ ...previous, [name]: value }));
     }, []);
 
     const resetForm = React.useCallback(() => {
         setFormState({ ...INITIAL_FORM, owner_user_id: identity.user?.id ?? '' });
+        setEditingContactId(null);
     }, [identity.user?.id]);
 
-    const handleCreateContact = React.useCallback(
+    const handleSubmitContact = React.useCallback(
         async (event: React.FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             setIsSubmittingContact(true);
@@ -152,12 +164,16 @@ function ContactsWorkspace() {
                     city: formState.city.trim() || null,
                     state: formState.state.trim() || null,
                     business: formState.business.trim() || null,
-                    created_at: nowIso,
-                    updated_at: nowIso
+                    status: formState.status,
+                    updated_at: nowIso,
+                    ...(editingContactId ? {} : { created_at: nowIso })
                 };
 
-                const response = await fetch('/api/contacts', {
-                    method: 'POST',
+                const endpoint = editingContactId ? `/api/contacts/${editingContactId}` : '/api/contacts';
+                const method = editingContactId ? 'PUT' : 'POST';
+
+                const response = await fetch(endpoint, {
+                    method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
@@ -165,33 +181,39 @@ function ContactsWorkspace() {
                 const result = (await response.json()) as ContactsApiResponse;
 
                 if (!response.ok) {
-                    throw new Error(result.error ?? 'Unable to create contact');
+                    throw new Error(result.error ?? (editingContactId ? 'Unable to update contact' : 'Unable to create contact'));
                 }
 
-                notify('success', 'Contact added to CRM');
+                notify('success', editingContactId ? 'Contact updated' : 'Contact added to CRM');
                 setIsAddModalOpen(false);
                 resetForm();
                 setIsRefreshing(true);
                 await loadContacts();
             } catch (error) {
-                console.error('Failed to create contact', error);
-                notify('error', error instanceof Error ? error.message : 'Unable to create contact');
+                console.error('Failed to submit contact', error);
+                notify(
+                    'error',
+                    error instanceof Error
+                        ? error.message
+                        : editingContactId
+                          ? 'Unable to update contact'
+                          : 'Unable to create contact'
+                );
             } finally {
                 setIsSubmittingContact(false);
                 setIsRefreshing(false);
             }
         },
-        [formState, loadContacts, notify, resetForm]
+        [editingContactId, formState, loadContacts, notify, resetForm]
     );
 
     const handleConvert = React.useCallback(
         async (contact: ContactRecord) => {
             setConversionTarget(contact.id);
             try {
-                const response = await fetch('/api/contacts/convert', {
+                const response = await fetch(`/api/contacts/${contact.id}/convert`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contactId: contact.id })
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
                 const payload = (await response.json()) as ConvertApiResponse;
@@ -204,6 +226,8 @@ function ContactsWorkspace() {
                 notify('success', `${getContactName(contact)} is now a client`);
                 setIsRefreshing(true);
                 await loadContacts();
+                setIsContactModalOpen(false);
+                setSelectedContactId(null);
             } catch (error) {
                 console.error('Failed to convert contact', error);
                 notify('error', error instanceof Error ? error.message : 'Unable to convert contact');
@@ -213,6 +237,76 @@ function ContactsWorkspace() {
             }
         },
         [loadContacts, notify]
+    );
+
+    const handleViewContact = React.useCallback((contactId: string) => {
+        setSelectedContactId(contactId);
+        setIsContactModalOpen(true);
+    }, []);
+
+    const handleCloseContactModal = React.useCallback(() => {
+        setIsContactModalOpen(false);
+        setSelectedContactId(null);
+    }, []);
+
+    const handleEditContact = React.useCallback(
+        (contact: ContactRecord) => {
+            setFormState({
+                owner_user_id: contact.owner_user_id ?? identity.user?.id ?? '',
+                first_name: contact.first_name ?? '',
+                last_name: contact.last_name ?? '',
+                email: contact.email ?? '',
+                phone: contact.phone ?? '',
+                notes: contact.notes ?? '',
+                address: contact.address ?? '',
+                city: contact.city ?? '',
+                state: contact.state ?? '',
+                business: contact.business ?? '',
+                status: contact.status ?? 'lead'
+            });
+            setEditingContactId(contact.id);
+            setIsAddModalOpen(true);
+            setIsContactModalOpen(false);
+            setSelectedContactId(null);
+        },
+        [identity.user?.id]
+    );
+
+    const handleDeleteContact = React.useCallback(
+        async (contact: ContactRecord) => {
+            setIsRefreshing(true);
+            try {
+                const response = await fetch(`/api/contacts/${contact.id}`, {
+                    method: 'DELETE'
+                });
+
+                const payload = (await response.json()) as ContactsApiResponse;
+
+                if (!response.ok) {
+                    throw new Error(payload.error ?? 'Unable to delete contact');
+                }
+
+                notify('success', 'Contact deleted');
+                handleCloseContactModal();
+                await loadContacts();
+            } catch (error) {
+                console.error('Failed to delete contact', error);
+                notify('error', error instanceof Error ? error.message : 'Unable to delete contact');
+            } finally {
+                setIsRefreshing(false);
+            }
+        },
+        [handleCloseContactModal, loadContacts, notify]
+    );
+
+    const handleFormModalToggle = React.useCallback(
+        (open: boolean) => {
+            setIsAddModalOpen(open);
+            if (!open) {
+                resetForm();
+            }
+        },
+        [resetForm]
     );
 
     const analytics = React.useMemo(() => {
@@ -336,6 +430,7 @@ function ContactsWorkspace() {
 
     const hasContacts = contacts.length > 0;
     const visibleContacts = hasContacts ? filteredContacts : [];
+    const isEditingContact = Boolean(editingContactId);
 
     const handleResetFilters = React.useCallback(() => {
         setActiveFilter('all');
@@ -363,7 +458,7 @@ function ContactsWorkspace() {
                     >
                         {isRefreshing ? 'Refreshing…' : 'Refresh'}
                     </button>
-                    <Dialog.Root open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                    <Dialog.Root open={isAddModalOpen} onOpenChange={handleFormModalToggle}>
                         <Dialog.Trigger asChild>
                             <button
                                 type="button"
@@ -373,10 +468,11 @@ function ContactsWorkspace() {
                             </button>
                         </Dialog.Trigger>
                         <AddContactModal
-                            onSubmit={handleCreateContact}
+                            onSubmit={handleSubmitContact}
                             onChange={handleFormChange}
                             isSubmitting={isSubmittingContact}
                             formState={formState}
+                            isEditing={isEditingContact}
                         />
                     </Dialog.Root>
                 </div>
@@ -540,20 +636,19 @@ function ContactsWorkspace() {
                         </button>
                     </div>
                 ) : (
-                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                        {visibleContacts.map((contact) => (
-                            <ContactCard
-                                key={contact.id}
-                                contact={contact}
-                                onConvert={handleConvert}
-                                isConverting={conversionTarget === contact.id}
-                                isDisabled={Boolean(conversionTarget && conversionTarget !== contact.id)}
-                            />
-                        ))}
-                    </div>
+                    <ContactsTable contacts={visibleContacts} onSelect={handleViewContact} isLoading={isRefreshing} />
                 )}
             </section>
 
+            <ContactModal
+                contactId={selectedContactId}
+                open={isContactModalOpen}
+                onClose={handleCloseContactModal}
+                onEdit={handleEditContact}
+                onConvert={handleConvert}
+                onDelete={handleDeleteContact}
+                isConverting={Boolean(conversionTarget && selectedContactId === conversionTarget)}
+            />
             <ConversionSuccessModal conversion={conversionResult} onClose={() => setConversionResult(null)} />
         </div>
     );
@@ -561,12 +656,19 @@ function ContactsWorkspace() {
 
 type AddContactModalProps = {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
     formState: ContactFormState;
     isSubmitting: boolean;
+    isEditing: boolean;
 };
 
-function AddContactModal({ onSubmit, onChange, formState, isSubmitting }: AddContactModalProps) {
+function AddContactModal({ onSubmit, onChange, formState, isSubmitting, isEditing }: AddContactModalProps) {
+    const heading = isEditing ? 'Edit contact' : 'Add contact';
+    const description = isEditing
+        ? 'Update the latest details so your team always has the right context.'
+        : 'Capture the essentials so you can follow up quickly and convert to a client later.';
+    const submitLabel = isSubmitting ? 'Saving…' : isEditing ? 'Save changes' : 'Create contact';
+
     return (
         <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm" />
@@ -574,9 +676,9 @@ function AddContactModal({ onSubmit, onChange, formState, isSubmitting }: AddCon
                 <form onSubmit={onSubmit} className="flex flex-col gap-6 p-8">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <Dialog.Title className="text-xl font-semibold text-slate-900 dark:text-white">Add contact</Dialog.Title>
+                            <Dialog.Title className="text-xl font-semibold text-slate-900 dark:text-white">{heading}</Dialog.Title>
                             <Dialog.Description className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                Capture the essentials so you can follow up quickly and convert to a client later.
+                                {description}
                             </Dialog.Description>
                         </div>
                         <Dialog.Close asChild>
@@ -672,6 +774,19 @@ function AddContactModal({ onSubmit, onChange, formState, isSubmitting }: AddCon
                                 placeholder="CA"
                             />
                         </label>
+                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
+                            <span className="font-semibold">Status</span>
+                            <select
+                                className={inputClassName}
+                                name="status"
+                                value={formState.status}
+                                onChange={onChange}
+                            >
+                                <option value="lead">Lead</option>
+                                <option value="active">Active</option>
+                                <option value="client">Client</option>
+                            </select>
+                        </label>
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
@@ -710,7 +825,7 @@ function AddContactModal({ onSubmit, onChange, formState, isSubmitting }: AddCon
                                 disabled={isSubmitting}
                                 className="inline-flex items-center justify-center rounded-2xl border border-transparent bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-offset-slate-950"
                             >
-                                {isSubmitting ? 'Saving…' : 'Save contact'}
+                                {submitLabel}
                             </button>
                         </div>
                     </div>

@@ -116,13 +116,34 @@ function parseContactId(body: unknown): string | null {
     return null;
 }
 
+function parseContactIdFromQuery(query: NextApiRequest['query']): string | null {
+    const candidates = [query.id, query.contactId, query.contact_id];
+
+    for (const candidate of candidates) {
+        if (Array.isArray(candidate)) {
+            for (const entry of candidate) {
+                if (typeof entry === 'string' && entry.trim()) {
+                    return entry.trim();
+                }
+            }
+        } else if (typeof candidate === 'string') {
+            const trimmed = candidate.trim();
+            if (trimmed) {
+                return trimmed;
+            }
+        }
+    }
+
+    return null;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse<ConvertResponse>) {
     if (req.method !== 'POST') {
         res.setHeader('Allow', 'POST');
         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
 
-    const contactId = parseContactId(req.body);
+    const contactId = parseContactIdFromQuery(req.query) ?? parseContactId(req.body);
 
     if (!contactId) {
         return res.status(400).json({ error: 'contactId is required' });

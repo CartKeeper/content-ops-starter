@@ -5,6 +5,8 @@ export type { StatusTone } from './StatusPill';
 export { ClientTable } from './ClientTable';
 export type { ClientRecord, ClientStatus } from './ClientTable';
 export { ContactCard } from './ContactCard';
+export { ContactsTable } from './ContactsTable';
+export { ContactModal } from './ContactModal';
 export { BookingList } from './BookingList';
 export type { BookingRecord, BookingStatus } from './BookingList';
 export { InvoiceTable } from './InvoiceTable';
