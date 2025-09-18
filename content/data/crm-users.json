@@ -1,0 +1,17 @@
+{
+    "type": "CrmUsers",
+    "items": [
+        {
+            "id": "avery-logan",
+            "name": "Avery Logan",
+            "email": "avery@codex.studio",
+            "role": "admin"
+        },
+        {
+            "id": "jordan-lee",
+            "name": "Jordan Lee",
+            "email": "jordan@codex.studio",
+            "role": "member"
+        }
+    ]
+}

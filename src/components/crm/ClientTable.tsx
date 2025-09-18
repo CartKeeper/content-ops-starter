@@ -15,6 +15,8 @@ export type ClientRecord = {
     lastShoot: string;
     upcomingShoot?: string;
     status: ClientStatus;
+    ownerId?: string;
+    ownerName?: string;
 };
 
 const statusToneMap: Record<ClientStatus, StatusTone> = {
