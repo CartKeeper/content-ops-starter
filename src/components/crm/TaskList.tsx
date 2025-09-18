@@ -13,24 +13,24 @@ const formatDate = (value: string) => dayjs(value).format('MMM D');
 
 export function TaskList({ tasks }: { tasks: TaskRecord[] }) {
     return (
-        <ul className="space-y-3">
+        <ul className="list-group list-group-flush">
             {tasks.map((task) => (
-                <li key={task.id} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <li key={task.id} className="list-group-item d-flex align-items-start gap-3">
                     <input
                         type="checkbox"
+                        className="form-check-input mt-1"
                         checked={task.completed}
                         readOnly
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-300 dark:border-slate-600 dark:bg-slate-900 dark:text-indigo-300 dark:focus:ring-indigo-500/40"
                     />
-                    <div className="flex-1">
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">{task.title}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex-grow-1">
+                        <div className="fw-semibold">{task.title}</div>
+                        <div className="text-secondary small">
                             Due {formatDate(task.dueDate)}
                             {task.assignee ? ` · ${task.assignee}` : ''}
-                        </p>
+                        </div>
                     </div>
                     {!task.completed && (
-                        <button className="text-xs font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200">
+                        <button className="btn btn-sm btn-outline-primary" type="button">
                             Open
                         </button>
                     )}

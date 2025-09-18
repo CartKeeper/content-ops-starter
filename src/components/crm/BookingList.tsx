@@ -27,34 +27,34 @@ const formatDate = (value: string) => dayjs(value).format('ddd, MMM D');
 
 export function BookingList({ bookings }: { bookings: BookingRecord[] }) {
     return (
-        <ol className="relative space-y-6 border-l border-slate-200 pl-6 dark:border-slate-800">
+        <ul className="timeline timeline-simple">
             {bookings.map((booking) => (
-                <li key={booking.id} className="relative">
-                    <span className="absolute -left-3 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-indigo-100 text-indigo-600 dark:border-slate-900 dark:bg-indigo-900/60 dark:text-indigo-300">
-                        •
-                    </span>
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <p className="text-sm font-medium text-indigo-600 dark:text-indigo-300">{formatDate(booking.date)}</p>
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{booking.client}</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">{booking.shootType}</p>
+                <li key={booking.id} className="timeline-event">
+                    <div className="timeline-event-icon bg-primary" aria-hidden />
+                    <div className="card timeline-event-card">
+                        <div className="card-body">
+                            <div className="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+                                <div>
+                                    <div className="text-uppercase text-secondary fw-semibold small">{formatDate(booking.date)}</div>
+                                    <h3 className="h4 mb-1">{booking.client}</h3>
+                                    <div className="text-secondary">{booking.shootType}</div>
+                                </div>
+                                <div className="text-end text-secondary">
+                                    <div>
+                                        {booking.startTime}
+                                        {booking.endTime ? ` – ${booking.endTime}` : ''}
+                                    </div>
+                                    <div>{booking.location}</div>
+                                </div>
                             </div>
-                            <div className="text-right text-sm text-slate-500 dark:text-slate-400">
-                                <p>
-                                    {booking.startTime}
-                                    {booking.endTime ? ` – ${booking.endTime}` : ''}
-                                </p>
-                                <p>{booking.location}</p>
+                            <div className="mt-3">
+                                <StatusPill tone={statusToneMap[booking.status]}>{booking.status}</StatusPill>
                             </div>
-                        </div>
-                        <div className="mt-3">
-                            <StatusPill tone={statusToneMap[booking.status]}>{booking.status}</StatusPill>
                         </div>
                     </div>
                 </li>
             ))}
-        </ol>
+        </ul>
     );
 }
 
