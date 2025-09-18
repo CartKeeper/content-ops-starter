@@ -848,10 +848,6 @@ a.link-primary:hover {
     position: relative;
 }
 
-.crm-action-dropdown .dropdown-menu {
-    margin-top: 0.5rem;
-}
-
 @media (max-width: 767.98px) {
     .crm-page-heading-actions {
         align-items: stretch;

@@ -260,6 +260,17 @@ const notificationToneBadge: Record<NotificationTone, string> = {
     warning: 'bg-warning-lt text-warning'
 };
 
+type DropdownPlacement = 'top' | 'bottom';
+type DropdownAlignment = 'start' | 'end';
+
+type UseDropdownOptions = {
+    defaultAlignment?: DropdownAlignment;
+    offset?: number;
+    boundaryPadding?: number;
+};
+
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
+
 function matchPath(currentPath: string, target: string) {
     if (currentPath === target) {
         return true;
@@ -270,8 +281,14 @@ function matchPath(currentPath: string, target: string) {
     return currentPath.startsWith(target) && target !== '/';
 }
 
-function useDropdown<T extends HTMLElement>() {
+function useDropdown<T extends HTMLElement>({
+    defaultAlignment = 'start',
+    offset = 8,
+    boundaryPadding = 8
+}: UseDropdownOptions = {}) {
     const [isOpen, setIsOpen] = React.useState(false);
+    const [placement, setPlacement] = React.useState<DropdownPlacement>('bottom');
+    const [alignment, setAlignment] = React.useState<DropdownAlignment>(defaultAlignment);
     const containerRef = React.useRef<T | null>(null);
 
     const close = React.useCallback(() => {
@@ -281,6 +298,109 @@ function useDropdown<T extends HTMLElement>() {
     const toggle = React.useCallback(() => {
         setIsOpen((previous) => !previous);
     }, []);
+
+    const updatePlacement = React.useCallback(() => {
+        if (!isOpen || typeof window === 'undefined') {
+            return;
+        }
+
+        const container = containerRef.current;
+        if (!container) {
+            return;
+        }
+
+        const menu = container.querySelector<HTMLElement>('.dropdown-menu');
+        if (!menu) {
+            return;
+        }
+
+        const toggleElement =
+            container.querySelector<HTMLElement>('[data-dropdown-toggle]') ??
+            container.querySelector<HTMLElement>('.dropdown-toggle') ??
+            (container.firstElementChild instanceof HTMLElement &&
+            !container.firstElementChild.classList.contains('dropdown-menu')
+                ? container.firstElementChild
+                : null);
+
+        if (!toggleElement) {
+            return;
+        }
+
+        const menuRect = menu.getBoundingClientRect();
+        const toggleRect = toggleElement.getBoundingClientRect();
+
+        if (menuRect.width === 0 && menuRect.height === 0) {
+            return;
+        }
+
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        const spaceAbove = toggleRect.top - boundaryPadding;
+        const spaceBelow = viewportHeight - toggleRect.bottom - boundaryPadding;
+
+        let nextPlacement: DropdownPlacement = 'bottom';
+        if (spaceBelow < menuRect.height + offset && spaceAbove > spaceBelow) {
+            nextPlacement = 'top';
+        }
+
+        const paddedLeft = boundaryPadding;
+        const paddedRight = viewportWidth - boundaryPadding;
+
+        const startLeft = toggleRect.left;
+        const startRight = startLeft + menuRect.width;
+        const endLeft = toggleRect.right - menuRect.width;
+        const endRight = endLeft + menuRect.width;
+
+        const fitsStart = startLeft >= paddedLeft && startRight <= paddedRight;
+        const fitsEnd = endLeft >= paddedLeft && endRight <= paddedRight;
+
+        let nextAlignment: DropdownAlignment = defaultAlignment;
+
+        const calculateOverflow = (left: number, right: number) =>
+            Math.max(0, paddedLeft - left) + Math.max(0, right - paddedRight);
+
+        if (defaultAlignment === 'end') {
+            if (fitsEnd || (!fitsStart && endLeft >= paddedLeft)) {
+                nextAlignment = 'end';
+            } else if (fitsStart) {
+                nextAlignment = 'start';
+            } else {
+                const startOverflow = calculateOverflow(startLeft, startRight);
+                const endOverflow = calculateOverflow(endLeft, endRight);
+                nextAlignment = startOverflow <= endOverflow ? 'start' : 'end';
+            }
+        } else {
+            if (fitsStart || (!fitsEnd && startRight <= paddedRight)) {
+                nextAlignment = 'start';
+            } else if (fitsEnd) {
+                nextAlignment = 'end';
+            } else {
+                const startOverflow = calculateOverflow(startLeft, startRight);
+                const endOverflow = calculateOverflow(endLeft, endRight);
+                nextAlignment = startOverflow <= endOverflow ? 'start' : 'end';
+            }
+        }
+
+        setPlacement(nextPlacement);
+        setAlignment(nextAlignment);
+
+        if (nextPlacement === 'bottom') {
+            menu.style.top = `calc(100% + ${offset}px)`;
+            menu.style.bottom = 'auto';
+        } else {
+            menu.style.bottom = `calc(100% + ${offset}px)`;
+            menu.style.top = 'auto';
+        }
+
+        if (nextAlignment === 'end') {
+            menu.style.right = '0';
+            menu.style.left = 'auto';
+        } else {
+            menu.style.left = '0';
+            menu.style.right = 'auto';
+        }
+    }, [boundaryPadding, defaultAlignment, isOpen, offset]);
 
     React.useEffect(() => {
         function handlePointer(event: MouseEvent | TouchEvent) {
@@ -301,7 +421,44 @@ function useDropdown<T extends HTMLElement>() {
         };
     }, []);
 
-    return { isOpen, close, toggle, containerRef } as const;
+    useIsomorphicLayoutEffect(() => {
+        if (!isOpen) {
+            const container = containerRef.current;
+            if (!container) {
+                return;
+            }
+            const menu = container.querySelector<HTMLElement>('.dropdown-menu');
+            if (menu) {
+                menu.style.removeProperty('top');
+                menu.style.removeProperty('bottom');
+                menu.style.removeProperty('left');
+                menu.style.removeProperty('right');
+            }
+            return;
+        }
+
+        updatePlacement();
+    }, [isOpen, updatePlacement]);
+
+    React.useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        function handleWindowChange() {
+            updatePlacement();
+        }
+
+        window.addEventListener('resize', handleWindowChange);
+        window.addEventListener('scroll', handleWindowChange, true);
+
+        return () => {
+            window.removeEventListener('resize', handleWindowChange);
+            window.removeEventListener('scroll', handleWindowChange, true);
+        };
+    }, [isOpen, updatePlacement]);
+
+    return { isOpen, close, toggle, containerRef, placement, alignment } as const;
 }
 
 export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
@@ -313,26 +470,34 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         isOpen: isAppsOpen,
         close: closeApps,
         toggle: toggleApps,
-        containerRef: appsDropdownRef
-    } = useDropdown<HTMLDivElement>();
+        containerRef: appsDropdownRef,
+        placement: appsPlacement,
+        alignment: appsAlignment
+    } = useDropdown<HTMLDivElement>({ defaultAlignment: 'end' });
     const {
         isOpen: isThemeMenuOpen,
         close: closeThemeMenu,
         toggle: toggleThemeMenu,
-        containerRef: themeDropdownRef
-    } = useDropdown<HTMLDivElement>();
+        containerRef: themeDropdownRef,
+        placement: themePlacement,
+        alignment: themeAlignment
+    } = useDropdown<HTMLDivElement>({ defaultAlignment: 'end' });
     const {
         isOpen: isNotificationsOpen,
         close: closeNotifications,
         toggle: toggleNotifications,
-        containerRef: notificationsDropdownRef
-    } = useDropdown<HTMLDivElement>();
+        containerRef: notificationsDropdownRef,
+        placement: notificationsPlacement,
+        alignment: notificationsAlignment
+    } = useDropdown<HTMLDivElement>({ defaultAlignment: 'end' });
     const {
         isOpen: isProfileOpen,
         close: closeProfile,
         toggle: toggleProfile,
-        containerRef: profileDropdownRef
-    } = useDropdown<HTMLDivElement>();
+        containerRef: profileDropdownRef,
+        placement: profilePlacement,
+        alignment: profileAlignment
+    } = useDropdown<HTMLDivElement>({ defaultAlignment: 'end' });
 
     const [accent, setAccent] = React.useState<string>(() => {
         if (typeof window === 'undefined') {
@@ -544,6 +709,8 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                         <div
                             className={classNames('nav-item dropdown', { show: isAppsOpen })}
                             ref={appsDropdownRef}
+                            data-dropdown-placement={isAppsOpen ? appsPlacement : undefined}
+                            data-dropdown-alignment={isAppsOpen ? appsAlignment : undefined}
                         >
                             <button
                                 type="button"
@@ -551,13 +718,18 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                 aria-label="Open quick launch"
                                 aria-expanded={isAppsOpen}
                                 onClick={toggleApps}
+                                data-dropdown-toggle
                             >
                                 <AppsIcon className="icon" aria-hidden />
                             </button>
                             <div
                                 className={classNames(
-                                    'dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-xl',
-                                    { show: isAppsOpen }
+                                    'dropdown-menu dropdown-menu-card dropdown-menu-xl',
+                                    {
+                                        'dropdown-menu-end': appsAlignment === 'end',
+                                        'dropdown-menu-start': appsAlignment === 'start',
+                                        show: isAppsOpen
+                                    }
                                 )}
                             >
                                 <div className="card crm-quick-launch-card">
@@ -610,6 +782,10 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                         <div
                             className={classNames('nav-item dropdown', { show: isNotificationsOpen })}
                             ref={notificationsDropdownRef}
+                            data-dropdown-placement={isNotificationsOpen ? notificationsPlacement : undefined}
+                            data-dropdown-alignment={
+                                isNotificationsOpen ? notificationsAlignment : undefined
+                            }
                         >
                             <button
                                 type="button"
@@ -617,14 +793,19 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                 aria-label="View notifications"
                                 aria-expanded={isNotificationsOpen}
                                 onClick={toggleNotifications}
+                                data-dropdown-toggle
                             >
                                 <BellIcon className="icon" aria-hidden />
                                 <span className="crm-notification-indicator" aria-hidden />
                             </button>
                             <div
                                 className={classNames(
-                                    'dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-md',
-                                    { show: isNotificationsOpen }
+                                    'dropdown-menu dropdown-menu-card dropdown-menu-md',
+                                    {
+                                        'dropdown-menu-end': notificationsAlignment === 'end',
+                                        'dropdown-menu-start': notificationsAlignment === 'start',
+                                        show: isNotificationsOpen
+                                    }
                                 )}
                             >
                                 <div className="card">
@@ -658,6 +839,8 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                         <div
                             className={classNames('nav-item dropdown crm-action-dropdown', { show: isThemeMenuOpen })}
                             ref={themeDropdownRef}
+                            data-dropdown-placement={isThemeMenuOpen ? themePlacement : undefined}
+                            data-dropdown-alignment={isThemeMenuOpen ? themeAlignment : undefined}
                         >
                             <button
                                 type="button"
@@ -665,6 +848,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                 aria-label="Open theme settings"
                                 aria-expanded={isThemeMenuOpen}
                                 onClick={toggleThemeMenu}
+                                data-dropdown-toggle
                             >
                                 {theme === 'dark' ? (
                                     <MoonIcon className="icon" aria-hidden />
@@ -674,8 +858,12 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                             </button>
                             <div
                                 className={classNames(
-                                    'dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-lg',
-                                    { show: isThemeMenuOpen }
+                                    'dropdown-menu dropdown-menu-card dropdown-menu-lg',
+                                    {
+                                        'dropdown-menu-end': themeAlignment === 'end',
+                                        'dropdown-menu-start': themeAlignment === 'start',
+                                        show: isThemeMenuOpen
+                                    }
                                 )}
                             >
                                 <div className="card crm-theme-menu">
@@ -801,6 +989,8 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                         <div
                             className={classNames('nav-item dropdown crm-action-dropdown', { show: isProfileOpen })}
                             ref={profileDropdownRef}
+                            data-dropdown-placement={isProfileOpen ? profilePlacement : undefined}
+                            data-dropdown-alignment={isProfileOpen ? profileAlignment : undefined}
                         >
                             <button
                                 type="button"
@@ -808,6 +998,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                 aria-label="Open profile menu"
                                 aria-expanded={isProfileOpen}
                                 onClick={toggleProfile}
+                                data-dropdown-toggle
                             >
                                 <span className="crm-profile-card">
                                     <span className="crm-avatar-wrapper">
@@ -830,8 +1021,12 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                             </button>
                             <div
                                 className={classNames(
-                                    'dropdown-menu dropdown-menu-end dropdown-menu-arrow dropdown-menu-card dropdown-menu-md',
-                                    { show: isProfileOpen }
+                                    'dropdown-menu dropdown-menu-arrow dropdown-menu-card dropdown-menu-md',
+                                    {
+                                        'dropdown-menu-end': profileAlignment === 'end',
+                                        'dropdown-menu-start': profileAlignment === 'start',
+                                        show: isProfileOpen
+                                    }
                                 )}
                             >
                                 <div className="card">
