@@ -560,6 +560,11 @@ a.link-primary:hover {
     background-color: rgba(15, 23, 42, 0.88);
 }
 
+.crm-top-nav > .container-xl {
+    padding-left: var(--content-margin, 1.5rem);
+    padding-right: var(--content-margin, 1.5rem);
+}
+
 .crm-top-nav .navbar-brand .crm-brand-name {
     font-weight: 600;
     letter-spacing: 0.08em;
@@ -585,7 +590,7 @@ a.link-primary:hover {
 }
 
 .crm-top-nav-actions {
-    margin-right: var(--content-margin, 1.5rem);
+    margin-right: 0;
 }
 
 .crm-top-nav .nav-link.active,
@@ -868,27 +873,31 @@ a.link-primary:hover {
 }
 
 .crm-page-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 0.75rem;
-    align-items: center;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+    justify-items: stretch;
+    align-items: stretch;
+    max-width: 64rem;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
 }
 
 .crm-page-nav-link {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.4rem 0.9rem;
+    justify-content: center;
+    width: 100%;
+    padding: 0.55rem 1.1rem;
     border-radius: 9999px;
     font-weight: 500;
     color: var(--tblr-secondary-color, #64748b);
     background-color: rgba(var(--crm-accent-rgb), 0.08);
     transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-    justify-content: center;
     text-align: center;
-    flex: 0 1 11rem;
 }
 
 .crm-page-nav-link:hover,
@@ -914,18 +923,21 @@ a.link-primary:hover {
     width: 1rem;
     height: 1rem;
 }
-@media (max-width: 991.98px) {
+@media (max-width: 1399.98px) {
     .crm-page-nav {
-        justify-content: center;
-        text-align: center;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
-@media (max-width: 767.98px) {
-    .crm-page-nav-link {
-        width: 100%;
-        justify-content: center;
-        flex: 1 1 100%;
+@media (max-width: 991.98px) {
+    .crm-page-nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 575.98px) {
+    .crm-page-nav {
+        grid-template-columns: 1fr;
     }
 }
 
