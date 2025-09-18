@@ -1075,6 +1075,58 @@ a.link-primary:hover {
     color: #ffffff;
 }
 
+.crm-integration-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+}
+
+.crm-integration-manage {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.crm-integration-manage .btn-group {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.crm-integration-manage .btn-group .btn {
+    flex: 1 0 auto;
+}
+
+.crm-integration-add {
+    background-color: var(--tblr-bg-surface, #ffffff);
+}
+
+.theme-dark .crm-integration-add {
+    background-color: rgba(30, 41, 59, 0.85);
+    border-color: rgba(71, 85, 105, 0.5) !important;
+}
+
+.crm-integration-empty {
+    border-radius: 0.85rem;
+    border: 1px dashed rgba(148, 163, 184, 0.35);
+}
+
+.theme-dark .crm-integration-empty {
+    border-color: rgba(71, 85, 105, 0.5);
+}
+
+.crm-quick-launch-empty {
+    padding: 1.5rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px dashed rgba(148, 163, 184, 0.35);
+}
+
+.theme-dark .crm-quick-launch-empty {
+    border-color: rgba(71, 85, 105, 0.5);
+}
+
 body.crm-outline-mode {
     --crm-outline-border: rgba(var(--crm-accent-rgb), 0.65);
 }
