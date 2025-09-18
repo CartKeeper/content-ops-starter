@@ -21,7 +21,6 @@ import {
     BellIcon,
     CalendarIcon,
     CheckIcon,
-    ChevronDownIcon,
     FolderIcon,
     MoonIcon,
     PhotoIcon,
@@ -656,6 +655,206 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                 </div>
                             </div>
                         </div>
+                        <div
+                            className={classNames('nav-item dropdown crm-action-dropdown', { show: isThemeMenuOpen })}
+                            ref={themeDropdownRef}
+                        >
+                            <button
+                                type="button"
+                                className="btn btn-icon"
+                                aria-label="Open theme settings"
+                                aria-expanded={isThemeMenuOpen}
+                                onClick={toggleThemeMenu}
+                            >
+                                {theme === 'dark' ? (
+                                    <MoonIcon className="icon" aria-hidden />
+                                ) : (
+                                    <SunIcon className="icon" aria-hidden />
+                                )}
+                            </button>
+                            <div
+                                className={classNames(
+                                    'dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-lg',
+                                    { show: isThemeMenuOpen }
+                                )}
+                            >
+                                <div className="card crm-theme-menu">
+                                    <div className="card-header">
+                                        <h4 className="card-title mb-0">Theme settings</h4>
+                                        <div className="text-secondary">Fine-tune your control center.</div>
+                                    </div>
+                                    <div className="card-body">
+                                        <div className="mb-4">
+                                            <div className="crm-dropdown-label">Color mode</div>
+                                            <div className="btn-list">
+                                                <button
+                                                    type="button"
+                                                    className={classNames('btn', {
+                                                        'btn-primary': theme === 'light',
+                                                        'btn-outline-secondary': theme !== 'light'
+                                                    })}
+                                                    onClick={() => setTheme('light')}
+                                                >
+                                                    <SunIcon className="icon" aria-hidden /> Light
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={classNames('btn', {
+                                                        'btn-primary': theme === 'dark',
+                                                        'btn-outline-secondary': theme !== 'dark'
+                                                    })}
+                                                    onClick={() => setTheme('dark')}
+                                                >
+                                                    <MoonIcon className="icon" aria-hidden /> Dark
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline-secondary"
+                                                    onClick={toggleTheme}
+                                                >
+                                                    Auto toggle
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="mb-4">
+                                            <div className="crm-dropdown-label">Accent color</div>
+                                            <div className="row g-2">
+                                                {accentOptions.map((option) => {
+                                                    const isActive = option.id === accent;
+                                                    return (
+                                                        <div className="col-4" key={option.id}>
+                                                            <button
+                                                                type="button"
+                                                                className={classNames('crm-color-choice w-100', {
+                                                                    active: isActive
+                                                                })}
+                                                                style={{
+                                                                    backgroundColor: option.swatch,
+                                                                    boxShadow: isActive
+                                                                        ? `0 0 0 4px ${option.soft}`
+                                                                        : undefined,
+                                                                    color: option.contrast ?? '#ffffff'
+                                                                }}
+                                                                onClick={() => handleSelectAccent(option.id)}
+                                                                aria-pressed={isActive}
+                                                            >
+                                                                <span className="crm-color-check" aria-hidden>
+                                                                    <CheckIcon className="icon" />
+                                                                </span>
+                                                                <span className="crm-color-label">{option.label}</span>
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="mb-4">
+                                            <div className="d-flex align-items-start justify-content-between gap-3">
+                                                <div>
+                                                    <div className="crm-dropdown-label mb-1">Outline mode</div>
+                                                    <div className="text-secondary small">
+                                                        Add neon outlines to dashboard cards and controls.
+                                                    </div>
+                                                </div>
+                                                <div className="form-check form-switch mb-0">
+                                                    <input
+                                                        id="outline-mode-toggle"
+                                                        type="checkbox"
+                                                        className="form-check-input"
+                                                        role="switch"
+                                                        checked={isOutlineMode}
+                                                        onChange={toggleOutlineMode}
+                                                    />
+                                                    <label className="visually-hidden" htmlFor="outline-mode-toggle">
+                                                        Toggle outline mode
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="crm-dropdown-label">Current selection</div>
+                                            <div className="d-flex align-items-center justify-content-between gap-3">
+                                                <div>
+                                                    <div className="fw-semibold">
+                                                        {theme === 'dark' ? 'Dark mode' : 'Light mode'}
+                                                    </div>
+                                                    <div className="text-secondary">
+                                                        <div>Accent: {activeAccent.label}</div>
+                                                        <div>Outline: {isOutlineMode ? 'Enabled' : 'Off'}</div>
+                                                    </div>
+                                                </div>
+                                                <span
+                                                    className="badge text-uppercase fw-semibold"
+                                                    style={{
+                                                        backgroundColor: activeAccent.soft,
+                                                        color: activeAccent.swatch
+                                                    }}
+                                                >
+                                                    Saved
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            className={classNames('nav-item dropdown crm-action-dropdown', { show: isProfileOpen })}
+                            ref={profileDropdownRef}
+                        >
+                            <button
+                                type="button"
+                                className="btn p-0 border-0 bg-transparent"
+                                aria-label="Open profile menu"
+                                aria-expanded={isProfileOpen}
+                                onClick={toggleProfile}
+                            >
+                                <span className="crm-avatar-wrapper">
+                                    <span
+                                        className="avatar avatar-sm"
+                                        style={{ backgroundImage: `url(${adminUser.avatar})` }}
+                                    />
+                                    {adminUser.status ? <span className="crm-avatar-status" aria-hidden /> : null}
+                                </span>
+                            </button>
+                            <div
+                                className={classNames(
+                                    'dropdown-menu dropdown-menu-end dropdown-menu-arrow dropdown-menu-card dropdown-menu-md',
+                                    { show: isProfileOpen }
+                                )}
+                            >
+                                <div className="card">
+                                    <div className="card-body">
+                                        <div className="d-flex align-items-center gap-3">
+                                            <span
+                                                className="avatar avatar-lg"
+                                                style={{ backgroundImage: `url(${adminUser.avatar})` }}
+                                            />
+                                            <div>
+                                                <div className="fw-semibold">{adminUser.name}</div>
+                                                <div className="text-secondary">{adminUser.email}</div>
+                                                {adminUser.status ? (
+                                                    <span className="badge bg-success-lt text-success mt-2">
+                                                        {adminUser.status}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 d-grid gap-2">
+                                            <Link href="/settings" className="btn btn-outline-secondary">
+                                                Manage profile
+                                            </Link>
+                                            <Link href="/" className="btn btn-outline-secondary">
+                                                View public site
+                                            </Link>
+                                            <button type="button" className="btn btn-primary">
+                                                Sign out
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -663,28 +862,28 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                 <section className="crm-page-header">
                     <div className="container-xl">
                         <div className="crm-page-heading">
-                        <div className="crm-page-heading-text">
-                            <span className="crm-page-pretitle">{headingLabel}</span>
-                            <h1 className="crm-page-title">Command center</h1>
-                            <nav className="crm-page-nav" aria-label="Workspace pages">
-                                {navItems.map((item) => {
-                                    const isActive = matchPath(router.pathname, item.href);
-                                    return (
-                                        <Link
-                                            key={`page-nav-${item.href}`}
-                                            href={item.href}
-                                            className={classNames('crm-page-nav-link', { active: isActive })}
-                                            aria-current={isActive ? 'page' : undefined}
-                                        >
-                                            <span className="crm-page-nav-icon" aria-hidden>
-                                                <item.icon className="icon" />
-                                            </span>
-                                            <span>{item.label}</span>
-                                        </Link>
-                                    );
-                                })}
-                            </nav>
-                        </div>
+                            <div className="crm-page-heading-text">
+                                <span className="crm-page-pretitle">{headingLabel}</span>
+                                <h1 className="crm-page-title">Command center</h1>
+                                <nav className="crm-page-nav" aria-label="Workspace pages">
+                                    {navItems.map((item) => {
+                                        const isActive = matchPath(router.pathname, item.href);
+                                        return (
+                                            <Link
+                                                key={`page-nav-${item.href}`}
+                                                href={item.href}
+                                                className={classNames('crm-page-nav-link', { active: isActive })}
+                                                aria-current={isActive ? 'page' : undefined}
+                                            >
+                                                <span className="crm-page-nav-icon" aria-hidden>
+                                                    <item.icon className="icon" />
+                                                </span>
+                                                <span>{item.label}</span>
+                                            </Link>
+                                        );
+                                    })}
+                                </nav>
+                            </div>
                             <div className="crm-page-heading-actions">
                                 <div className="crm-page-action-row">
                                     <Link
@@ -694,207 +893,6 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                         <CalendarIcon className="icon" aria-hidden />
                                         New booking
                                     </Link>
-                                    <div
-                                        className={classNames('dropdown crm-action-dropdown', { show: isThemeMenuOpen })}
-                                        ref={themeDropdownRef}
-                                    >
-                                        <button
-                                            type="button"
-                                            className="btn btn-outline-secondary d-inline-flex align-items-center gap-2"
-                                            onClick={toggleThemeMenu}
-                                            aria-expanded={isThemeMenuOpen}
-                                        >
-                                            <SparklesIcon className="icon" aria-hidden />
-                                            Theme Settings
-                                            <span className="badge bg-green-lt text-green fw-semibold text-uppercase">New</span>
-                                        </button>
-                                        <div
-                                            className={classNames(
-                                                'dropdown-menu dropdown-menu-end dropdown-menu-card dropdown-menu-lg',
-                                                { show: isThemeMenuOpen }
-                                            )}
-                                        >
-                                            <div className="card crm-theme-menu">
-                                                <div className="card-header">
-                                                    <h4 className="card-title mb-0">Theme settings</h4>
-                                                    <div className="text-secondary">Fine-tune your control center.</div>
-                                                </div>
-                                                <div className="card-body">
-                                                    <div className="mb-4">
-                                                        <div className="crm-dropdown-label">Color mode</div>
-                                                        <div className="btn-list">
-                                                            <button
-                                                                type="button"
-                                                                className={classNames('btn', {
-                                                                    'btn-primary': theme === 'light',
-                                                                    'btn-outline-secondary': theme !== 'light'
-                                                                })}
-                                                                onClick={() => setTheme('light')}
-                                                            >
-                                                                <SunIcon className="icon" aria-hidden /> Light
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className={classNames('btn', {
-                                                                    'btn-primary': theme === 'dark',
-                                                                    'btn-outline-secondary': theme !== 'dark'
-                                                                })}
-                                                                onClick={() => setTheme('dark')}
-                                                            >
-                                                                <MoonIcon className="icon" aria-hidden /> Dark
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-outline-secondary"
-                                                                onClick={toggleTheme}
-                                                            >
-                                                                Auto toggle
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="mb-4">
-                                                        <div className="crm-dropdown-label">Accent color</div>
-                                                        <div className="row g-2">
-                                                            {accentOptions.map((option) => {
-                                                                const isActive = option.id === accent;
-                                                                return (
-                                                                    <div className="col-4" key={option.id}>
-                                                                        <button
-                                                                            type="button"
-                                                                            className={classNames('crm-color-choice w-100', {
-                                                                                active: isActive
-                                                                            })}
-                                                                            style={{
-                                                                                backgroundColor: option.swatch,
-                                                                                boxShadow: isActive
-                                                                                    ? `0 0 0 4px ${option.soft}`
-                                                                                    : undefined,
-                                                                                color: option.contrast ?? '#ffffff'
-                                                                            }}
-                                                                            onClick={() => handleSelectAccent(option.id)}
-                                                                            aria-pressed={isActive}
-                                                                        >
-                                                                            <span className="crm-color-check" aria-hidden>
-                                                                                <CheckIcon className="icon" />
-                                                                            </span>
-                                                                            <span className="crm-color-label">{option.label}</span>
-                                                                        </button>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                    <div className="mb-4">
-                                                        <div className="d-flex align-items-start justify-content-between gap-3">
-                                                            <div>
-                                                                <div className="crm-dropdown-label mb-1">Outline mode</div>
-                                                                <div className="text-secondary small">
-                                                                    Add neon outlines to dashboard cards and controls.
-                                                                </div>
-                                                            </div>
-                                                            <div className="form-check form-switch mb-0">
-                                                                <input
-                                                                    id="outline-mode-toggle"
-                                                                    type="checkbox"
-                                                                    className="form-check-input"
-                                                                    role="switch"
-                                                                    checked={isOutlineMode}
-                                                                    onChange={toggleOutlineMode}
-                                                                />
-                                                                <label className="visually-hidden" htmlFor="outline-mode-toggle">
-                                                                    Toggle outline mode
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="crm-dropdown-label">Current selection</div>
-                                                        <div className="d-flex align-items-center justify-content-between gap-3">
-                                                            <div>
-                                                                <div className="fw-semibold">
-                                                                    {theme === 'dark' ? 'Dark mode' : 'Light mode'}
-                                                                </div>
-                                                                <div className="text-secondary">
-                                                                    <div>Accent: {activeAccent.label}</div>
-                                                                    <div>Outline: {isOutlineMode ? 'Enabled' : 'Off'}</div>
-                                                                </div>
-                                                            </div>
-                                                            <span
-                                                                className="badge text-uppercase fw-semibold"
-                                                                style={{
-                                                                    backgroundColor: activeAccent.soft,
-                                                                    color: activeAccent.swatch
-                                                                }}
-                                                            >
-                                                                Saved
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div
-                                        className={classNames('dropdown crm-action-dropdown', { show: isProfileOpen })}
-                                        ref={profileDropdownRef}
-                                    >
-                                        <button
-                                            type="button"
-                                            className="btn d-flex align-items-center gap-2"
-                                            aria-expanded={isProfileOpen}
-                                            onClick={toggleProfile}
-                                        >
-                                            <span className="crm-avatar-wrapper">
-                                                <span
-                                                    className="avatar avatar-sm"
-                                                    style={{ backgroundImage: `url(${adminUser.avatar})` }}
-                                                />
-                                                {adminUser.status ? <span className="crm-avatar-status" aria-hidden /> : null}
-                                            </span>
-                                            <span className="d-flex flex-column align-items-start">
-                                                <span className="fw-semibold">{adminUser.name}</span>
-                                                <span className="text-secondary small">{adminUser.role}</span>
-                                            </span>
-                                            <ChevronDownIcon className="icon" aria-hidden />
-                                        </button>
-                                        <div
-                                            className={classNames(
-                                                'dropdown-menu dropdown-menu-end dropdown-menu-arrow dropdown-menu-card dropdown-menu-md',
-                                                { show: isProfileOpen }
-                                            )}
-                                        >
-                                            <div className="card">
-                                                <div className="card-body">
-                                                    <div className="d-flex align-items-center gap-3">
-                                                        <span
-                                                            className="avatar avatar-lg"
-                                                            style={{ backgroundImage: `url(${adminUser.avatar})` }}
-                                                        />
-                                                        <div>
-                                                            <div className="fw-semibold">{adminUser.name}</div>
-                                                            <div className="text-secondary">{adminUser.email}</div>
-                                                            {adminUser.status ? (
-                                                                <span className="badge bg-success-lt text-success mt-2">
-                                                                    {adminUser.status}
-                                                                </span>
-                                                            ) : null}
-                                                        </div>
-                                                    </div>
-                                                    <div className="mt-4 d-grid gap-2">
-                                                        <Link href="/settings" className="btn btn-outline-secondary">
-                                                            Manage profile
-                                                        </Link>
-                                                        <Link href="/" className="btn btn-outline-secondary">
-                                                            View public site
-                                                        </Link>
-                                                        <button type="button" className="btn btn-primary">
-                                                            Sign out
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                                 <div className="crm-page-action-row">
                                     <div className="crm-status-pill">
