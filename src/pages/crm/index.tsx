@@ -1,7 +1,6 @@
 import * as React from 'react';
 import type { GetStaticProps } from 'next';
 import Head from 'next/head';
-import Image from 'next/image';
 import Link from 'next/link';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -29,7 +28,7 @@ import {
     type Timeframe
 } from '../../components/crm';
 import { useNetlifyIdentity } from '../../components/auth';
-import { adminUser, tasks as defaultTasks, type AdminUser } from '../../data/crm';
+import { tasks as defaultTasks } from '../../data/crm';
 import type { InvoiceStatus } from '../../types/invoice';
 import { readCmsCollection } from '../../utils/read-cms-collection';
 import { useAutoDismiss } from '../../utils/use-auto-dismiss';
@@ -796,9 +795,6 @@ function CrmDashboardWorkspace({
                                 ) : null}
                             </div>
                         </div>
-                        <div className="col-auto">
-                            <AdminProfileCard user={adminUser} />
-                        </div>
                     </div>
                 </div>
 
@@ -959,37 +955,6 @@ function CrmDashboardWorkspace({
                 </div>
             </WorkspaceLayout>
         </>
-    );
-}
-
-type AdminProfileCardProps = {
-    user: AdminUser;
-};
-
-function AdminProfileCard({ user }: AdminProfileCardProps) {
-    return (
-        <div className="card shadow-sm mb-0">
-            <div className="card-body d-flex align-items-center gap-3">
-                <span className="avatar avatar-lg rounded-3 overflow-hidden">
-                    <Image
-                        src={user.avatar}
-                        alt={`${user.name} avatar`}
-                        width={48}
-                        height={48}
-                        className="rounded-3"
-                    />
-                </span>
-                <div className="flex-grow-1">
-                    <div className="fw-semibold">{user.name}</div>
-                    <div className="text-secondary small">{user.role}</div>
-                    <div className="text-secondary small">{user.email}</div>
-                    {user.phone ? <div className="text-secondary small">{user.phone}</div> : null}
-                </div>
-                {user.status ? (
-                    <span className="badge bg-success-lt text-success text-uppercase fw-semibold">{user.status}</span>
-                ) : null}
-            </div>
-        </div>
     );
 }
 
