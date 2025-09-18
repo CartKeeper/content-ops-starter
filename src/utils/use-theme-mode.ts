@@ -40,6 +40,18 @@ function applyTheme(theme: ThemeMode) {
         root.classList.remove('dark');
     }
     root.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
+
+    const body = document.body;
+    if (body) {
+        if (theme === 'dark') {
+            body.classList.add('theme-dark');
+            body.classList.remove('theme-light');
+        } else {
+            body.classList.add('theme-light');
+            body.classList.remove('theme-dark');
+        }
+        body.dataset.bsTheme = theme;
+    }
 }
 
 export function useThemeMode() {

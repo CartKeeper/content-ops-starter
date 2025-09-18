@@ -774,60 +774,45 @@ function CrmDashboardWorkspace({
                 <title>{studioName} · Photography CRM</title>
             </Head>
             <WorkspaceLayout>
-                <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
-                    <header className="rounded-3xl border border-slate-200 bg-white/90 px-6 py-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-indigo-500 dark:text-indigo-300">
-                                    Workspace snapshot
-                                </p>
-                                <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                                    {studioName} dashboard
-                                </h1>
-                                <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                                    Monitor bookings, revenue momentum, and client health with a refreshed Tabler-inspired layout.
-                                </p>
-                                <div className="mt-5 flex flex-wrap items-center gap-3">
-                                    <Link
-                                        href="/bookings"
-                                        className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
-                                    >
-                                        Plan a shoot
-                                    </Link>
-                                    <Link
-                                        href="/invoices"
-                                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300"
-                                    >
-                                        Review billing
-                                    </Link>
-                                    {guardEnabled ? (
-                                        <button
-                                            type="button"
-                                            onClick={signOut}
-                                            className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-500 transition hover:border-slate-400 hover:text-slate-700 dark:border-slate-600 dark:text-slate-300"
-                                        >
-                                            Sign out
-                                        </button>
-                                    ) : null}
-                                </div>
+                <div className="page-header d-print-none">
+                    <div className="row align-items-center">
+                        <div className="col">
+                            <div className="page-pretitle">Workspace snapshot</div>
+                            <h2 className="page-title">{studioName} dashboard</h2>
+                            <div className="text-secondary mt-2">
+                                Monitor bookings, revenue momentum, and client health with a refreshed Tabler-inspired layout.
                             </div>
+                            <div className="mt-3 d-flex flex-wrap gap-2">
+                                <Link href="/bookings" className="btn btn-primary">
+                                    Plan a shoot
+                                </Link>
+                                <Link href="/invoices" className="btn btn-outline-primary">
+                                    Review billing
+                                </Link>
+                                {guardEnabled ? (
+                                    <button type="button" onClick={signOut} className="btn btn-outline-secondary">
+                                        Sign out
+                                    </button>
+                                ) : null}
+                            </div>
+                        </div>
+                        <div className="col-auto">
                             <AdminProfileCard user={adminUser} />
                         </div>
-                    </header>
+                    </div>
+                </div>
 
-                    {feedback ? (
-                        <div
-                            className={`mt-8 rounded-2xl border px-4 py-3 text-sm font-medium shadow-sm ${
-                                feedback.type === 'success'
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200'
-                                    : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200'
-                            }`}
-                        >
-                            {feedback.message}
-                        </div>
-                    ) : null}
+                {feedback ? (
+                    <div
+                        className={`alert mt-3 ${feedback.type === 'success' ? 'alert-success' : 'alert-danger'}`}
+                        role="status"
+                    >
+                        {feedback.message}
+                    </div>
+                ) : null}
 
-                    <section className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                <div className="row row-cards mt-3">
+                    <div className="col-sm-6 col-xl-3">
                         <StatCard
                             title="Shoots scheduled"
                             value={`${metrics.scheduledThisWeek}`}
@@ -835,6 +820,8 @@ function CrmDashboardWorkspace({
                             changeLabel="vs last week"
                             icon={<CalendarGlyph />}
                         />
+                    </div>
+                    <div className="col-sm-6 col-xl-3">
                         <StatCard
                             title="Invoices paid"
                             value={formatCurrency(metrics.paidThisMonth)}
@@ -842,6 +829,8 @@ function CrmDashboardWorkspace({
                             changeLabel="vs last month"
                             icon={<RevenueGlyph />}
                         />
+                    </div>
+                    <div className="col-sm-6 col-xl-3">
                         <StatCard
                             title="Outstanding balance"
                             value={formatCurrency(metrics.outstandingBalance)}
@@ -849,6 +838,8 @@ function CrmDashboardWorkspace({
                             changeLabel="vs prior month"
                             icon={<BalanceGlyph />}
                         />
+                    </div>
+                    <div className="col-sm-6 col-xl-3">
                         <StatCard
                             title="Active clients"
                             value={`${metrics.activeClientCount}`}
@@ -856,10 +847,14 @@ function CrmDashboardWorkspace({
                             changeLabel="retention delta"
                             icon={<ClientsGlyph />}
                         />
-                    </section>
+                    </div>
+                </div>
 
-                    <section className="mt-10 grid gap-6 lg:grid-cols-[3fr,2fr]">
+                <div className="row row-cards mt-3">
+                    <div className="col-lg-7">
                         <OverviewChart data={chartData} />
+                    </div>
+                    <div className="col-lg-5">
                         <DashboardCard
                             title="Studio signal"
                             value={formatCurrencyExact(metrics.paidThisMonth + metrics.outstandingBalance)}
@@ -869,97 +864,95 @@ function CrmDashboardWorkspace({
                                 isPositive: metrics.scheduledChange >= 0
                             }}
                         >
-                            <p>
-                                {metrics.activeClientCount} active clients and {upcomingBookings.length} upcoming shoots keep momentum high.
-                                Finance is watching {openInvoices.length} open invoices this cycle.
-                            </p>
+                            <div className="mb-2">
+                                {metrics.activeClientCount} active clients and {upcomingBookings.length} upcoming shoots keep
+                                momentum high. Finance is watching {openInvoices.length} open invoices this cycle.
+                            </div>
                             {settings?.custom_fields && settings.custom_fields.length > 0 ? (
-                                <ul className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-300">
+                                <ul className="list-unstyled small mb-0">
                                     {settings.custom_fields.map((field, index) => (
                                         <li key={index}>
-                                            <span className="font-semibold text-slate-600 dark:text-slate-200">{field.label}:</span>{' '}
-                                            {field.value ?? '—'}
+                                            <span className="fw-semibold">{field.label}:</span> {field.value ?? '—'}
                                         </li>
                                     ))}
                                 </ul>
                             ) : null}
                         </DashboardCard>
-                    </section>
+                    </div>
+                </div>
 
-                    <div className="mt-10 grid gap-6 lg:grid-cols-3">
-                        <div className="space-y-6 lg:col-span-2">
+                <div className="row row-cards mt-3">
+                    <div className="col-lg-8">
+                        <div className="row row-cards">
                             {secondaryPanelVisibility.upcomingShoots !== false ? (
-                                <SectionCard
-                                    title="Upcoming Shoots"
-                                    description="Stay ready for every session with a quick view of the week ahead."
-                                    action={
-                                        <Link
-                                            href="/bookings"
-                                            className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200"
-                                        >
-                                            Open calendar
-                                        </Link>
-                                    }
-                                >
-                                    <BookingList bookings={upcomingBookings} />
-                                </SectionCard>
+                                <div className="col-12">
+                                    <SectionCard
+                                        title="Upcoming Shoots"
+                                        description="Stay ready for every session with a quick view of the week ahead."
+                                        action={
+                                            <Link href="/bookings" className="btn btn-sm btn-outline-primary">
+                                                Open calendar
+                                            </Link>
+                                        }
+                                    >
+                                        <BookingList bookings={upcomingBookings} />
+                                    </SectionCard>
+                                </div>
                             ) : null}
 
                             {secondaryPanelVisibility.activeClients !== false ? (
-                                <SectionCard
-                                    title="Active Clients"
-                                    description="From loyal regulars to new leads, see who needs attention next."
-                                    action={
-                                        <Link
-                                            href="/clients"
-                                            className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200"
-                                        >
-                                            View all clients
-                                        </Link>
-                                    }
-                                >
-                                    <ClientTable clients={clients} />
-                                </SectionCard>
+                                <div className="col-12">
+                                    <SectionCard
+                                        title="Active Clients"
+                                        description="From loyal regulars to new leads, see who needs attention next."
+                                        action={
+                                            <Link href="/clients" className="btn btn-sm btn-outline-primary">
+                                                View all clients
+                                            </Link>
+                                        }
+                                    >
+                                        <ClientTable clients={clients} />
+                                    </SectionCard>
+                                </div>
                             ) : null}
                         </div>
+                    </div>
 
-                        <div className="space-y-6">
+                    <div className="col-lg-4">
+                        <div className="row row-cards">
                             {secondaryPanelVisibility.openInvoices !== false ? (
-                                <SectionCard
-                                    title="Open Invoices"
-                                    description="Collect payments faster with a focused list of outstanding balances."
-                                    action={
-                                        <Link
-                                            href="/invoices"
-                                            className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200"
-                                        >
-                                            View all invoices
-                                        </Link>
-                                    }
-                                >
-                                    <InvoiceTable
-                                        invoices={openInvoices}
-                                        onUpdateStatus={handleUpdateInvoiceStatus}
-                                        onGeneratePdf={handleGenerateInvoicePdf}
-                                        onCreateCheckout={handleCreateCheckoutSession}
-                                        generatingInvoiceId={pdfInvoiceId}
-                                        checkoutInvoiceId={checkoutInvoiceId}
-                                    />
-                                </SectionCard>
+                                <div className="col-12">
+                                    <SectionCard
+                                        title="Open Invoices"
+                                        description="Collect payments faster with a focused list of outstanding balances."
+                                        action={
+                                            <Link href="/invoices" className="btn btn-sm btn-outline-primary">
+                                                View all invoices
+                                            </Link>
+                                        }
+                                    >
+                                        <InvoiceTable
+                                            invoices={openInvoices}
+                                            onUpdateStatus={handleUpdateInvoiceStatus}
+                                            onGeneratePdf={handleGenerateInvoicePdf}
+                                            onCreateCheckout={handleCreateCheckoutSession}
+                                            generatingInvoiceId={pdfInvoiceId}
+                                            checkoutInvoiceId={checkoutInvoiceId}
+                                        />
+                                    </SectionCard>
+                                </div>
                             ) : null}
 
                             {secondaryPanelVisibility.studioTasks !== false ? (
-                                <SectionCard
-                                    title="Studio Tasks"
-                                    description="Keep production moving with next actions across your team."
-                                    action={
-                                        <button className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200">
-                                            Create task
-                                        </button>
-                                    }
-                                >
-                                    <TaskList tasks={tasks} />
-                                </SectionCard>
+                                <div className="col-12">
+                                    <SectionCard
+                                        title="Studio Tasks"
+                                        description="Keep production moving with next actions across your team."
+                                        action={<button className="btn btn-sm btn-outline-primary">Create task</button>}
+                                    >
+                                        <TaskList tasks={tasks} />
+                                    </SectionCard>
+                                </div>
                             ) : null}
                         </div>
                     </div>
@@ -975,29 +968,27 @@ type AdminProfileCardProps = {
 
 function AdminProfileCard({ user }: AdminProfileCardProps) {
     return (
-        <div className="flex w-full max-w-sm items-center gap-4 rounded-3xl border border-slate-200 bg-slate-50 px-5 py-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/60">
-            <span className="relative inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-                <Image
-                    src={user.avatar}
-                    alt={`${user.name} avatar`}
-                    width={48}
-                    height={48}
-                    className="h-full w-full object-cover"
-                />
-            </span>
-            <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">{user.name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{user.role}</p>
-                <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">{user.email}</p>
-                {user.phone ? (
-                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{user.phone}</p>
+        <div className="card shadow-sm mb-0">
+            <div className="card-body d-flex align-items-center gap-3">
+                <span className="avatar avatar-lg rounded-3 overflow-hidden">
+                    <Image
+                        src={user.avatar}
+                        alt={`${user.name} avatar`}
+                        width={48}
+                        height={48}
+                        className="rounded-3"
+                    />
+                </span>
+                <div className="flex-grow-1">
+                    <div className="fw-semibold">{user.name}</div>
+                    <div className="text-secondary small">{user.role}</div>
+                    <div className="text-secondary small">{user.email}</div>
+                    {user.phone ? <div className="text-secondary small">{user.phone}</div> : null}
+                </div>
+                {user.status ? (
+                    <span className="badge bg-success-lt text-success text-uppercase fw-semibold">{user.status}</span>
                 ) : null}
             </div>
-            {user.status ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
-                    {user.status}
-                </span>
-            ) : null}
         </div>
     );
 }

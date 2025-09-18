@@ -19,38 +19,34 @@ export function StatCard({ title, value, change, changeLabel, icon }: StatCardPr
     const isPositive = change >= 0;
     const TrendIcon = isPositive ? TrendUpIcon : TrendDownIcon;
 
-    const changeToneClass = isPositive
-        ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300'
-        : 'bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-200';
-
     return (
-        <article className="relative flex h-full flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-                <div className="rounded-2xl bg-indigo-100 p-3 text-indigo-600 shadow-inner dark:bg-indigo-500/20 dark:text-indigo-200">
-                    <span className="block h-5 w-5" aria-hidden="true">
-                        {icon}
+        <div className="card card-stacked h-100">
+            <div className="card-body">
+                <div className="d-flex align-items-center justify-content-between">
+                    <span className="avatar avatar-md bg-primary-lt text-primary">
+                        <span className="icon" aria-hidden="true">
+                            {icon}
+                        </span>
                     </span>
                 </div>
+                <div className="mt-3">
+                    <div className="subheader">{title}</div>
+                    <div className="h1 mb-2">{value}</div>
+                    <div className="d-flex align-items-center gap-2 text-uppercase fw-semibold">
+                        <span
+                            className={classNames('badge d-inline-flex align-items-center gap-2', {
+                                'bg-success-lt text-success': isPositive,
+                                'bg-danger-lt text-danger': !isPositive
+                            })}
+                        >
+                            <TrendIcon className="icon" />
+                            {formatChange(change)}
+                        </span>
+                        <span className="text-secondary">{changeLabel}</span>
+                    </div>
+                </div>
             </div>
-            <div className="mt-8">
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-300">{title}</p>
-                <p className="mt-3 text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">{value}</p>
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                    <span
-                        className={classNames(
-                            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em]',
-                            changeToneClass
-                        )}
-                    >
-                        <TrendIcon className="h-3.5 w-3.5" />
-                        {formatChange(change)}
-                    </span>
-                    <span className="ml-3 text-xs font-semibold uppercase tracking-[0.28em] text-slate-400 dark:text-slate-500">
-                        {changeLabel}
-                    </span>
-                </p>
-            </div>
-        </article>
+        </div>
     );
 }
 

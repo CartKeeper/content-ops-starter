@@ -7,7 +7,6 @@ import { ApertureMark } from './ApertureMark';
 import {
     AddressBookIcon,
     CalendarIcon,
-    CloseIcon,
     MenuIcon,
     MoonIcon,
     PhotoIcon,
@@ -84,150 +83,130 @@ export function WorkspaceLayout({ children, onSidebarChange }: WorkspaceLayoutPr
         return navItems.find((item) => matchPath(path, item.href)) ?? null;
     }, [router.pathname]);
 
-    const sidebar = (
-        <aside
-            className={classNames(
-                'fixed inset-y-0 left-0 z-40 flex w-72 flex-col gap-8 border-r border-white/10 bg-slate-950/95 px-6 py-7 text-slate-200 shadow-2xl backdrop-blur-lg transition-transform duration-300 ease-out lg:static lg:translate-x-0 lg:shadow-none lg:transition-none',
-                { '-translate-x-full': !isSidebarOpen, 'translate-x-0': isSidebarOpen }
-            )}
-        >
-            <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-sky-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/40">
-                        <ApertureMark className="h-6 w-6" />
-                    </span>
-                    <div>
-                        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.4em] text-indigo-200/80">Codex</p>
-                        <p className="text-sm font-semibold text-white">Studio CRM</p>
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    onClick={() => setIsSidebarOpen(false)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition hover:border-white/20 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 lg:hidden"
-                >
-                    <CloseIcon className="h-4 w-4" aria-hidden />
-                    <span className="sr-only">Close navigation</span>
-                </button>
-            </div>
-            <nav className="flex flex-col gap-1 text-sm">
-                {navItems.map((item) => {
-                    const isActive = matchPath(router.pathname, item.href);
-                    return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={classNames(
-                                'group inline-flex items-center gap-3 rounded-2xl px-4 py-3 font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
-                                isActive
-                                    ? 'bg-white/10 text-white shadow-lg shadow-indigo-500/15'
-                                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                            )}
-                        >
-                            <span
-                                className={classNames(
-                                    'flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-indigo-200 transition group-hover:border-white/20 group-hover:bg-white/10',
-                                    isActive && 'border-transparent bg-white text-slate-900 shadow-sm'
-                                )}
-                            >
-                                <item.icon className="h-5 w-5" aria-hidden />
-                            </span>
-                            <span>{item.label}</span>
-                        </Link>
-                    );
-                })}
-            </nav>
-            <div className="mt-auto space-y-4">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-100 shadow-inner">
-                    <p className="text-[0.65rem] font-semibold uppercase tracking-[0.36em] text-indigo-200/70">Workspace tips</p>
-                    <p className="mt-2 leading-relaxed text-slate-200">
-                        Collapse the navigation on smaller screens or pin your favorite modules for a focused review.
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={toggleTheme}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-                >
-                    {theme === 'dark' ? <SunIcon className="h-4 w-4" aria-hidden /> : <MoonIcon className="h-4 w-4" aria-hidden />}
-                    <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-                </button>
-            </div>
-        </aside>
-    );
+    const sidebarClassName = classNames('navbar navbar-vertical navbar-expand-lg', 'navbar-dark bg-body-tertiary', {
+        show: isSidebarOpen
+    });
 
     return (
         <WorkspaceLayoutContext.Provider value={contextValue}>
-            <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.12),_transparent_55%)] bg-slate-100/80 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
-                <div className="relative flex min-h-screen">
-                    {isSidebarOpen ? (
+            <div className={classNames('page', theme === 'dark' ? 'theme-dark' : 'theme-light')}>
+                <aside className={sidebarClassName} data-bs-theme={theme}>
+                    <div className="container-fluid">
                         <button
                             type="button"
-                            className="fixed inset-0 z-30 bg-slate-900/60 backdrop-blur-sm lg:hidden"
-                            aria-label="Close navigation overlay"
-                            onClick={() => setIsSidebarOpen(false)}
-                        />
-                    ) : null}
-                    {sidebar}
-                    <div className="flex min-h-screen flex-1 flex-col bg-transparent">
-                        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-white/80 px-4 py-4 shadow-sm backdrop-blur-lg dark:border-slate-800 dark:bg-slate-900/70 sm:px-6 lg:px-8">
-                            <div className="flex items-center gap-3">
+                            className="navbar-toggler"
+                            aria-label="Toggle navigation"
+                            onClick={() => setIsSidebarOpen((previous) => !previous)}
+                        >
+                            <span className="navbar-toggler-icon" />
+                        </button>
+                        <Link href="/crm" className="navbar-brand navbar-brand-autodark d-flex align-items-center gap-2">
+                            <span className="avatar avatar-sm bg-primary-lt text-primary">
+                                <ApertureMark className="icon" aria-hidden />
+                            </span>
+                            <span className="fw-semibold">Codex Studio CRM</span>
+                        </Link>
+                        <div className={classNames('collapse navbar-collapse', { show: isSidebarOpen })}>
+                            <ul className="navbar-nav pt-lg-3" role="navigation" aria-label="Workspace navigation">
+                                {navItems.map((item) => {
+                                    const isActive = matchPath(router.pathname, item.href);
+                                    return (
+                                        <li key={item.href} className="nav-item">
+                                            <Link
+                                                href={item.href}
+                                                className={classNames('nav-link', { active: isActive })}
+                                                aria-current={isActive ? 'page' : undefined}
+                                            >
+                                                <span className="nav-link-icon d-md-none d-lg-inline-block">
+                                                    <item.icon className="icon" aria-hidden />
+                                                </span>
+                                                <span className="nav-link-title">{item.label}</span>
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                            <div className="mt-auto pt-4">
+                                <div className="alert alert-primary" role="status">
+                                    <div className="fw-semibold text-uppercase small text-primary mb-1">Workspace tips</div>
+                                    <div className="text-secondary">
+                                        Collapse the navigation on smaller screens or pin your favourite modules for a focused review.
+                                    </div>
+                                </div>
+                                <button type="button" className="btn w-100 btn-outline-primary" onClick={toggleTheme}>
+                                    {theme === 'dark' ? <SunIcon className="icon" aria-hidden /> : <MoonIcon className="icon" aria-hidden />} {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+                {isSidebarOpen ? (
+                    <div
+                        className="navbar-backdrop d-lg-none"
+                        role="presentation"
+                        onClick={() => setIsSidebarOpen(false)}
+                    />
+                ) : null}
+                <div className="page-wrapper">
+                    <header className="navbar navbar-expand-md d-print-none" data-bs-theme={theme}>
+                        <div className="container-xl">
+                            <div className="d-flex align-items-center">
                                 <button
                                     type="button"
+                                    className="btn btn-icon me-2 d-lg-none"
+                                    aria-label="Open navigation"
                                     onClick={() => setIsSidebarOpen(true)}
-                                    className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950 lg:hidden"
                                 >
-                                    <MenuIcon className="h-5 w-5" aria-hidden />
-                                    <span className="sr-only">Open navigation</span>
+                                    <MenuIcon className="icon" aria-hidden />
                                 </button>
-                                <div>
-                                    <p className="text-[0.65rem] font-semibold uppercase tracking-[0.4em] text-slate-400 dark:text-slate-500">
+                                <div className="d-none d-md-flex flex-column">
+                                    <span className="page-pretitle text-uppercase text-secondary fw-semibold">
                                         {activeItem ? activeItem.label : 'Workspace'}
-                                    </p>
-                                    <p className="text-base font-semibold text-slate-900 dark:text-white">Command center</p>
+                                    </span>
+                                    <span className="page-title fw-semibold">Command center</span>
                                 </div>
                             </div>
-                            <div className="flex flex-1 items-center justify-end gap-3">
-                                <label className="hidden w-full max-w-xs items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-200 focus-within:ring-offset-2 focus-within:ring-offset-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:focus-within:border-indigo-400 dark:focus-within:ring-indigo-500/40 dark:focus-within:ring-offset-slate-900 md:flex">
-                                    <svg
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="h-4 w-4 text-slate-400 dark:text-slate-500"
-                                        aria-hidden
-                                    >
-                                        <circle cx="11" cy="11" r="7" />
-                                        <path d="m20 20-2.6-2.6" />
-                                    </svg>
-                                    <span className="sr-only">Search workspace</span>
-                                    <input
-                                        type="search"
-                                        placeholder="Search clients, invoices, tasks"
-                                        className="flex-1 bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder:text-slate-500"
-                                    />
-                                </label>
-                                <Link
-                                    href="/bookings"
-                                    className="hidden items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 md:inline-flex"
-                                >
-                                    <CalendarIcon className="h-4 w-4" aria-hidden />
+                            <div className="navbar-nav flex-row order-md-last gap-2 align-items-center ms-auto">
+                                <Link href="/bookings" className="btn btn-primary d-none d-md-inline-flex align-items-center gap-2">
+                                    <CalendarIcon className="icon" aria-hidden />
                                     New booking
                                 </Link>
-                                <button
-                                    type="button"
-                                    onClick={toggleTheme}
-                                    className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
-                                >
-                                    {theme === 'dark' ? <SunIcon className="h-5 w-5" aria-hidden /> : <MoonIcon className="h-5 w-5" aria-hidden />}
-                                    <span className="sr-only">Toggle dark mode</span>
+                                <button type="button" className="btn btn-icon" onClick={toggleTheme} aria-label="Toggle theme">
+                                    {theme === 'dark' ? <SunIcon className="icon" aria-hidden /> : <MoonIcon className="icon" aria-hidden />}
                                 </button>
                             </div>
-                        </header>
-                        <main className="flex-1 overflow-y-auto">{children}</main>
-                    </div>
+                            <div className="collapse navbar-collapse" id="crm-navbar">
+                                <form className="navbar-search d-none d-md-flex ms-md-4" role="search">
+                                    <div className="input-icon">
+                                        <span className="input-icon-addon">
+                                            <svg
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="1.5"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                className="icon"
+                                                aria-hidden
+                                            >
+                                                <circle cx="11" cy="11" r="7" />
+                                                <path d="m20 20-2.6-2.6" />
+                                            </svg>
+                                        </span>
+                                        <input
+                                            type="search"
+                                            className="form-control"
+                                            placeholder="Search clients, invoices, tasks"
+                                            aria-label="Search workspace"
+                                        />
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </header>
+                    <main className="page-body">
+                        <div className="container-xl">{children}</div>
+                    </main>
                 </div>
             </div>
         </WorkspaceLayoutContext.Provider>
