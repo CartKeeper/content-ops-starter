@@ -421,6 +421,7 @@
 }
 
 :root {
+    --content-margin: clamp(1.25rem, 4vw, 1.75rem);
     --crm-accent: #6366f1;
     --crm-accent-soft: rgba(99, 102, 241, 0.22);
     --crm-accent-contrast: #ffffff;
@@ -581,6 +582,10 @@ a.link-primary:hover {
 .crm-top-nav .nav-link .icon {
     width: 1rem;
     height: 1rem;
+}
+
+.crm-top-nav-actions {
+    margin-right: var(--content-margin, 1.5rem);
 }
 
 .crm-top-nav .nav-link.active,
@@ -831,37 +836,6 @@ a.link-primary:hover {
     gap: 1.25rem;
 }
 
-.crm-page-heading-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 1rem;
-    margin-left: auto;
-}
-
-.crm-page-action-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-}
-
-.crm-page-action-grid .btn {
-    width: 100%;
-    justify-content: center;
-}
-
-.crm-page-action-row {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.crm-page-action-row .btn {
-    white-space: nowrap;
-}
-
 .crm-action-dropdown {
     position: relative;
 }
@@ -872,20 +846,6 @@ a.link-primary:hover {
         align-items: stretch;
     }
 
-    .crm-page-heading-actions {
-        width: 100%;
-        margin-left: 0;
-        align-items: stretch;
-    }
-
-    .crm-page-action-grid {
-        width: 100%;
-        grid-template-columns: 1fr;
-    }
-
-    .crm-page-action-row {
-        justify-content: flex-start;
-    }
 }
 
 .crm-page-heading-text {
@@ -912,6 +872,8 @@ a.link-primary:hover {
     flex-wrap: wrap;
     gap: 0.5rem;
     margin-top: 0.75rem;
+    align-items: center;
+    justify-content: flex-start;
 }
 
 .crm-page-nav-link {
@@ -950,8 +912,29 @@ a.link-primary:hover {
     height: 1rem;
 }
 
+.crm-page-nav .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    padding: 0.45rem 1rem;
+    font-weight: 600;
+}
+
+@media (max-width: 991.98px) {
+    .crm-page-nav {
+        justify-content: center;
+        text-align: center;
+    }
+}
+
 @media (max-width: 767.98px) {
     .crm-page-nav-link {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .crm-page-nav .btn {
         width: 100%;
         justify-content: center;
     }

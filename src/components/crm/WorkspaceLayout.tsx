@@ -35,6 +35,13 @@ type NavItem = {
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
 
+type QuickAction = {
+    href: string;
+    label: string;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+    variant: 'primary' | 'outline';
+};
+
 type AccentOption = {
     id: string;
     label: string;
@@ -122,6 +129,13 @@ const navItems: NavItem[] = [
     { href: '/projects', label: 'Projects', icon: FolderIcon },
     { href: '/accounts-payable', label: 'Accounts Payable', icon: ReceiptIcon },
     { href: '/settings', label: 'Settings', icon: SettingsIcon }
+];
+
+const quickActions: QuickAction[] = [
+    { href: '/bookings', label: 'New booking', icon: CalendarIcon, variant: 'primary' },
+    { href: '/bookings', label: 'Quick set up', icon: CheckIcon, variant: 'outline' },
+    { href: '/bookings', label: 'Plan a shoot', icon: PhotoIcon, variant: 'primary' },
+    { href: '/invoices', label: 'Review billing', icon: ReceiptIcon, variant: 'outline' }
 ];
 
 const ACCENT_STORAGE_KEY = 'crm-accent-preference';
@@ -652,7 +666,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                             </div>
                         </form>
                     </div>
-                    <div className="navbar-nav flex-row order-md-last align-items-center gap-2 ms-3">
+                    <div className="navbar-nav flex-row order-md-last align-items-center gap-2 ms-3 crm-top-nav-actions">
                         <div
                             className={classNames('nav-item dropdown', { show: isAppsOpen })}
                             ref={appsDropdownRef}
@@ -1028,7 +1042,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                             <div className="crm-page-heading-text">
                                 <span className="crm-page-pretitle">{headingLabel}</span>
                                 <h1 className="crm-page-title">Command center</h1>
-                                <nav className="crm-page-nav" aria-label="Workspace pages">
+                                <nav className="crm-page-nav" aria-label="Workspace pages and quick actions">
                                     {navItems.map((item) => {
                                         const isActive = matchPath(router.pathname, item.href);
                                         return (
@@ -1045,43 +1059,24 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                             </Link>
                                         );
                                     })}
+                                    {quickActions.map((action) => {
+                                        const actionClassName = classNames(
+                                            'btn d-inline-flex align-items-center gap-2 crm-page-nav-action',
+                                            action.variant === 'primary' ? 'btn-primary' : 'btn-outline-primary'
+                                        );
+                                        const ActionIcon = action.icon;
+                                        return (
+                                            <Link
+                                                key={`quick-action-${action.href}-${action.label}`}
+                                                href={action.href}
+                                                className={actionClassName}
+                                            >
+                                                <ActionIcon className="icon" aria-hidden />
+                                                <span>{action.label}</span>
+                                            </Link>
+                                        );
+                                    })}
                                 </nav>
-                            </div>
-                            <div className="crm-page-heading-actions">
-                                <div
-                                    className="crm-page-action-grid"
-                                    role="group"
-                                    aria-label="Command center quick actions"
-                                >
-                                    <Link
-                                        href="/bookings"
-                                        className="btn btn-primary d-inline-flex align-items-center gap-2"
-                                    >
-                                        <CalendarIcon className="icon" aria-hidden />
-                                        New booking
-                                    </Link>
-                                    <Link
-                                        href="/bookings"
-                                        className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
-                                    >
-                                        <CheckIcon className="icon" aria-hidden />
-                                        Quick set up
-                                    </Link>
-                                    <Link
-                                        href="/bookings"
-                                        className="btn btn-primary d-inline-flex align-items-center gap-2"
-                                    >
-                                        <PhotoIcon className="icon" aria-hidden />
-                                        Plan a shoot
-                                    </Link>
-                                    <Link
-                                        href="/invoices"
-                                        className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
-                                    >
-                                        <ReceiptIcon className="icon" aria-hidden />
-                                        Review billing
-                                    </Link>
-                                </div>
                             </div>
                         </div>
                     </div>
