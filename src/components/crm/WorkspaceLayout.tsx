@@ -1091,7 +1091,11 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                 </nav>
                             </div>
                             <div className="crm-page-heading-actions">
-                                <div className="crm-page-action-grid">
+                                <div
+                                    className="crm-page-action-grid"
+                                    role="group"
+                                    aria-label="Command center quick actions"
+                                >
                                     <Link
                                         href="/bookings"
                                         className="btn btn-primary d-inline-flex align-items-center gap-2"
@@ -1101,21 +1105,23 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                     </Link>
                                     <Link
                                         href="/bookings"
-                                        className="btn btn-primary d-inline-flex align-items-center gap-2"
+                                        className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
                                     >
-                                        <CalendarIcon className="icon" aria-hidden />
-                                        Quick schedule
+                                        <CheckIcon className="icon" aria-hidden />
+                                        Quick set up
                                     </Link>
                                     <Link
                                         href="/bookings"
-                                        className="btn btn-primary d-inline-flex align-items-center justify-content-center"
+                                        className="btn btn-primary d-inline-flex align-items-center gap-2"
                                     >
+                                        <PhotoIcon className="icon" aria-hidden />
                                         Plan a shoot
                                     </Link>
                                     <Link
                                         href="/invoices"
-                                        className="btn btn-outline-primary d-inline-flex align-items-center justify-content-center"
+                                        className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
                                     >
+                                        <ReceiptIcon className="icon" aria-hidden />
                                         Review billing
                                     </Link>
                                 </div>
