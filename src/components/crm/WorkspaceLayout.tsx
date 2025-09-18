@@ -804,17 +804,28 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                         >
                             <button
                                 type="button"
-                                className="btn p-0 border-0 bg-transparent"
+                                className="btn p-0 border-0 bg-transparent crm-profile-trigger"
                                 aria-label="Open profile menu"
                                 aria-expanded={isProfileOpen}
                                 onClick={toggleProfile}
                             >
-                                <span className="crm-avatar-wrapper">
-                                    <span
-                                        className="avatar avatar-sm"
-                                        style={{ backgroundImage: `url(${adminUser.avatar})` }}
-                                    />
-                                    {adminUser.status ? <span className="crm-avatar-status" aria-hidden /> : null}
+                                <span className="crm-profile-card">
+                                    <span className="crm-avatar-wrapper">
+                                        <span
+                                            className="avatar avatar-sm"
+                                            style={{ backgroundImage: `url(${adminUser.avatar})` }}
+                                        />
+                                        {adminUser.status ? <span className="crm-avatar-status" aria-hidden /> : null}
+                                    </span>
+                                    <span className="crm-profile-card-details">
+                                        <span className="crm-profile-card-name">{adminUser.name}</span>
+                                        {adminUser.status ? (
+                                            <span className="crm-profile-card-status">
+                                                <span className="crm-dot" aria-hidden />
+                                                {adminUser.status}
+                                            </span>
+                                        ) : null}
+                                    </span>
                                 </span>
                             </button>
                             <div
@@ -883,29 +894,41 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                         );
                                     })}
                                 </nav>
-                            </div>
-                            <div className="crm-page-heading-actions">
-                                <div className="crm-page-action-row">
-                                    <Link
-                                        href="/bookings"
-                                        className="btn btn-primary d-inline-flex align-items-center gap-2"
-                                    >
-                                        <CalendarIcon className="icon" aria-hidden />
-                                        New booking
-                                    </Link>
-                                </div>
-                                <div className="crm-page-action-row">
-                                    <div className="crm-status-pill">
-                                        <span className="crm-dot" aria-hidden />
-                                        {adminUser.status ?? 'Operational'}
+                                <div
+                                    className="crm-page-quick-actions"
+                                    role="group"
+                                    aria-label="Command center quick actions"
+                                >
+                                    <div className="crm-page-action-grid">
+                                        <Link
+                                            href="/bookings"
+                                            className="btn btn-primary d-inline-flex align-items-center gap-2"
+                                        >
+                                            <CalendarIcon className="icon" aria-hidden />
+                                            New booking
+                                        </Link>
+                                        <Link
+                                            href="/bookings"
+                                            className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+                                        >
+                                            <CheckIcon className="icon" aria-hidden />
+                                            Quick set up
+                                        </Link>
+                                        <Link
+                                            href="/bookings"
+                                            className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+                                        >
+                                            <PhotoIcon className="icon" aria-hidden />
+                                            Plan a shoot
+                                        </Link>
+                                        <Link
+                                            href="/invoices"
+                                            className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+                                        >
+                                            <ReceiptIcon className="icon" aria-hidden />
+                                            Review billing
+                                        </Link>
                                     </div>
-                                    <Link
-                                        href="/bookings"
-                                        className="btn btn-primary d-inline-flex align-items-center gap-2"
-                                    >
-                                        <CalendarIcon className="icon" aria-hidden />
-                                        Quick schedule
-                                    </Link>
                                 </div>
                             </div>
                         </div>
