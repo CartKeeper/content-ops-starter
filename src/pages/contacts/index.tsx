@@ -2,8 +2,10 @@ import * as React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import * as Dialog from '@radix-ui/react-dialog';
+import classNames from 'classnames';
+import dayjs from 'dayjs';
 
-import { CrmAuthGuard, WorkspaceLayout, ContactCard } from '../../components/crm';
+import { CrmAuthGuard, WorkspaceLayout, ContactCard, DashboardCard } from '../../components/crm';
 import { useNetlifyIdentity } from '../../components/auth';
 import type { ContactRecord, ConvertContactResponse } from '../../types/contact';
 import { getContactName } from '../../types/contact';
@@ -38,6 +40,8 @@ type ConvertApiResponse = {
     error?: string;
 };
 
+type ContactFilter = 'all' | 'withEmail' | 'withNotes';
+
 const INITIAL_FORM: ContactFormState = {
     owner_user_id: '',
     first_name: '',
@@ -53,6 +57,12 @@ const INITIAL_FORM: ContactFormState = {
 
 const inputClassName =
     'w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-indigo-300';
+
+const FILTER_OPTIONS: Array<{ id: ContactFilter; label: string }> = [
+    { id: 'all', label: 'All leads' },
+    { id: 'withEmail', label: 'Email captured' },
+    { id: 'withNotes', label: 'With notes' }
+];
 
 export default function ContactsPage() {
     return (
@@ -83,6 +93,8 @@ function ContactsWorkspace() {
     const [conversionResult, setConversionResult] = React.useState<
         { contact: ContactRecord; result: ConvertContactResponse } | null
     >(null);
+    const [searchTerm, setSearchTerm] = React.useState<string>('');
+    const [activeFilter, setActiveFilter] = React.useState<ContactFilter>('all');
 
     useAutoDismiss(feedback, () => setFeedback(null));
 
@@ -203,6 +215,133 @@ function ContactsWorkspace() {
         [loadContacts, notify]
     );
 
+    const analytics = React.useMemo(() => {
+        if (contacts.length === 0) {
+            return {
+                total: 0,
+                withEmail: 0,
+                withPhone: 0,
+                withNotes: 0,
+                newThisMonth: 0,
+                staleCount: 0,
+                cityCount: 0,
+                topCity: null as string | null,
+                latestActivity: null as string | null
+            };
+        }
+
+        const now = dayjs();
+        const cityCounts = new Map<string, number>();
+        let withEmail = 0;
+        let withPhone = 0;
+        let withNotes = 0;
+        let newThisMonth = 0;
+        let staleCount = 0;
+        let latestActivity: string | null = null;
+
+        contacts.forEach((contact) => {
+            if (contact.email && contact.email.trim()) {
+                withEmail += 1;
+            }
+            if (contact.phone && contact.phone.trim()) {
+                withPhone += 1;
+            }
+            if (contact.notes && contact.notes.trim()) {
+                withNotes += 1;
+            }
+            if (contact.created_at && dayjs(contact.created_at).isSame(now, 'month')) {
+                newThisMonth += 1;
+            }
+
+            const updatedSource = contact.updated_at ?? contact.created_at;
+            if (updatedSource) {
+                const updatedAt = dayjs(updatedSource);
+                if (!latestActivity || updatedAt.isAfter(dayjs(latestActivity))) {
+                    latestActivity = updatedAt.toISOString();
+                }
+                if (updatedAt.isBefore(now.subtract(21, 'day'))) {
+                    staleCount += 1;
+                }
+            }
+
+            const location = [contact.city, contact.state].filter(Boolean).join(', ');
+            if (location) {
+                cityCounts.set(location, (cityCounts.get(location) ?? 0) + 1);
+            }
+        });
+
+        const [topCity] = Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1])[0] ?? [null];
+
+        return {
+            total: contacts.length,
+            withEmail,
+            withPhone,
+            withNotes,
+            newThisMonth,
+            staleCount,
+            cityCount: cityCounts.size,
+            topCity,
+            latestActivity
+        };
+    }, [contacts]);
+
+    const filteredContacts = React.useMemo(() => {
+        const normalizedSearch = searchTerm.trim().toLowerCase();
+
+        const sorted = [...contacts].sort((a, b) => {
+            const getTime = (value?: string | null) => {
+                if (!value) {
+                    return 0;
+                }
+                const timestamp = dayjs(value);
+                return timestamp.isValid() ? timestamp.valueOf() : 0;
+            };
+
+            return getTime(b.updated_at ?? b.created_at) - getTime(a.updated_at ?? a.created_at);
+        });
+
+        const filteredByStage = sorted.filter((contact) => {
+            if (activeFilter === 'withEmail') {
+                return Boolean(contact.email && contact.email.trim());
+            }
+
+            if (activeFilter === 'withNotes') {
+                return Boolean(contact.notes && contact.notes.trim());
+            }
+
+            return true;
+        });
+
+        if (!normalizedSearch) {
+            return filteredByStage;
+        }
+
+        return filteredByStage.filter((contact) => {
+            const haystack = [
+                contact.first_name,
+                contact.last_name,
+                contact.business,
+                contact.email,
+                contact.phone,
+                contact.city,
+                contact.state,
+                contact.notes
+            ]
+                .filter((value): value is string => Boolean(value))
+                .map((value) => value.toLowerCase());
+
+            return haystack.some((value) => value.includes(normalizedSearch));
+        });
+    }, [contacts, activeFilter, searchTerm]);
+
+    const hasContacts = contacts.length > 0;
+    const visibleContacts = hasContacts ? filteredContacts : [];
+
+    const handleResetFilters = React.useCallback(() => {
+        setActiveFilter('all');
+        setSearchTerm('');
+    }, []);
+
     return (
         <div className="px-4 pb-16 pt-8 sm:px-6 lg:px-10">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
@@ -243,6 +382,118 @@ function ContactsWorkspace() {
                 </div>
             </div>
 
+            <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <DashboardCard
+                    title="Active contacts"
+                    value={`${analytics.total}`}
+                    trend={{
+                        value:
+                            analytics.newThisMonth > 0
+                                ? `${analytics.newThisMonth} added this month`
+                                : 'Log your next lead',
+                        label: 'Studio pipeline',
+                        isPositive: analytics.newThisMonth > 0
+                    }}
+                >
+                    <p className="mb-0 text-sm">
+                        {analytics.staleCount > 0
+                            ? `${analytics.staleCount} contacts need a follow-up touch.`
+                            : 'Every lead has been touched recently.'}
+                    </p>
+                </DashboardCard>
+                <DashboardCard
+                    title="Reachable audience"
+                    value={
+                        analytics.total > 0
+                            ? `${analytics.withEmail}/${analytics.total} emails`
+                            : '0 emails'
+                    }
+                    trend={{
+                        value: `${analytics.withPhone} phone numbers`,
+                        label: 'Contact coverage',
+                        isPositive: analytics.withEmail >= Math.ceil(analytics.total / 2)
+                    }}
+                >
+                    <p className="mb-0 text-sm">
+                        {analytics.withEmail === analytics.total
+                            ? 'Every lead can be emailed instantly.'
+                            : `${analytics.total - analytics.withEmail} contacts still need an email captured.`}
+                    </p>
+                </DashboardCard>
+                <DashboardCard
+                    title="Context captured"
+                    value={`${analytics.withNotes}`}
+                    trend={{
+                        value: `${Math.round(
+                            (analytics.total === 0 ? 0 : (analytics.withNotes / analytics.total) * 100)
+                        )}% enriched`,
+                        label: 'Discovery notes',
+                        isPositive: analytics.withNotes >= Math.ceil(Math.max(analytics.total, 1) * 0.5)
+                    }}
+                >
+                    <p className="mb-0 text-sm">
+                        {analytics.withNotes > 0
+                            ? 'Detailed notes keep handoffs smooth when projects become real.'
+                            : 'Add quick notes after intro calls to boost conversions.'}
+                    </p>
+                </DashboardCard>
+                <DashboardCard
+                    title="Regional reach"
+                    value={analytics.cityCount > 0 ? `${analytics.cityCount} cities` : '—'}
+                    trend={{
+                        value: analytics.topCity ? `Hotspot: ${analytics.topCity}` : 'Capture locations on intake',
+                        label: 'Lead geography',
+                        isPositive: Boolean(analytics.topCity)
+                    }}
+                >
+                    <p className="mb-0 text-sm">
+                        {analytics.latestActivity
+                            ? `Last update ${dayjs(analytics.latestActivity).format('MMM D, YYYY')}.`
+                            : 'No activity recorded yet.'}
+                    </p>
+                </DashboardCard>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <label htmlFor="contact-search" className="sr-only">
+                        Search contacts
+                    </label>
+                    <input
+                        id="contact-search"
+                        type="search"
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Search by name, company, or notes"
+                        className={`${inputClassName} w-full max-w-xs`}
+                    />
+                </div>
+                <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
+                    <div className="inline-flex rounded-full bg-slate-100 p-1 dark:bg-slate-800/60">
+                        {FILTER_OPTIONS.map((option) => (
+                            <button
+                                key={option.id}
+                                type="button"
+                                onClick={() => setActiveFilter(option.id)}
+                                className={classNames(
+                                    'rounded-full px-3 py-1.5 text-xs font-semibold transition',
+                                    activeFilter === option.id
+                                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white'
+                                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                                )}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                    <span className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400 dark:text-slate-500">
+                        {hasContacts
+                            ? `Showing ${visibleContacts.length} of ${contacts.length}`
+                            : 'No contacts yet'}
+                    </span>
+                </div>
+            </div>
+
             {feedback ? (
                 <div
                     className={`mt-6 rounded-3xl border px-4 py-3 text-sm font-medium shadow-sm ${
@@ -260,10 +511,10 @@ function ContactsWorkspace() {
                     <div className="flex h-48 items-center justify-center rounded-3xl border border-dashed border-slate-300 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                         Loading contacts…
                     </div>
-                ) : contacts.length === 0 ? (
+                ) : !hasContacts ? (
                     <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
                         <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">No contacts yet</p>
-                        <p className="text-sm max-w-md">
+                        <p className="max-w-md text-sm">
                             Start by adding your first contact. When you win the work, convert them to a client and activate billing, invoices, and a gallery.
                         </p>
                         <button
@@ -274,9 +525,23 @@ function ContactsWorkspace() {
                             Add your first contact
                         </button>
                     </div>
+                ) : visibleContacts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                        <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">No matches</p>
+                        <p className="max-w-md text-sm">
+                            Adjust your search or filter to rediscover contacts hidden from view.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleResetFilters}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
+                        >
+                            Clear filters
+                        </button>
+                    </div>
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                        {contacts.map((contact) => (
+                        {visibleContacts.map((contact) => (
                             <ContactCard
                                 key={contact.id}
                                 contact={contact}
