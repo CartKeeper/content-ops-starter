@@ -127,7 +127,7 @@ const navItems: NavItem[] = [
     { href: '/clients', label: 'Clients', icon: UsersIcon },
     { href: '/galleries', label: 'Galleries', icon: PhotoIcon },
     { href: '/projects', label: 'Projects', icon: FolderIcon },
-    { href: '/accounts-payable', label: 'Accounts Payable', icon: ReceiptIcon },
+    { href: '/accounts-payable', label: 'Books', icon: ReceiptIcon },
     { href: '/settings', label: 'Settings', icon: SettingsIcon }
 ];
 
