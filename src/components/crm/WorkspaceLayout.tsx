@@ -3,16 +3,9 @@ import classNames from 'classnames';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import type { IconType } from 'react-icons';
-import {
-    SiGoogleanalytics,
-    SiGoogledrive,
-    SiGooglemeet,
-    SiGooglephotos,
-    SiTiktok
-} from 'react-icons/si';
-import { FaFacebookF, FaInstagram, FaPinterestP } from 'react-icons/fa6';
 
 import { adminUser } from '../../data/crm';
+import { INTEGRATION_CATEGORIES } from '../../data/integrations';
 import { useThemeMode } from '../../utils/use-theme-mode';
 import { ApertureMark } from './ApertureMark';
 import {
@@ -30,6 +23,7 @@ import {
     SunIcon,
     UsersIcon
 } from './icons';
+import { useIntegrations } from './integration-context';
 
 type WorkspaceLayoutProps = {
     children: React.ReactNode;
@@ -143,92 +137,6 @@ const accentOptions: AccentOption[] = [
     { id: 'rose', label: 'Rose', swatch: '#f43f5e', soft: 'rgba(244, 63, 94, 0.2)' }
 ];
 
-const appCollections: AppCollection[] = [
-    {
-        id: 'google',
-        label: 'Google Workspace',
-        apps: [
-            {
-                id: 'analytics',
-                name: 'Google Analytics',
-                description: 'Monitor marketing funnels and site traffic.',
-                href: 'https://analytics.google.com',
-                icon: SiGoogleanalytics,
-                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                iconColor: '#c2410c'
-            },
-            {
-                id: 'drive',
-                name: 'Google Drive',
-                description: 'Browse shared folders and deliverables.',
-                href: 'https://drive.google.com',
-                icon: SiGoogledrive,
-                background: 'linear-gradient(135deg, #e0f2f1 0%, #e0f7fa 100%)',
-                iconColor: '#0f9d58'
-            },
-            {
-                id: 'meet',
-                name: 'Google Meet',
-                description: 'Launch virtual consultations and reviews.',
-                href: 'https://meet.google.com',
-                icon: SiGooglemeet,
-                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                iconColor: '#047857'
-            },
-            {
-                id: 'photos',
-                name: 'Google Photos',
-                description: 'Reference archived shoots and mood boards.',
-                href: 'https://photos.google.com',
-                icon: SiGooglephotos,
-                background: 'linear-gradient(135deg, #ffe4e6 0%, #fce7f3 100%)',
-                iconColor: '#db2777'
-            }
-        ]
-    },
-    {
-        id: 'social',
-        label: 'Social Launchpad',
-        apps: [
-            {
-                id: 'instagram',
-                name: 'Instagram',
-                description: 'Share teasers and behind-the-scenes reels.',
-                href: 'https://www.instagram.com',
-                icon: FaInstagram,
-                background: 'linear-gradient(135deg, #f97316 0%, #ec4899 50%, #6366f1 100%)',
-                iconColor: '#ffffff'
-            },
-            {
-                id: 'facebook',
-                name: 'Facebook',
-                description: 'Connect with leads and publish announcements.',
-                href: 'https://www.facebook.com',
-                icon: FaFacebookF,
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                iconColor: '#ffffff'
-            },
-            {
-                id: 'pinterest',
-                name: 'Pinterest',
-                description: 'Curate inspiration boards for upcoming shoots.',
-                href: 'https://www.pinterest.com',
-                icon: FaPinterestP,
-                background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
-                iconColor: '#ffffff'
-            },
-            {
-                id: 'tiktok',
-                name: 'TikTok',
-                description: 'Publish highlight reels and client testimonials.',
-                href: 'https://www.tiktok.com',
-                icon: SiTiktok,
-                background: 'linear-gradient(135deg, #0ea5e9 0%, #f43f5e 100%)',
-                iconColor: '#0f172a'
-            }
-        ]
-    }
-];
 
 const notifications: NotificationItem[] = [
     {
@@ -465,6 +373,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
     const router = useRouter();
     const { theme, setTheme, toggleTheme } = useThemeMode();
     const [isNavOpen, setIsNavOpen] = React.useState(false);
+    const { connectedIntegrations } = useIntegrations();
 
     const {
         isOpen: isAppsOpen,
@@ -637,6 +546,44 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
 
     const headingLabel = activeItem ? activeItem.label : 'Workspace';
 
+    const quickLaunchCollections = React.useMemo<AppCollection[]>(() => {
+        const grouped = new Map<string, QuickAccessApp[]>();
+
+        connectedIntegrations.forEach((entry) => {
+            const { definition } = entry;
+            if (!definition.href) {
+                return;
+            }
+
+            const quickApp: QuickAccessApp = {
+                id: definition.id,
+                name: definition.name,
+                description: definition.description,
+                href: definition.href,
+                icon: definition.icon,
+                background: definition.background,
+                iconColor: definition.iconColor
+            };
+
+            const existing = grouped.get(definition.categoryId);
+            if (existing) {
+                existing.push(quickApp);
+            } else {
+                grouped.set(definition.categoryId, [quickApp]);
+            }
+        });
+
+        return INTEGRATION_CATEGORIES.map<AppCollection>((category) => {
+            const apps = grouped.get(category.id) ?? [];
+            const ordered = [...apps].sort((a, b) => a.name.localeCompare(b.name));
+            return {
+                id: category.id,
+                label: category.label,
+                apps: ordered
+            };
+        }).filter((collection) => collection.apps.length > 0);
+    }, [connectedIntegrations]);
+
     return (
         <div className={classNames('page', theme === 'dark' ? 'theme-dark' : 'theme-light')}>
             <header className="navbar navbar-expand-md shadow-sm border-bottom crm-top-nav" data-bs-theme={theme}>
@@ -738,43 +685,53 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                         <span className="text-secondary">Stay connected</span>
                                     </div>
                                     <div className="card-body crm-quick-launch-body">
-                                        {appCollections.map((collection) => (
-                                            <div key={collection.id} className="crm-quick-launch-group">
-                                                <div className="crm-dropdown-label">{collection.label}</div>
-                                                <div className="crm-app-grid">
-                                                    {collection.apps.map((app) => {
-                                                        const Icon = app.icon;
-                                                        const buttonStyle: React.CSSProperties = {
-                                                            background: app.background
-                                                        };
-                                                        if (app.iconColor) {
-                                                            buttonStyle.color = app.iconColor;
-                                                        }
+                                        {quickLaunchCollections.length > 0 ? (
+                                            quickLaunchCollections.map((collection) => (
+                                                <div key={collection.id} className="crm-quick-launch-group">
+                                                    <div className="crm-dropdown-label">{collection.label}</div>
+                                                    <div className="crm-app-grid">
+                                                        {collection.apps.map((app) => {
+                                                            const Icon = app.icon;
+                                                            const buttonStyle: React.CSSProperties = {
+                                                                background: app.background
+                                                            };
+                                                            if (app.iconColor) {
+                                                                buttonStyle.color = app.iconColor;
+                                                            }
 
-                                                        return (
-                                                            <a
-                                                                key={app.id}
-                                                                href={app.href}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="crm-app-button"
-                                                                style={buttonStyle}
-                                                                aria-label={app.name}
-                                                                title={`${app.name} – ${app.description}`}
-                                                            >
-                                                                <Icon
-                                                                    className="crm-app-button-icon"
-                                                                    size={20}
-                                                                    aria-hidden="true"
-                                                                    focusable="false"
-                                                                />
-                                                                <span className="visually-hidden">{app.name}</span>
-                                                            </a>
-                                                        );
-                                                    })}
+                                                            return (
+                                                                <a
+                                                                    key={app.id}
+                                                                    href={app.href}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="crm-app-button"
+                                                                    style={buttonStyle}
+                                                                    aria-label={app.name}
+                                                                    title={`${app.name} – ${app.description}`}
+                                                                >
+                                                                    <Icon
+                                                                        className="crm-app-button-icon"
+                                                                        size={20}
+                                                                        aria-hidden="true"
+                                                                        focusable="false"
+                                                                    />
+                                                                    <span className="visually-hidden">{app.name}</span>
+                                                                </a>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
+                                            ))
+                                        ) : (
+                                            <div className="crm-quick-launch-empty text-center text-secondary">
+                                                <p className="mb-2">No integrations are connected yet.</p>
+                                                <p className="mb-3">Add them from settings to build your quick launch palette.</p>
+                                                <Link href="/settings" className="btn btn-sm btn-primary">
+                                                    Add integrations
+                                                </Link>
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
                                 </div>
                             </div>

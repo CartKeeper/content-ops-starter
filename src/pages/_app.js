@@ -8,6 +8,7 @@ import '../css/main.css';
 
 import { NetlifyIdentityProvider } from '../components/auth';
 import { QuickActionSettingsProvider } from '../components/crm/quick-action-settings';
+import { IntegrationProvider } from '../components/crm/integration-context';
 
 export default function MyApp({ Component, pageProps }) {
     useEffect(() => {
@@ -25,7 +26,9 @@ export default function MyApp({ Component, pageProps }) {
     return (
         <NetlifyIdentityProvider>
             <QuickActionSettingsProvider>
-                <Component {...pageProps} />
+                <IntegrationProvider>
+                    <Component {...pageProps} />
+                </IntegrationProvider>
             </QuickActionSettingsProvider>
         </NetlifyIdentityProvider>
     );
