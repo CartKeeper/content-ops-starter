@@ -590,7 +590,13 @@ a.link-primary:hover {
 }
 
 .crm-top-nav-actions {
-    margin-right: 0;
+    margin-right: var(--content-margin, 1.5rem);
+}
+
+@media (max-width: 767.98px) {
+    .crm-top-nav-actions {
+        margin-right: 0;
+    }
 }
 
 .crm-top-nav .nav-link.active,
@@ -873,12 +879,12 @@ a.link-primary:hover {
 }
 
 .crm-page-nav {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-    justify-items: stretch;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     align-items: stretch;
+    gap: 1.1rem;
+    margin-top: 1rem;
     max-width: 64rem;
     margin-left: auto;
     margin-right: auto;
@@ -888,10 +894,12 @@ a.link-primary:hover {
 .crm-page-nav-link {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
     justify-content: center;
-    width: 100%;
-    padding: 0.55rem 1.1rem;
+    gap: 0.5rem;
+    flex: 0 1 clamp(12rem, 21vw, 15.5rem);
+    max-width: 18rem;
+    min-height: 3.125rem;
+    padding: 0.65rem 1.35rem;
     border-radius: 9999px;
     font-weight: 500;
     color: var(--tblr-secondary-color, #64748b);
@@ -923,21 +931,32 @@ a.link-primary:hover {
     width: 1rem;
     height: 1rem;
 }
-@media (max-width: 1399.98px) {
-    .crm-page-nav {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+@media (max-width: 1199.98px) {
+    .crm-page-nav-link {
+        flex-basis: clamp(12rem, 28vw, 16rem);
+        max-width: clamp(12rem, 28vw, 16rem);
     }
 }
 
 @media (max-width: 991.98px) {
     .crm-page-nav {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.9rem;
+    }
+
+    .crm-page-nav-link {
+        flex-basis: min(17rem, 48%);
+        max-width: min(17rem, 48%);
     }
 }
 
 @media (max-width: 575.98px) {
     .crm-page-nav {
-        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .crm-page-nav-link {
+        flex-basis: 100%;
+        max-width: 100%;
     }
 }
 
