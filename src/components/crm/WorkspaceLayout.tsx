@@ -41,6 +41,50 @@ type AccentOption = {
     contrast?: string;
 };
 
+type RgbTuple = [number, number, number];
+
+function hexToRgbTuple(hex: string): RgbTuple | null {
+    const value = hex.replace('#', '').trim();
+    if (value.length !== 3 && value.length !== 6) {
+        return null;
+    }
+
+    const normalized = value.length === 3 ? value.split('').map((char) => char + char).join('') : value;
+
+    const numeric = Number.parseInt(normalized, 16);
+    if (Number.isNaN(numeric)) {
+        return null;
+    }
+
+    return [
+        (numeric >> 16) & 255,
+        (numeric >> 8) & 255,
+        numeric & 255
+    ];
+}
+
+function rgbTupleToHex([r, g, b]: RgbTuple) {
+    const toHex = (value: number) => value.toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function mixRgb(color: RgbTuple, target: RgbTuple, amount: number): RgbTuple {
+    const clamp = (value: number) => Math.min(255, Math.max(0, value));
+    return [
+        Math.round(clamp(color[0] * (1 - amount) + target[0] * amount)),
+        Math.round(clamp(color[1] * (1 - amount) + target[1] * amount)),
+        Math.round(clamp(color[2] * (1 - amount) + target[2] * amount))
+    ];
+}
+
+function darkenRgb(color: RgbTuple, amount: number): RgbTuple {
+    return mixRgb(color, [0, 0, 0], amount);
+}
+
+function brightenRgb(color: RgbTuple, amount: number): RgbTuple {
+    return mixRgb(color, [255, 255, 255], amount);
+}
+
 type QuickAccessApp = {
     id: string;
     name: string;
@@ -79,6 +123,7 @@ const navItems: NavItem[] = [
 ];
 
 const ACCENT_STORAGE_KEY = 'crm-accent-preference';
+const OUTLINE_MODE_STORAGE_KEY = 'crm-outline-mode';
 const DEFAULT_ACCENT_ID = 'indigo';
 
 const accentOptions: AccentOption[] = [
@@ -289,6 +334,19 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         return DEFAULT_ACCENT_ID;
     });
 
+    const [isOutlineMode, setIsOutlineMode] = React.useState<boolean>(() => {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+        try {
+            const stored = window.localStorage.getItem(OUTLINE_MODE_STORAGE_KEY);
+            return stored === 'true';
+        } catch (error) {
+            console.warn('Unable to read stored outline preference', error);
+        }
+        return false;
+    });
+
     const activeItem = React.useMemo(() => {
         const path = router.pathname;
         return navItems.find((item) => matchPath(path, item.href)) ?? null;
@@ -324,9 +382,32 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
 
         if (typeof document !== 'undefined') {
             const root = document.documentElement;
+            const accentRgb = hexToRgbTuple(selectedAccent.swatch);
+
             root.style.setProperty('--crm-accent', selectedAccent.swatch);
             root.style.setProperty('--crm-accent-soft', selectedAccent.soft);
             root.style.setProperty('--crm-accent-contrast', selectedAccent.contrast ?? '#ffffff');
+
+            if (accentRgb) {
+                const hoverHex = rgbTupleToHex(darkenRgb(accentRgb, 0.08));
+                const activeHex = rgbTupleToHex(darkenRgb(accentRgb, 0.16));
+                const brightHex = rgbTupleToHex(brightenRgb(accentRgb, 0.2));
+                const rgbValue = accentRgb.join(', ');
+
+                root.style.setProperty('--crm-accent-rgb', rgbValue);
+                root.style.setProperty('--crm-accent-hover', hoverHex);
+                root.style.setProperty('--crm-accent-active', activeHex);
+                root.style.setProperty('--crm-accent-bright', brightHex);
+                root.style.setProperty('--crm-accent-glow', `rgba(${rgbValue}, 0.35)`);
+                root.style.setProperty('--crm-accent-glow-strong', `rgba(${rgbValue}, 0.55)`);
+
+                root.style.setProperty('--tblr-primary', selectedAccent.swatch);
+                root.style.setProperty('--tblr-primary-rgb', rgbValue);
+                root.style.setProperty('--tblr-link-color', selectedAccent.swatch);
+                root.style.setProperty('--tblr-link-hover-color', hoverHex);
+                root.style.setProperty('--tblr-primary-hover', hoverHex);
+                root.style.setProperty('--tblr-primary-fg', selectedAccent.contrast ?? '#ffffff');
+            }
 
             const body = document.body;
             if (body) {
@@ -343,10 +424,35 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         }
     }, [accent]);
 
+    React.useEffect(() => {
+        if (typeof document === 'undefined') {
+            return;
+        }
+
+        const body = document.body;
+        if (!body) {
+            return;
+        }
+
+        body.classList.toggle('crm-outline-mode', isOutlineMode);
+
+        try {
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem(OUTLINE_MODE_STORAGE_KEY, isOutlineMode ? 'true' : 'false');
+            }
+        } catch (error) {
+            console.warn('Unable to persist outline preference', error);
+        }
+    }, [isOutlineMode]);
+
     const activeAccent = accentOptions.find((option) => option.id === accent) ?? accentOptions[0];
 
     const handleSelectAccent = React.useCallback((nextAccent: string) => {
         setAccent(nextAccent);
+    }, []);
+
+    const toggleOutlineMode = React.useCallback(() => {
+        setIsOutlineMode((previous) => !previous);
     }, []);
 
     const headingLabel = activeItem ? activeItem.label : 'Workspace';
@@ -639,6 +745,29 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                                             })}
                                                         </div>
                                                     </div>
+                                                    <div className="mb-4">
+                                                        <div className="d-flex align-items-start justify-content-between gap-3">
+                                                            <div>
+                                                                <div className="crm-dropdown-label mb-1">Outline mode</div>
+                                                                <div className="text-secondary small">
+                                                                    Add neon outlines to dashboard cards and controls.
+                                                                </div>
+                                                            </div>
+                                                            <div className="form-check form-switch mb-0">
+                                                                <input
+                                                                    id="outline-mode-toggle"
+                                                                    type="checkbox"
+                                                                    className="form-check-input"
+                                                                    role="switch"
+                                                                    checked={isOutlineMode}
+                                                                    onChange={toggleOutlineMode}
+                                                                />
+                                                                <label className="visually-hidden" htmlFor="outline-mode-toggle">
+                                                                    Toggle outline mode
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                     <div>
                                                         <div className="crm-dropdown-label">Current selection</div>
                                                         <div className="d-flex align-items-center justify-content-between gap-3">
@@ -646,7 +775,10 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                                                 <div className="fw-semibold">
                                                                     {theme === 'dark' ? 'Dark mode' : 'Light mode'}
                                                                 </div>
-                                                                <div className="text-secondary">Accent: {activeAccent.label}</div>
+                                                                <div className="text-secondary">
+                                                                    <div>Accent: {activeAccent.label}</div>
+                                                                    <div>Outline: {isOutlineMode ? 'Enabled' : 'Off'}</div>
+                                                                </div>
                                                             </div>
                                                             <span
                                                                 className="badge text-uppercase fw-semibold"
