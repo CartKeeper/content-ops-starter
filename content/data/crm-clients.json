@@ -2,6 +2,7 @@
     "type": "CrmClients",
     "items": [
         {
+            "id": "client-evelyn-sanders",
             "name": "Evelyn Sanders",
             "email": "evelyn@wanderlight.co",
             "phone": "+1 (415) 555-0134",
@@ -11,9 +12,16 @@
                 "Engagement Session",
                 "Wedding Weekend"
             ],
-            "owner": "avery-logan"
+            "owner": "avery-logan",
+            "defaultPackageIds": [
+                "pkg-brand-launch"
+            ],
+            "defaultItemIds": [
+                "svc-retouching-batch"
+            ]
         },
         {
+            "id": "client-evergreen-architects",
             "name": "Evergreen Architects",
             "email": "studio@evergreenarchitects.com",
             "phone": "+1 (628) 555-0180",
@@ -23,9 +31,16 @@
                 "Team Headshots",
                 "Site Progress"
             ],
-            "owner": "avery-logan"
+            "owner": "avery-logan",
+            "defaultPackageIds": [
+                "pkg-retainer-lite"
+            ],
+            "defaultItemIds": [
+                "svc-monthly-retainer"
+            ]
         },
         {
+            "id": "client-sona-patel",
             "name": "Sona Patel",
             "email": "sona@patelcreative.co",
             "phone": "+1 (510) 555-0198",
@@ -35,9 +50,16 @@
                 "Brand Lifestyle",
                 "Campaign Phase 2"
             ],
-            "owner": "avery-logan"
+            "owner": "avery-logan",
+            "defaultPackageIds": [
+                "pkg-brand-launch"
+            ],
+            "defaultItemIds": [
+                "svc-social-cutdowns"
+            ]
         },
         {
+            "id": "client-harbor-co",
             "name": "Harbor & Co",
             "email": "hello@harborandco.com",
             "phone": "+1 (650) 555-0110",
@@ -47,9 +69,17 @@
                 "Product Launch",
                 "Holiday Campaign"
             ],
-            "owner": "jordan-lee"
+            "owner": "jordan-lee",
+            "defaultPackageIds": [
+                "pkg-brand-launch"
+            ],
+            "defaultItemIds": [
+                "svc-creative-direction",
+                "svc-retouching-batch"
+            ]
         },
         {
+            "id": "client-atlas-fitness",
             "name": "Atlas Fitness",
             "email": "team@atlasfit.com",
             "phone": "+1 (628) 555-0154",
@@ -59,7 +89,14 @@
                 "Campaign Refresh",
                 "Brand Campaign"
             ],
-            "owner": "jordan-lee"
+            "owner": "jordan-lee",
+            "defaultPackageIds": [
+                "pkg-retainer-lite"
+            ],
+            "defaultItemIds": [
+                "svc-monthly-retainer",
+                "svc-social-cutdowns"
+            ]
         }
     ]
 }

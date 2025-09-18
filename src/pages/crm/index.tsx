@@ -46,6 +46,7 @@ type CmsBookingEntry = {
 };
 
 type CmsClientEntry = {
+    id?: string;
     name?: string;
     email?: string;
     phone?: string;
@@ -53,6 +54,8 @@ type CmsClientEntry = {
     notes?: string;
     related_projects?: string[];
     owner?: string;
+    defaultPackageIds?: string[];
+    defaultItemIds?: string[];
 };
 
 type CmsInvoiceEntry = {

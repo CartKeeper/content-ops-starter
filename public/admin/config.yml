@@ -300,6 +300,7 @@ collections:
                   name: items
                   widget: list
                   fields:
+                      - { label: Record ID, name: id, widget: string, required: false }
                       - { label: Name, name: name, widget: string }
                       - { label: Email, name: email, widget: string }
                       - { label: Phone, name: phone, widget: string, required: false }
@@ -309,6 +310,32 @@ collections:
                         name: related_projects
                         widget: list
                         required: false
+                      - label: Default Packages
+                        name: defaultPackageIds
+                        widget: relation
+                        required: false
+                        collection: crm
+                        file: invoicePackages
+                        search_fields:
+                            - items.*.name
+                            - items.*.description
+                        value_field: items.*.id
+                        display_fields:
+                            - items.*.name
+                        multiple: true
+                      - label: Default Line Items
+                        name: defaultItemIds
+                        widget: relation
+                        required: false
+                        collection: crm
+                        file: invoiceItems
+                        search_fields:
+                            - items.*.name
+                            - items.*.description
+                        value_field: items.*.id
+                        display_fields:
+                            - items.*.name
+                        multiple: true
           - label: Bookings
             name: bookings
             file: content/data/crm-bookings.json
@@ -375,3 +402,83 @@ collections:
                   fields:
                       - { label: Label, name: label, widget: string }
                       - { label: Value, name: value, widget: string, required: false }
+          - label: Invoice Catalog
+            name: invoiceItems
+            file: content/data/crm-invoice-items.json
+            format: json
+            fields:
+                - { label: Collection Type, name: type, widget: hidden, default: CrmInvoiceItems }
+                - label: Catalog Items
+                  name: items
+                  widget: list
+                  fields:
+                      - { label: ID, name: id, widget: string }
+                      - { label: Name, name: name, widget: string }
+                      - { label: Description, name: description, widget: text }
+                      - { label: Default Quantity, name: defaultQuantity, widget: number, value_type: float }
+                      - label: Quantity Presets
+                        name: quantityPresets
+                        widget: list
+                        required: false
+                        field: { label: Quantity, name: quantity, widget: number, value_type: float }
+                      - { label: Unit Price, name: unitPrice, widget: number, value_type: float }
+                      - { label: Unit Label, name: unitLabel, widget: string, required: false }
+                      - label: Tags
+                        name: tags
+                        widget: list
+                        required: false
+                        field: { label: Tag, name: tag, widget: string }
+          - label: Invoice Packages
+            name: invoicePackages
+            file: content/data/crm-invoice-packages.json
+            format: json
+            fields:
+                - { label: Collection Type, name: type, widget: hidden, default: CrmInvoicePackages }
+                - label: Package Definitions
+                  name: items
+                  widget: list
+                  fields:
+                      - { label: ID, name: id, widget: string }
+                      - { label: Name, name: name, widget: string }
+                      - { label: Description, name: description, widget: text, required: false }
+                      - label: Catalog Items
+                        name: itemIds
+                        widget: relation
+                        required: false
+                        collection: crm
+                        file: invoiceItems
+                        search_fields:
+                            - items.*.name
+                            - items.*.description
+                        value_field: items.*.id
+                        display_fields:
+                            - items.*.name
+                        multiple: true
+                      - label: Overrides
+                        name: overrides
+                        widget: list
+                        required: false
+                        fields:
+                            - label: Catalog Item
+                              name: catalogItemId
+                              widget: relation
+                              collection: crm
+                              file: invoiceItems
+                              search_fields:
+                                  - items.*.name
+                              value_field: items.*.id
+                              display_fields:
+                                  - items.*.name
+                            - { label: Description, name: description, widget: string, required: false }
+                            - { label: Quantity, name: quantity, widget: number, value_type: float, required: false }
+                            - { label: Unit Price, name: unitPrice, widget: number, value_type: float, required: false }
+                      - label: Line Items
+                        name: lineItems
+                        widget: list
+                        fields:
+                            - { label: ID, name: id, widget: string }
+                            - { label: Description, name: description, widget: string }
+                            - { label: Quantity, name: quantity, widget: number, value_type: float }
+                            - { label: Unit Price, name: unitPrice, widget: number, value_type: float }
+                            - { label: Total, name: total, widget: number, value_type: float }
+                      - { label: Notes, name: notes, widget: text, required: false }

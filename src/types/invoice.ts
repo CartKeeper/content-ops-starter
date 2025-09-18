@@ -10,6 +10,34 @@ export type InvoiceLineItem = {
     total: number;
 };
 
+export type InvoiceCatalogItem = {
+    id: string;
+    name: string;
+    description: string;
+    defaultQuantity: number;
+    quantityPresets?: number[];
+    unitPrice: number;
+    unitLabel?: string;
+    tags?: string[];
+};
+
+export type InvoicePackageItemOverride = {
+    catalogItemId: string;
+    description?: string;
+    quantity?: number;
+    unitPrice?: number;
+};
+
+export type InvoicePackage = {
+    id: string;
+    name: string;
+    description?: string;
+    itemIds: string[];
+    overrides?: InvoicePackageItemOverride[];
+    lineItems: InvoiceLineItem[];
+    notes?: string;
+};
+
 export type InvoiceTotals = {
     subtotal: number;
     taxTotal: number;

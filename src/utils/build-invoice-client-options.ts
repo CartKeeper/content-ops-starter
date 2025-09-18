@@ -6,6 +6,17 @@ export type InvoiceClientOption = {
     name: string;
     email?: string;
     address?: string;
+    defaultPackageIds?: string[];
+    defaultItemIds?: string[];
+};
+
+export type InvoiceClientDirectoryEntry = {
+    id?: string;
+    name?: string;
+    email?: string;
+    address?: string;
+    defaultPackageIds?: string[];
+    defaultItemIds?: string[];
 };
 
 function createSlug(value: string): string {
@@ -15,7 +26,10 @@ function createSlug(value: string): string {
         .replace(/(^-|-$)+/g, '');
 }
 
-export function buildInvoiceClientOptions(invoices: InvoiceRecord[]): InvoiceClientOption[] {
+export function buildInvoiceClientOptions(
+    invoices: InvoiceRecord[],
+    directoryEntries: InvoiceClientDirectoryEntry[] = []
+): InvoiceClientOption[] {
     const map = new Map<string, InvoiceClientOption>();
 
     baseClients.forEach((client) => {
@@ -23,8 +37,32 @@ export function buildInvoiceClientOptions(invoices: InvoiceRecord[]): InvoiceCli
             id: client.id,
             name: client.name,
             email: client.email,
-            address: undefined
+            address: undefined,
+            defaultPackageIds: client.defaultPackageIds,
+            defaultItemIds: client.defaultItemIds
         });
+    });
+
+    directoryEntries.forEach((entry) => {
+        const name = entry.name?.trim();
+        if (!name) {
+            return;
+        }
+
+        const existingByName = Array.from(map.values()).find((option) => option.name === name);
+        const resolvedId = entry.id?.trim() || existingByName?.id || `crm-${createSlug(name)}`;
+
+        const existing = map.get(resolvedId) || existingByName;
+        const normalized: InvoiceClientOption = {
+            id: resolvedId,
+            name,
+            email: entry.email ?? existing?.email,
+            address: entry.address ?? existing?.address,
+            defaultPackageIds: entry.defaultPackageIds ?? existing?.defaultPackageIds,
+            defaultItemIds: entry.defaultItemIds ?? existing?.defaultItemIds
+        };
+
+        map.set(resolvedId, normalized);
     });
 
     invoices.forEach((invoice) => {
@@ -43,7 +81,9 @@ export function buildInvoiceClientOptions(invoices: InvoiceRecord[]): InvoiceCli
             id: `invoice-${slug}`,
             name,
             email: invoice.clientEmail,
-            address: invoice.clientAddress
+            address: invoice.clientAddress,
+            defaultPackageIds: [],
+            defaultItemIds: []
         });
     });
 

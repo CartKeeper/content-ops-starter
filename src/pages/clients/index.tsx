@@ -10,8 +10,12 @@ import { CrmAuthGuard, DashboardCard, StatusPill, WorkspaceLayout } from '../../
 import { InvoiceBuilderModal, type InvoiceBuilderSubmitValues } from '../../components/crm/InvoiceBuilderModal';
 import { useNetlifyIdentity } from '../../components/auth';
 import { clients as baseClients, galleryCollection } from '../../data/crm';
-import type { InvoiceRecord, InvoiceStatus } from '../../types/invoice';
-import { buildInvoiceClientOptions } from '../../utils/build-invoice-client-options';
+import type { InvoiceCatalogItem, InvoicePackage, InvoiceRecord, InvoiceStatus } from '../../types/invoice';
+import {
+    buildInvoiceClientOptions,
+    type InvoiceClientDirectoryEntry,
+    type InvoiceClientOption
+} from '../../utils/build-invoice-client-options';
 import { readCmsCollection } from '../../utils/read-cms-collection';
 import { useAutoDismiss } from '../../utils/use-auto-dismiss';
 
@@ -53,6 +57,16 @@ type ClientSummary = {
 
 type ClientsPageProps = {
     invoices: InvoiceRecord[];
+};
+
+type CrmCollectionResponse<T> = {
+    data?: T[];
+    error?: string;
+};
+
+type ClientDefaultsState = {
+    defaultPackageIds: string[];
+    defaultItemIds: string[];
 };
 
 type ClientListFilter = 'all' | 'withOutstanding' | 'noUpcoming';
@@ -162,6 +176,15 @@ function ClientsWorkspace({ invoices }: ClientsPageProps) {
     const [searchTerm, setSearchTerm] = React.useState<string>('');
     const [listFilter, setListFilter] = React.useState<ClientListFilter>('all');
     const [copyStatus, setCopyStatus] = React.useState<'idle' | 'success' | 'error'>('idle');
+    const [clientDirectory, setClientDirectory] = React.useState<InvoiceClientDirectoryEntry[]>([]);
+    const [catalogItems, setCatalogItems] = React.useState<InvoiceCatalogItem[]>([]);
+    const [catalogPackages, setCatalogPackages] = React.useState<InvoicePackage[]>([]);
+    const [isCatalogLoading, setIsCatalogLoading] = React.useState<boolean>(false);
+    const [isSavingClientDefaults, setIsSavingClientDefaults] = React.useState<boolean>(false);
+    const [editedDefaults, setEditedDefaults] = React.useState<ClientDefaultsState>({
+        defaultPackageIds: [],
+        defaultItemIds: []
+    });
 
     const isFiltered = listFilter !== 'all' || searchTerm.trim().length > 0;
 
@@ -171,7 +194,75 @@ function ClientsWorkspace({ invoices }: ClientsPageProps) {
         setFeedback({ id: `${Date.now()}`, type, message });
     }, []);
 
-    const clientOptions = React.useMemo(() => buildInvoiceClientOptions(invoiceList), [invoiceList]);
+    React.useEffect(() => {
+        let isActive = true;
+
+        async function fetchCollection<T>(resource: string): Promise<T[]> {
+            const response = await fetch(`/api/crm/${resource}`);
+            let payload: CrmCollectionResponse<T> | null = null;
+
+            try {
+                payload = (await response.json()) as CrmCollectionResponse<T>;
+            } catch (error) {
+                // Ignore JSON parse errors, handled below
+            }
+
+            if (!response.ok) {
+                const message = payload?.error || `Unable to load ${resource}.`;
+                throw new Error(message);
+            }
+
+            return Array.isArray(payload?.data) ? (payload?.data as T[]) : [];
+        }
+
+        async function loadCatalog() {
+            setIsCatalogLoading(true);
+
+            try {
+                const [clients, items, packages] = await Promise.all([
+                    fetchCollection<InvoiceClientDirectoryEntry>('clients').catch((error) => {
+                        console.error('Failed to load CRM clients', error);
+                        return [] as InvoiceClientDirectoryEntry[];
+                    }),
+                    fetchCollection<InvoiceCatalogItem>('invoice-items').catch((error) => {
+                        console.error('Failed to load invoice catalog items', error);
+                        return [] as InvoiceCatalogItem[];
+                    }),
+                    fetchCollection<InvoicePackage>('invoice-packages').catch((error) => {
+                        console.error('Failed to load invoice packages', error);
+                        return [] as InvoicePackage[];
+                    })
+                ]);
+
+                if (!isActive) {
+                    return;
+                }
+
+                setClientDirectory(clients);
+                setCatalogItems(items);
+                setCatalogPackages(packages);
+            } catch (error) {
+                if (isActive) {
+                    console.error('Failed to load CRM resources', error);
+                }
+            } finally {
+                if (isActive) {
+                    setIsCatalogLoading(false);
+                }
+            }
+        }
+
+        loadCatalog();
+
+        return () => {
+            isActive = false;
+        };
+    }, []);
+
+    const clientOptions: InvoiceClientOption[] = React.useMemo(
+        () => buildInvoiceClientOptions(invoiceList, clientDirectory),
+        [invoiceList, clientDirectory]
+    );
     const clientSummaries = React.useMemo(() => createClientSummaries(invoiceList), [invoiceList]);
     const filteredClientSummaries = React.useMemo(() => {
         const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -243,6 +334,99 @@ function ClientsWorkspace({ invoices }: ClientsPageProps) {
         setListFilter('all');
     }, []);
 
+    const handleToggleDefaultValue = React.useCallback((key: keyof ClientDefaultsState, value: string) => {
+        setEditedDefaults((previous) => {
+            const current = new Set(previous[key]);
+            if (current.has(value)) {
+                current.delete(value);
+            } else {
+                current.add(value);
+            }
+            return {
+                ...previous,
+                [key]: Array.from(current)
+            } as ClientDefaultsState;
+        });
+    }, []);
+
+    const selectedClient = clientSummaries.find((client) => client.id === selectedClientId) ?? null;
+
+    const selectedClientDirectoryEntry = React.useMemo(() => {
+        if (!selectedClient) {
+            return null;
+        }
+
+        const normalizedName = selectedClient.name.trim().toLowerCase();
+        return (
+            clientDirectory.find((entry) => entry.name?.trim().toLowerCase() === normalizedName) ?? null
+        );
+    }, [clientDirectory, selectedClient]);
+
+    React.useEffect(() => {
+        if (selectedClientDirectoryEntry) {
+            setEditedDefaults({
+                defaultPackageIds: [...(selectedClientDirectoryEntry.defaultPackageIds ?? [])],
+                defaultItemIds: [...(selectedClientDirectoryEntry.defaultItemIds ?? [])]
+            });
+        } else {
+            setEditedDefaults({ defaultPackageIds: [], defaultItemIds: [] });
+        }
+    }, [selectedClientDirectoryEntry]);
+
+    const handleSaveClientDefaults = React.useCallback(async () => {
+        if (!selectedClientDirectoryEntry?.id) {
+            notify('error', 'This client is not yet synced to the CRM directory.');
+            return;
+        }
+
+        setIsSavingClientDefaults(true);
+
+        try {
+            const response = await fetch(`/api/crm/clients?id=${encodeURIComponent(selectedClientDirectoryEntry.id)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    defaultPackageIds: editedDefaults.defaultPackageIds,
+                    defaultItemIds: editedDefaults.defaultItemIds
+                })
+            });
+
+            let payload: CrmCollectionResponse<InvoiceClientDirectoryEntry> | null = null;
+            try {
+                payload = (await response.json()) as CrmCollectionResponse<InvoiceClientDirectoryEntry>;
+            } catch (error) {
+                // Ignore payload parsing errors
+            }
+
+            if (!response.ok) {
+                const message = payload?.error || 'Unable to save invoice presets for this client.';
+                throw new Error(message);
+            }
+
+            setClientDirectory((previous) => {
+                const nextEntry: InvoiceClientDirectoryEntry = {
+                    ...selectedClientDirectoryEntry,
+                    defaultPackageIds: [...editedDefaults.defaultPackageIds],
+                    defaultItemIds: [...editedDefaults.defaultItemIds]
+                };
+
+                const hasEntry = previous.some((entry) => entry.id === selectedClientDirectoryEntry.id);
+                if (hasEntry) {
+                    return previous.map((entry) => (entry.id === selectedClientDirectoryEntry.id ? nextEntry : entry));
+                }
+
+                return [...previous, nextEntry];
+            });
+
+            notify('success', `Invoice presets updated for ${selectedClientDirectoryEntry.name}.`);
+        } catch (error) {
+            console.error('Failed to save client defaults', error);
+            notify('error', error instanceof Error ? error.message : 'Unable to save invoice presets.');
+        } finally {
+            setIsSavingClientDefaults(false);
+        }
+    }, [editedDefaults.defaultItemIds, editedDefaults.defaultPackageIds, notify, selectedClientDirectoryEntry]);
+
     React.useEffect(() => {
         if (copyStatus === 'idle') {
             return;
@@ -251,7 +435,25 @@ function ClientsWorkspace({ invoices }: ClientsPageProps) {
         return () => clearTimeout(timer);
     }, [copyStatus]);
 
-    const selectedClient = clientSummaries.find((client) => client.id === selectedClientId) ?? null;
+    const sortedPackages = React.useMemo(
+        () => [...catalogPackages].sort((a, b) => a.name.localeCompare(b.name)),
+        [catalogPackages]
+    );
+
+    const sortedItems = React.useMemo(
+        () => [...catalogItems].sort((a, b) => a.name.localeCompare(b.name)),
+        [catalogItems]
+    );
+
+    const hasDefaultsChanged = React.useMemo(() => {
+        const sortKey = (values: string[] | undefined) => [...(values ?? [])].sort().join('|');
+        const originalPackages = sortKey(selectedClientDirectoryEntry?.defaultPackageIds);
+        const originalItems = sortKey(selectedClientDirectoryEntry?.defaultItemIds);
+        return (
+            sortKey(editedDefaults.defaultPackageIds) !== originalPackages ||
+            sortKey(editedDefaults.defaultItemIds) !== originalItems
+        );
+    }, [editedDefaults.defaultItemIds, editedDefaults.defaultPackageIds, selectedClientDirectoryEntry]);
 
     const clientInvoices = React.useMemo(
         () =>
@@ -904,6 +1106,118 @@ function ClientsWorkspace({ invoices }: ClientsPageProps) {
                                                 </p>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-indigo-500 dark:text-indigo-300">
+                                                    Invoice presets
+                                                </p>
+                                                <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                                                    Saved catalog defaults
+                                                </h3>
+                                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                                    Pin frequently used packages or services so they appear automatically in the invoice builder.
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSaveClientDefaults}
+                                                    disabled={
+                                                        isSavingClientDefaults ||
+                                                        !selectedClientDirectoryEntry?.id ||
+                                                        !hasDefaultsChanged
+                                                    }
+                                                    className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:outline-indigo-300"
+                                                >
+                                                    {isSavingClientDefaults ? 'Saving…' : 'Save presets'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {selectedClientDirectoryEntry ? (
+                                            <div className="mt-6 grid gap-6 md:grid-cols-2">
+                                                <div>
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400 dark:text-slate-500">
+                                                        Packages
+                                                    </p>
+                                                    {isCatalogLoading ? (
+                                                        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Loading catalog…</p>
+                                                    ) : sortedPackages.length > 0 ? (
+                                                        <ul className="mt-2 space-y-2">
+                                                            {sortedPackages.map((pkg) => {
+                                                                const checked = editedDefaults.defaultPackageIds.includes(pkg.id);
+                                                                return (
+                                                                    <li key={pkg.id}>
+                                                                        <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm shadow-sm transition hover:border-indigo-300 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:border-indigo-400">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-400 dark:border-slate-600 dark:text-indigo-400"
+                                                                                checked={checked}
+                                                                                onChange={() => handleToggleDefaultValue('defaultPackageIds', pkg.id)}
+                                                                            />
+                                                                            <span>
+                                                                                <span className="font-semibold text-slate-900 dark:text-white">{pkg.name}</span>
+                                                                                {pkg.description ? (
+                                                                                    <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                                                                                        {pkg.description}
+                                                                                    </span>
+                                                                                ) : null}
+                                                                            </span>
+                                                                        </label>
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    ) : (
+                                                        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                                                            Create a package in the CRM catalog to add it here.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400 dark:text-slate-500">
+                                                        Line items
+                                                    </p>
+                                                    {isCatalogLoading ? (
+                                                        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Loading catalog…</p>
+                                                    ) : sortedItems.length > 0 ? (
+                                                        <ul className="mt-2 space-y-2">
+                                                            {sortedItems.map((item) => {
+                                                                const checked = editedDefaults.defaultItemIds.includes(item.id);
+                                                                return (
+                                                                    <li key={item.id}>
+                                                                        <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm shadow-sm transition hover:border-indigo-300 dark:border-slate-700 dark:bg-slate-900/70 dark:hover:border-indigo-400">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-400 dark:border-slate-600 dark:text-indigo-400"
+                                                                                checked={checked}
+                                                                                onChange={() => handleToggleDefaultValue('defaultItemIds', item.id)}
+                                                                            />
+                                                                            <span>
+                                                                                <span className="font-semibold text-slate-900 dark:text-white">{item.name}</span>
+                                                                                <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                                                                                    {item.description}
+                                                                                </span>
+                                                                            </span>
+                                                                        </label>
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    ) : (
+                                                        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                                                            Save catalog line items to reuse them here.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                                                Add this client to the CRM clients collection to manage default packages and items.
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="space-y-4">

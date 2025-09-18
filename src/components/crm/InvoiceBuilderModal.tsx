@@ -2,8 +2,9 @@ import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion } from 'framer-motion';
 import dayjs from 'dayjs';
+import useSWR from 'swr';
 
-import type { InvoiceTemplateId } from '../../types/invoice';
+import type { InvoiceCatalogItem, InvoicePackage, InvoiceTemplateId } from '../../types/invoice';
 import type { QuickActionFormField } from './QuickActionModal';
 import { useQuickActionSettings } from './quick-action-settings';
 
@@ -35,7 +36,36 @@ type ClientOption = {
     name: string;
     email?: string;
     address?: string;
+    defaultPackageIds?: string[];
+    defaultItemIds?: string[];
 };
+
+type CrmCollectionResponse<T> = {
+    data?: T[];
+    error?: string;
+};
+
+async function fetchCrmCollection<T>(resource: string): Promise<T[]> {
+    const response = await fetch(resource);
+    let payload: CrmCollectionResponse<T> | null = null;
+
+    try {
+        payload = (await response.json()) as CrmCollectionResponse<T>;
+    } catch (error) {
+        // handled below
+    }
+
+    if (!response.ok) {
+        const message = payload?.error || 'Unable to load CRM data.';
+        throw new Error(message);
+    }
+
+    if (Array.isArray(payload?.data)) {
+        return payload?.data as T[];
+    }
+
+    return [];
+}
 
 type InvoiceBuilderModalProps = {
     clients: ClientOption[];
@@ -60,12 +90,12 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 2
 });
 
-function createLineItem(): InvoiceLineItemInput {
+function createLineItem(overrides: Partial<InvoiceLineItemInput> = {}): InvoiceLineItemInput {
     return {
-        id: `item-${Math.random().toString(36).slice(2, 10)}`,
-        description: '',
-        quantity: 1,
-        unitPrice: 0
+        id: overrides.id ?? `item-${Math.random().toString(36).slice(2, 10)}`,
+        description: overrides.description ?? '',
+        quantity: overrides.quantity ?? 1,
+        unitPrice: overrides.unitPrice ?? 0
     };
 }
 
@@ -107,6 +137,50 @@ export function InvoiceBuilderModal({
     const [customFieldValues, setCustomFieldValues] = React.useState<Record<string, string | boolean>>({});
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
+    const [selectedCatalogItemId, setSelectedCatalogItemId] = React.useState<string>('');
+    const [selectedPackageId, setSelectedPackageId] = React.useState<string>('');
+    const [pendingPackageSuggestions, setPendingPackageSuggestions] = React.useState<string[]>([]);
+    const [pendingItemSuggestions, setPendingItemSuggestions] = React.useState<string[]>([]);
+
+    const {
+        data: catalogItems,
+        error: catalogItemsError,
+        isLoading: isCatalogItemsLoading
+    } = useSWR<InvoiceCatalogItem[]>(
+        '/api/crm/invoice-items',
+        (resource) => fetchCrmCollection<InvoiceCatalogItem>(resource),
+        { revalidateOnFocus: false }
+    );
+
+    const {
+        data: catalogPackages,
+        error: catalogPackagesError,
+        isLoading: isCatalogPackagesLoading
+    } = useSWR<InvoicePackage[]>(
+        '/api/crm/invoice-packages',
+        (resource) => fetchCrmCollection<InvoicePackage>(resource),
+        { revalidateOnFocus: false }
+    );
+
+    const catalogItemMap = React.useMemo(() => {
+        const map = new Map<string, InvoiceCatalogItem>();
+        (catalogItems ?? []).forEach((item) => {
+            if (item?.id) {
+                map.set(item.id, item);
+            }
+        });
+        return map;
+    }, [catalogItems]);
+
+    const catalogPackageMap = React.useMemo(() => {
+        const map = new Map<string, InvoicePackage>();
+        (catalogPackages ?? []).forEach((pkg) => {
+            if (pkg?.id) {
+                map.set(pkg.id, pkg);
+            }
+        });
+        return map;
+    }, [catalogPackages]);
 
     React.useEffect(() => {
         setSelectedClientId(resolvedInitialClientId);
@@ -139,6 +213,13 @@ export function InvoiceBuilderModal({
         }
     }, [initialProjectName]);
 
+    React.useEffect(() => {
+        const packageIds = selectedClient?.defaultPackageIds ?? [];
+        const itemIds = selectedClient?.defaultItemIds ?? [];
+        setPendingPackageSuggestions([...packageIds]);
+        setPendingItemSuggestions([...itemIds]);
+    }, [selectedClient?.defaultItemIds, selectedClient?.defaultPackageIds, selectedClientId]);
+
     const subtotal = React.useMemo(
         () =>
             lineItems.reduce((total, item) => {
@@ -170,6 +251,106 @@ export function InvoiceBuilderModal({
             return items.filter((item) => item.id !== id);
         });
     };
+
+    const appendLineItems = React.useCallback((entries: InvoiceLineItemInput[]) => {
+        setLineItems((previous) => {
+            if (previous.length === 1) {
+                const [first] = previous;
+                const isEmpty =
+                    first &&
+                    !first.description &&
+                    (!Number.isFinite(first.quantity) || first.quantity <= 0 || first.quantity === 1) &&
+                    (!Number.isFinite(first.unitPrice) || first.unitPrice === 0);
+
+                if (isEmpty) {
+                    return entries.length > 0 ? entries : [createLineItem()];
+                }
+            }
+
+            return [...previous, ...entries];
+        });
+    }, []);
+
+    const buildPackageLineItems = React.useCallback(
+        (pkg: InvoicePackage): InvoiceLineItemInput[] => {
+            if (Array.isArray(pkg.lineItems) && pkg.lineItems.length > 0) {
+                return pkg.lineItems.map((item) =>
+                    createLineItem({
+                        description: item.description,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice
+                    })
+                );
+            }
+
+            const overridesById = new Map(
+                (pkg.overrides ?? []).map((override) => [override.catalogItemId, override])
+            );
+
+            const derived: InvoiceLineItemInput[] = [];
+
+            (pkg.itemIds ?? []).forEach((catalogItemId) => {
+                const catalogItem = catalogItemMap.get(catalogItemId);
+                if (!catalogItem) {
+                    return;
+                }
+
+                const override = overridesById.get(catalogItemId);
+                const description =
+                    override?.description ?? catalogItem.description ?? catalogItem.name ?? 'Invoice item';
+                const quantity = override?.quantity ?? catalogItem.defaultQuantity ?? 1;
+                const unitPrice = override?.unitPrice ?? catalogItem.unitPrice ?? 0;
+
+                derived.push(
+                    createLineItem({
+                        description,
+                        quantity,
+                        unitPrice
+                    })
+                );
+            });
+
+            return derived;
+        },
+        [catalogItemMap]
+    );
+
+    const handleInsertCatalogItem = React.useCallback(
+        (itemId: string) => {
+            const catalogItem = catalogItemMap.get(itemId);
+            if (!catalogItem) {
+                return false;
+            }
+
+            appendLineItems([
+                createLineItem({
+                    description: catalogItem.description ?? catalogItem.name ?? 'Invoice item',
+                    quantity: Math.max(0.001, catalogItem.defaultQuantity ?? 1),
+                    unitPrice: Math.max(0, catalogItem.unitPrice ?? 0)
+                })
+            ]);
+            return true;
+        },
+        [appendLineItems, catalogItemMap]
+    );
+
+    const handleInsertPackage = React.useCallback(
+        (packageId: string) => {
+            const pkg = catalogPackageMap.get(packageId);
+            if (!pkg) {
+                return false;
+            }
+
+            const items = buildPackageLineItems(pkg);
+            if (items.length === 0) {
+                return false;
+            }
+
+            appendLineItems(items);
+            return true;
+        },
+        [appendLineItems, buildPackageLineItems, catalogPackageMap]
+    );
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -337,11 +518,11 @@ export function InvoiceBuilderModal({
                         </div>
                         <form className="space-y-6" onSubmit={handleSubmit}>
                             <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
-                                        Client
-                                    </label>
-                                    <select
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
+                                    Client
+                                </label>
+                                <select
                                         className={`${inputBaseStyles} pr-10`}
                                         value={selectedClientId}
                                         onChange={(event) => setSelectedClientId(event.target.value)}
@@ -553,9 +734,9 @@ export function InvoiceBuilderModal({
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                            {lineItems.map((item) => (
-                                                <tr key={item.id} className="align-top">
-                                                    <td className="px-4 py-3">
+                                        {lineItems.map((item) => (
+                                            <tr key={item.id} className="align-top">
+                                                <td className="px-4 py-3">
                                                         <input
                                                             type="text"
                                                             className={inputBaseStyles}
@@ -600,6 +781,167 @@ export function InvoiceBuilderModal({
                                             ))}
                                         </tbody>
                                     </table>
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
+                                                Insert saved item
+                                            </label>
+                                            <div className="flex flex-col gap-2 sm:flex-row">
+                                                <select
+                                                    className={`${inputBaseStyles} flex-1 pr-10`}
+                                                    value={selectedCatalogItemId}
+                                                    onChange={(event) => setSelectedCatalogItemId(event.target.value)}
+                                                    disabled={isCatalogItemsLoading || (catalogItems?.length ?? 0) === 0}
+                                                >
+                                                    <option value="">
+                                                        {isCatalogItemsLoading ? 'Loading…' : 'Select saved service'}
+                                                    </option>
+                                                    {(catalogItems ?? []).map((item) => (
+                                                        <option key={item.id} value={item.id}>
+                                                            {item.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-indigo-500/50 dark:bg-indigo-500/10 dark:text-indigo-200"
+                                                    onClick={() => {
+                                                        if (selectedCatalogItemId && handleInsertCatalogItem(selectedCatalogItemId)) {
+                                                            setPendingItemSuggestions((previous) =>
+                                                                previous.filter((id) => id !== selectedCatalogItemId)
+                                                            );
+                                                            setSelectedCatalogItemId('');
+                                                        }
+                                                    }}
+                                                    disabled={!selectedCatalogItemId}
+                                                >
+                                                    Add saved item
+                                                </button>
+                                            </div>
+                                            {catalogItemsError ? (
+                                                <p className="text-xs text-[#D61B7B]">
+                                                    {catalogItemsError instanceof Error
+                                                        ? catalogItemsError.message
+                                                        : 'Unable to load saved services.'}
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
+                                                Insert package
+                                            </label>
+                                            <div className="flex flex-col gap-2 sm:flex-row">
+                                                <select
+                                                    className={`${inputBaseStyles} flex-1 pr-10`}
+                                                    value={selectedPackageId}
+                                                    onChange={(event) => setSelectedPackageId(event.target.value)}
+                                                    disabled={isCatalogPackagesLoading || (catalogPackages?.length ?? 0) === 0}
+                                                >
+                                                    <option value="">
+                                                        {isCatalogPackagesLoading ? 'Loading…' : 'Select package'}
+                                                    </option>
+                                                    {(catalogPackages ?? []).map((pkg) => (
+                                                        <option key={pkg.id} value={pkg.id}>
+                                                            {pkg.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-indigo-500/50 dark:bg-indigo-500/10 dark:text-indigo-200"
+                                                    onClick={() => {
+                                                        if (selectedPackageId && handleInsertPackage(selectedPackageId)) {
+                                                            setPendingPackageSuggestions((previous) =>
+                                                                previous.filter((id) => id !== selectedPackageId)
+                                                            );
+                                                            setSelectedPackageId('');
+                                                        }
+                                                    }}
+                                                    disabled={!selectedPackageId}
+                                                >
+                                                    Add package
+                                                </button>
+                                            </div>
+                                            {catalogPackagesError ? (
+                                                <p className="text-xs text-[#D61B7B]">
+                                                    {catalogPackagesError instanceof Error
+                                                        ? catalogPackagesError.message
+                                                        : 'Unable to load invoice packages.'}
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                        {(pendingPackageSuggestions.length > 0 || pendingItemSuggestions.length > 0) && (
+                                            <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 p-3 text-xs text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <p className="font-semibold uppercase tracking-[0.24em]">
+                                                        Suggested presets
+                                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setPendingPackageSuggestions([]);
+                                                            setPendingItemSuggestions([]);
+                                                        }}
+                                                        className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-500 transition hover:text-indigo-700 dark:text-indigo-200 dark:hover:text-indigo-100"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </div>
+                                                <p className="mt-1 text-[11px] text-indigo-600/80 dark:text-indigo-200/70">
+                                                    {selectedClient?.name ? `Recommended for ${selectedClient.name}` : 'Recommended presets'}
+                                                </p>
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    {pendingPackageSuggestions
+                                                        .map((packageId) => catalogPackageMap.get(packageId))
+                                                        .filter((pkg): pkg is InvoicePackage => Boolean(pkg))
+                                                        .map((pkg) => (
+                                                            <button
+                                                                key={`suggested-package-${pkg.id}`}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (handleInsertPackage(pkg.id)) {
+                                                                        setPendingPackageSuggestions((previous) =>
+                                                                            previous.filter((id) => id !== pkg.id)
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-600 shadow-sm ring-1 ring-indigo-200 transition hover:bg-white dark:bg-indigo-950/60 dark:text-indigo-200 dark:ring-indigo-500/40"
+                                                            >
+                                                                + {pkg.name}
+                                                            </button>
+                                                        ))}
+                                                    {pendingItemSuggestions
+                                                        .map((itemId) => catalogItemMap.get(itemId))
+                                                        .filter((item): item is InvoiceCatalogItem => Boolean(item))
+                                                        .map((item) => (
+                                                            <button
+                                                                key={`suggested-item-${item.id}`}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (handleInsertCatalogItem(item.id)) {
+                                                                        setPendingItemSuggestions((previous) =>
+                                                                            previous.filter((id) => id !== item.id)
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-600 shadow-sm ring-1 ring-indigo-200 transition hover:bg-white dark:bg-indigo-950/60 dark:text-indigo-200 dark:ring-indigo-500/40"
+                                                            >
+                                                                + {item.name}
+                                                            </button>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={addLineItem}
+                                        className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                                    >
+                                        + Add blank item
+                                    </button>
                                 </div>
                                 <div className="flex flex-col items-end gap-1 text-sm text-slate-600 dark:text-slate-300">
                                     <div className="flex w-full max-w-xs items-center justify-between">
