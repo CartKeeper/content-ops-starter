@@ -642,10 +642,28 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                 <section className="crm-page-header">
                     <div className="container-xl">
                         <div className="crm-page-heading">
-                            <div className="crm-page-heading-text">
-                                <span className="crm-page-pretitle">{headingLabel}</span>
-                                <h1 className="crm-page-title">Command center</h1>
-                            </div>
+                        <div className="crm-page-heading-text">
+                            <span className="crm-page-pretitle">{headingLabel}</span>
+                            <h1 className="crm-page-title">Command center</h1>
+                            <nav className="crm-page-nav" aria-label="Workspace pages">
+                                {navItems.map((item) => {
+                                    const isActive = matchPath(router.pathname, item.href);
+                                    return (
+                                        <Link
+                                            key={`page-nav-${item.href}`}
+                                            href={item.href}
+                                            className={classNames('crm-page-nav-link', { active: isActive })}
+                                            aria-current={isActive ? 'page' : undefined}
+                                        >
+                                            <span className="crm-page-nav-icon" aria-hidden>
+                                                <item.icon className="icon" />
+                                            </span>
+                                            <span>{item.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </nav>
+                        </div>
                             <div className="crm-page-heading-actions">
                                 <div className="crm-page-action-row">
                                     <Link
