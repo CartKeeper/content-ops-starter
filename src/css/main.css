@@ -848,12 +848,20 @@ a.link-primary:hover {
     position: relative;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 1199.98px) {
+    .crm-page-heading {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .crm-page-heading-actions {
+        width: 100%;
+        margin-left: 0;
         align-items: stretch;
     }
 
     .crm-page-action-grid {
+        width: 100%;
         grid-template-columns: 1fr;
     }
 
