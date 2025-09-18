@@ -807,6 +807,56 @@ a.link-primary:hover {
     font-weight: 600;
 }
 
+.crm-page-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.crm-page-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 9999px;
+    font-weight: 500;
+    color: var(--tblr-secondary-color, #64748b);
+    background-color: rgba(var(--crm-accent-rgb), 0.08);
+    transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.crm-page-nav-link:hover,
+.crm-page-nav-link:focus-visible {
+    color: var(--crm-accent, #6366f1);
+    background-color: rgba(var(--crm-accent-rgb), 0.18);
+    box-shadow: 0 0 0 2px rgba(var(--crm-accent-rgb), 0.2);
+    text-decoration: none;
+}
+
+.crm-page-nav-link.active {
+    color: var(--crm-accent, #6366f1);
+    background-color: var(--crm-accent-soft);
+    box-shadow: 0 0 0 2px rgba(var(--crm-accent-rgb), 0.18);
+}
+
+.crm-page-nav-icon {
+    display: inline-flex;
+    align-items: center;
+}
+
+.crm-page-nav-icon .icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+@media (max-width: 767.98px) {
+    .crm-page-nav-link {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
 .crm-status-pill {
     display: inline-flex;
     align-items: center;
