@@ -39,6 +39,7 @@ type QuickAction = {
     href: string;
     label: string;
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+    variant?: 'primary' | 'outline';
 };
 
 type AccentOption = {
@@ -131,10 +132,10 @@ const navItems: NavItem[] = [
 ];
 
 const quickActions: QuickAction[] = [
-    { href: '/bookings', label: 'New booking', icon: CalendarIcon },
-    { href: '/bookings', label: 'Quick set up', icon: CheckIcon },
-    { href: '/bookings', label: 'Plan a shoot', icon: PhotoIcon },
-    { href: '/invoices', label: 'Review billing', icon: ReceiptIcon }
+    { href: '/bookings', label: 'New booking', icon: CalendarIcon, variant: 'primary' },
+    { href: '/bookings', label: 'Quick set up', icon: CheckIcon, variant: 'outline' },
+    { href: '/bookings', label: 'Plan a shoot', icon: PhotoIcon, variant: 'primary' },
+    { href: '/invoices', label: 'Review billing', icon: ReceiptIcon, variant: 'outline' }
 ];
 
 const ACCENT_STORAGE_KEY = 'crm-accent-preference';
