@@ -95,14 +95,6 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
     const [isSyncing, setIsSyncing] = React.useState(false);
     const [lastSyncedAt, setLastSyncedAt] = React.useState<string | null>(null);
     const calendarRef = React.useRef<FullCalendarRef | null>(null);
-    const handleSidebarChange = React.useCallback(() => {
-        if (!calendarRef.current) {
-            return;
-        }
-
-        const api = calendarRef.current.getApi();
-        window.setTimeout(() => api.updateSize(), 160);
-    }, []);
 
     const calendarEvents = React.useMemo<CalendarEvent[]>(
         () => bookings.map((booking) => createCalendarEvent(booking)),
@@ -421,7 +413,7 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
             <Head>
                 <title>Studio bookings calendar</title>
             </Head>
-            <WorkspaceLayout onSidebarChange={handleSidebarChange}>
+            <WorkspaceLayout>
                 <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
                     <header className="flex flex-wrap items-start justify-between gap-6">
                         <div className="space-y-3">
