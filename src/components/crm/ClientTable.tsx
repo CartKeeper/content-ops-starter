@@ -17,6 +17,8 @@ export type ClientRecord = {
     status: ClientStatus;
     ownerId?: string;
     ownerName?: string;
+    defaultPackageIds?: string[];
+    defaultItemIds?: string[];
 };
 
 const statusToneMap: Record<ClientStatus, StatusTone> = {

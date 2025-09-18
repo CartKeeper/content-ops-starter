@@ -122,7 +122,9 @@ export const clients: ClientRecord[] = [
         shoots: 7,
         lastShoot: '2025-03-29',
         upcomingShoot: '2025-05-11',
-        status: 'Active'
+        status: 'Active',
+        defaultPackageIds: ['pkg-brand-launch'],
+        defaultItemIds: ['svc-retouching-batch']
     },
     {
         id: 'cl-02',
@@ -132,7 +134,9 @@ export const clients: ClientRecord[] = [
         shoots: 3,
         lastShoot: '2024-11-18',
         upcomingShoot: '2025-05-18',
-        status: 'Lead'
+        status: 'Lead',
+        defaultPackageIds: ['pkg-brand-launch'],
+        defaultItemIds: ['svc-creative-direction']
     },
     {
         id: 'cl-03',
@@ -142,7 +146,9 @@ export const clients: ClientRecord[] = [
         shoots: 4,
         lastShoot: '2025-04-02',
         upcomingShoot: '2025-05-21',
-        status: 'Active'
+        status: 'Active',
+        defaultPackageIds: ['pkg-brand-launch'],
+        defaultItemIds: ['svc-social-cutdowns']
     },
     {
         id: 'cl-04',
@@ -152,7 +158,9 @@ export const clients: ClientRecord[] = [
         shoots: 5,
         lastShoot: '2025-04-04',
         upcomingShoot: '2025-06-08',
-        status: 'Active'
+        status: 'Active',
+        defaultPackageIds: ['pkg-retainer-lite'],
+        defaultItemIds: ['svc-monthly-retainer', 'svc-retouching-batch']
     },
     {
         id: 'cl-05',
@@ -162,7 +170,9 @@ export const clients: ClientRecord[] = [
         shoots: 2,
         lastShoot: '2025-03-18',
         upcomingShoot: '2025-05-29',
-        status: 'Lead'
+        status: 'Lead',
+        defaultPackageIds: ['pkg-retainer-lite'],
+        defaultItemIds: ['svc-monthly-retainer']
     },
     {
         id: 'cl-06',
@@ -171,7 +181,9 @@ export const clients: ClientRecord[] = [
         phone: '(415) 555-0194',
         shoots: 3,
         lastShoot: '2025-01-22',
-        status: 'Active'
+        status: 'Active',
+        defaultPackageIds: ['pkg-retainer-lite'],
+        defaultItemIds: ['svc-social-cutdowns']
     }
 ];
 

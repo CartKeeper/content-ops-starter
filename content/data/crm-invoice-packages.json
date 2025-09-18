@@ -1,0 +1,82 @@
+{
+    "type": "CrmInvoicePackages",
+    "items": [
+        {
+            "id": "pkg-brand-launch",
+            "name": "Brand launch campaign",
+            "description": "Creative direction, retouching, and social-ready cutdowns for a launch sprint.",
+            "itemIds": [
+                "svc-creative-direction",
+                "svc-retouching-batch",
+                "svc-social-cutdowns"
+            ],
+            "overrides": [
+                {
+                    "catalogItemId": "svc-retouching-batch",
+                    "description": "Retouching & colour grading (30 images)",
+                    "quantity": 30
+                },
+                {
+                    "catalogItemId": "svc-social-cutdowns",
+                    "description": "Social cutdowns & reels",
+                    "quantity": 12
+                }
+            ],
+            "lineItems": [
+                {
+                    "id": "pkg-brand-launch-1",
+                    "description": "Creative direction day",
+                    "quantity": 1,
+                    "unitPrice": 850,
+                    "total": 850
+                },
+                {
+                    "id": "pkg-brand-launch-2",
+                    "description": "Retouching & colour grading (30 images)",
+                    "quantity": 30,
+                    "unitPrice": 35,
+                    "total": 1050
+                },
+                {
+                    "id": "pkg-brand-launch-3",
+                    "description": "Social cutdowns & reels",
+                    "quantity": 12,
+                    "unitPrice": 60,
+                    "total": 720
+                }
+            ]
+        },
+        {
+            "id": "pkg-retainer-lite",
+            "name": "Content retainer (lite)",
+            "description": "Monthly content capture paired with a bundle of social deliverables.",
+            "itemIds": [
+                "svc-monthly-retainer",
+                "svc-social-cutdowns"
+            ],
+            "overrides": [
+                {
+                    "catalogItemId": "svc-social-cutdowns",
+                    "description": "Quarterly social cutdowns",
+                    "quantity": 18
+                }
+            ],
+            "lineItems": [
+                {
+                    "id": "pkg-retainer-lite-1",
+                    "description": "Monthly content retainer",
+                    "quantity": 1,
+                    "unitPrice": 2400,
+                    "total": 2400
+                },
+                {
+                    "id": "pkg-retainer-lite-2",
+                    "description": "Quarterly social cutdowns",
+                    "quantity": 18,
+                    "unitPrice": 60,
+                    "total": 1080
+                }
+            ]
+        }
+    ]
+}

@@ -6,7 +6,10 @@ import dayjs from 'dayjs';
 
 import {
     DEFAULT_INVOICE_CURRENCY,
+    type InvoiceCatalogItem,
     type InvoiceLineItem,
+    type InvoicePackage,
+    type InvoicePackageItemOverride,
     type InvoiceRecord,
     type InvoiceStatus,
     type InvoiceTemplateId
@@ -16,7 +19,13 @@ import { generateInvoicePdf } from '../../../server/invoices/generator';
 import { sendInvoiceEmail, type InvoiceEmailResult } from '../../../server/invoices/mailer';
 import { createStripePaymentLink } from '../../../server/invoices/stripe';
 
-type ResourceKey = 'bookings' | 'invoices' | 'galleries';
+type ResourceKey =
+    | 'bookings'
+    | 'clients'
+    | 'galleries'
+    | 'invoices'
+    | 'invoice-items'
+    | 'invoice-packages';
 
 type ResourceConfig = {
     file: string;
@@ -25,8 +34,11 @@ type ResourceConfig = {
 
 const RESOURCE_CONFIG: Record<ResourceKey, ResourceConfig> = {
     bookings: { file: 'crm-bookings.json', type: 'CrmBookings' },
+    clients: { file: 'crm-clients.json', type: 'CrmClients' },
+    galleries: { file: 'crm-galleries.json', type: 'CrmGalleries' },
     invoices: { file: 'crm-invoices.json', type: 'CrmInvoices' },
-    galleries: { file: 'crm-galleries.json', type: 'CrmGalleries' }
+    'invoice-items': { file: 'crm-invoice-items.json', type: 'CrmInvoiceItems' },
+    'invoice-packages': { file: 'crm-invoice-packages.json', type: 'CrmInvoicePackages' }
 };
 
 const DATA_DIRECTORY = path.join(process.cwd(), 'content', 'data');
@@ -34,6 +46,19 @@ const DATA_DIRECTORY = path.join(process.cwd(), 'content', 'data');
 const INVOICE_STATUSES: InvoiceStatus[] = ['Draft', 'Sent', 'Paid', 'Overdue'];
 const GALLERY_STATUSES: GalleryStatus[] = ['Delivered', 'Pending'];
 const INVOICE_TEMPLATES: InvoiceTemplateId[] = ['classic', 'minimal', 'branded'];
+
+type CrmClientDirectoryRecord = {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    notes?: string;
+    related_projects?: string[];
+    owner?: string;
+    defaultPackageIds?: string[];
+    defaultItemIds?: string[];
+};
 
 type NormalizedInvoiceResult = {
     invoice: InvoiceRecord;
@@ -163,6 +188,13 @@ function roundTo(value: number, precision = 2): number {
     return Math.round((value + Number.EPSILON) * factor) / factor;
 }
 
+function createSlug(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+}
+
 function normalizeInvoiceLineItems(value: unknown, fallbackDescription: string): InvoiceLineItem[] {
     if (!Array.isArray(value)) {
         return [];
@@ -212,6 +244,234 @@ function normalizeInvoiceLineItems(value: unknown, fallbackDescription: string):
             } satisfies InvoiceLineItem;
         })
         .filter((item): item is InvoiceLineItem => Boolean(item));
+}
+
+function normalizeInvoiceCatalogItem(
+    payload: Record<string, unknown>,
+    existing?: InvoiceCatalogItem
+): InvoiceCatalogItem {
+    const id = parseString(payload.id, existing?.id ?? randomUUID());
+    const name = parseString(payload.name, existing?.name ?? 'Saved service');
+    const description = parseString(payload.description, existing?.description ?? name);
+
+    const quantityValue = parseNumber(payload.defaultQuantity);
+    const defaultQuantity =
+        quantityValue !== null && quantityValue > 0 ? roundTo(quantityValue, 3) : existing?.defaultQuantity ?? 1;
+
+    const unitPriceValue = parseNumber(payload.unitPrice);
+    const unitPrice =
+        unitPriceValue !== null && unitPriceValue >= 0 ? roundTo(unitPriceValue) : existing?.unitPrice ?? 0;
+
+    let quantityPresets: number[] | undefined = existing?.quantityPresets;
+    if (Object.prototype.hasOwnProperty.call(payload, 'quantityPresets')) {
+        if (Array.isArray(payload.quantityPresets)) {
+            const normalized = payload.quantityPresets
+                .map((value) => parseNumber(value))
+                .filter((value): value is number => value !== null && value > 0)
+                .map((value) => roundTo(value, 3));
+            quantityPresets = normalized.length > 0 ? normalized : undefined;
+        } else {
+            quantityPresets = undefined;
+        }
+    }
+
+    let unitLabel: string | undefined = existing?.unitLabel;
+    if (Object.prototype.hasOwnProperty.call(payload, 'unitLabel')) {
+        unitLabel = parseOptionalString(payload.unitLabel);
+    }
+
+    let tags: string[] | undefined = existing?.tags;
+    if (Object.prototype.hasOwnProperty.call(payload, 'tags')) {
+        if (Array.isArray(payload.tags)) {
+            const normalized = payload.tags
+                .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+                .filter((tag) => tag);
+            tags = normalized.length > 0 ? normalized : undefined;
+        } else {
+            tags = undefined;
+        }
+    }
+
+    return {
+        id,
+        name,
+        description,
+        defaultQuantity,
+        quantityPresets,
+        unitPrice,
+        unitLabel,
+        tags
+    } satisfies InvoiceCatalogItem;
+}
+
+function normalizePackageOverrides(value: unknown): InvoicePackageItemOverride[] | undefined {
+    if (!Array.isArray(value)) {
+        return undefined;
+    }
+
+    const overrides = value
+        .map((entry) => {
+            if (!isPlainObject(entry)) {
+                return null;
+            }
+
+            const catalogItemId = parseString(entry.catalogItemId, '');
+            if (!catalogItemId) {
+                return null;
+            }
+
+            const override: InvoicePackageItemOverride = { catalogItemId };
+
+            const description = parseOptionalString(entry.description);
+            if (description !== undefined) {
+                override.description = description;
+            }
+
+            const quantityValue = parseNumber(entry.quantity);
+            if (quantityValue !== null && quantityValue > 0) {
+                override.quantity = roundTo(quantityValue, 3);
+            }
+
+            const unitPriceValue = parseNumber(entry.unitPrice);
+            if (unitPriceValue !== null && unitPriceValue >= 0) {
+                override.unitPrice = roundTo(unitPriceValue);
+            }
+
+            return override;
+        })
+        .filter((entry): entry is InvoicePackageItemOverride => Boolean(entry));
+
+    return overrides.length > 0 ? overrides : undefined;
+}
+
+function normalizeInvoicePackage(payload: Record<string, unknown>, existing?: InvoicePackage): InvoicePackage {
+    const id = parseString(payload.id, existing?.id ?? randomUUID());
+    const name = parseString(payload.name, existing?.name ?? 'Invoice package');
+
+    let description = existing?.description;
+    if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
+        description = parseOptionalString(payload.description);
+    }
+
+    let notes = existing?.notes;
+    if (Object.prototype.hasOwnProperty.call(payload, 'notes')) {
+        notes = parseOptionalString(payload.notes);
+    }
+
+    let itemIds = existing?.itemIds ?? [];
+    if (Object.prototype.hasOwnProperty.call(payload, 'itemIds')) {
+        if (Array.isArray(payload.itemIds)) {
+            const normalized = payload.itemIds
+                .map((value) => (typeof value === 'string' ? value.trim() : ''))
+                .filter((value) => value);
+            itemIds = normalized;
+        } else {
+            itemIds = [];
+        }
+    }
+
+    let overrides = existing?.overrides;
+    if (Object.prototype.hasOwnProperty.call(payload, 'overrides')) {
+        overrides = normalizePackageOverrides(payload.overrides);
+    }
+
+    let lineItems = existing?.lineItems ?? [];
+    if (Array.isArray(payload.lineItems)) {
+        lineItems = normalizeInvoiceLineItems(payload.lineItems, name);
+    }
+
+    return {
+        id,
+        name,
+        description,
+        itemIds,
+        overrides,
+        lineItems,
+        notes
+    } satisfies InvoicePackage;
+}
+
+function normalizeCrmClientRecord(
+    payload: Record<string, unknown>,
+    existing?: CrmClientDirectoryRecord
+): CrmClientDirectoryRecord {
+    const id = parseString(payload.id, existing?.id ?? randomUUID());
+    const name = parseString(payload.name, existing?.name ?? 'New client');
+
+    let email = existing?.email;
+    if (Object.prototype.hasOwnProperty.call(payload, 'email')) {
+        email = parseOptionalString(payload.email);
+    }
+
+    let phone = existing?.phone;
+    if (Object.prototype.hasOwnProperty.call(payload, 'phone')) {
+        phone = parseOptionalString(payload.phone);
+    }
+
+    let address = existing?.address;
+    if (Object.prototype.hasOwnProperty.call(payload, 'address')) {
+        address = parseOptionalString(payload.address);
+    }
+
+    let notes = existing?.notes;
+    if (Object.prototype.hasOwnProperty.call(payload, 'notes')) {
+        const value = parseOptionalString(payload.notes);
+        notes = value === undefined ? undefined : value;
+    }
+
+    let relatedProjects = existing?.related_projects;
+    if (Object.prototype.hasOwnProperty.call(payload, 'related_projects')) {
+        if (Array.isArray(payload.related_projects)) {
+            const normalized = payload.related_projects
+                .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+                .filter((entry) => entry);
+            relatedProjects = normalized.length > 0 ? normalized : undefined;
+        } else {
+            relatedProjects = undefined;
+        }
+    }
+
+    let owner = existing?.owner;
+    if (Object.prototype.hasOwnProperty.call(payload, 'owner')) {
+        owner = parseOptionalString(payload.owner);
+    }
+
+    let defaultPackageIds = existing?.defaultPackageIds;
+    if (Object.prototype.hasOwnProperty.call(payload, 'defaultPackageIds')) {
+        if (Array.isArray(payload.defaultPackageIds)) {
+            const normalized = payload.defaultPackageIds
+                .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+                .filter((entry) => entry);
+            defaultPackageIds = normalized;
+        } else {
+            defaultPackageIds = [];
+        }
+    }
+
+    let defaultItemIds = existing?.defaultItemIds;
+    if (Object.prototype.hasOwnProperty.call(payload, 'defaultItemIds')) {
+        if (Array.isArray(payload.defaultItemIds)) {
+            const normalized = payload.defaultItemIds
+                .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+                .filter((entry) => entry);
+            defaultItemIds = normalized;
+        } else {
+            defaultItemIds = [];
+        }
+    }
+
+    return {
+        id,
+        name,
+        email,
+        phone,
+        address,
+        notes,
+        related_projects: relatedProjects,
+        owner,
+        defaultPackageIds,
+        defaultItemIds
+    } satisfies CrmClientDirectoryRecord;
 }
 
 function sanitizeCustomFields(value: unknown): Record<string, string | boolean> | undefined {
@@ -451,11 +711,62 @@ function parseResourceKey(value: string | string[] | undefined): ResourceKey | n
 
     const key = Array.isArray(value) ? value[0] : value;
 
-    if (key === 'bookings' || key === 'invoices' || key === 'galleries') {
+    if (
+        key === 'bookings' ||
+        key === 'clients' ||
+        key === 'galleries' ||
+        key === 'invoices' ||
+        key === 'invoice-items' ||
+        key === 'invoice-packages'
+    ) {
         return key;
     }
 
     return null;
+}
+
+function collectExistingIds(records: Array<{ id?: unknown }>): Set<string> {
+    return new Set(
+        records
+            .map((record) => {
+                if (typeof record.id === 'string' && record.id.trim()) {
+                    return record.id.trim();
+                }
+                if (typeof record.id === 'number' && Number.isFinite(record.id)) {
+                    return String(record.id);
+                }
+                return null;
+            })
+            .filter((value): value is string => Boolean(value))
+    );
+}
+
+function generatePrefixedId(prefix: string, name: string, existingIds: Set<string>): string {
+    const normalizedPrefix = prefix.endsWith('-') ? prefix : `${prefix}-`;
+    const slug = createSlug(name);
+    const base = slug || randomUUID().slice(0, 8);
+    const initial = base.startsWith(normalizedPrefix) ? base : `${normalizedPrefix}${base}`;
+
+    if (!existingIds.has(initial)) {
+        return initial;
+    }
+
+    let counter = 2;
+    let candidate = `${initial}-${counter}`;
+    while (existingIds.has(candidate)) {
+        counter += 1;
+        candidate = `${initial}-${counter}`;
+    }
+
+    return candidate;
+}
+
+function generateRandomId(prefix: string, existingIds: Set<string>): string {
+    let candidate = '';
+    do {
+        candidate = `${prefix}-${randomUUID().slice(0, 8)}`;
+    } while (existingIds.has(candidate));
+    return candidate;
 }
 
 function ensureRecordId(resource: ResourceKey, records: Array<{ id?: unknown }>, payload: Record<string, unknown>) {
@@ -464,19 +775,13 @@ function ensureRecordId(resource: ResourceKey, records: Array<{ id?: unknown }>,
     }
 
     const result: Record<string, unknown> = { ...payload };
+    const existingIds = collectExistingIds(records);
 
     if (resource === 'invoices') {
-        const numericIds = records
-            .map((record) => {
-                const idValue = record.id;
-                if (typeof idValue === 'string') {
-                    const parsed = Number.parseInt(idValue, 10);
-                    return Number.isFinite(parsed) ? parsed : null;
-                }
-                if (typeof idValue === 'number' && Number.isFinite(idValue)) {
-                    return idValue;
-                }
-                return null;
+        const numericIds = Array.from(existingIds)
+            .map((value) => {
+                const parsed = Number.parseInt(value, 10);
+                return Number.isFinite(parsed) ? parsed : null;
             })
             .filter((value): value is number => value !== null);
 
@@ -485,8 +790,27 @@ function ensureRecordId(resource: ResourceKey, records: Array<{ id?: unknown }>,
         return result;
     }
 
-    const prefix = resource === 'bookings' ? 'bk' : 'gal';
-    result.id = `${prefix}-${randomUUID().slice(0, 8)}`;
+    if (resource === 'clients') {
+        result.id = generatePrefixedId('client-', typeof payload.name === 'string' ? payload.name : '', existingIds);
+        return result;
+    }
+
+    if (resource === 'invoice-items') {
+        result.id = generatePrefixedId('svc-', typeof payload.name === 'string' ? payload.name : '', existingIds);
+        return result;
+    }
+
+    if (resource === 'invoice-packages') {
+        result.id = generatePrefixedId('pkg-', typeof payload.name === 'string' ? payload.name : '', existingIds);
+        return result;
+    }
+
+    if (resource === 'bookings') {
+        result.id = generateRandomId('bk', existingIds);
+        return result;
+    }
+
+    result.id = generateRandomId('gal', existingIds);
     return result;
 }
 
@@ -572,6 +896,39 @@ async function handlePost(
         return res.status(201).json({ data: gallery });
     }
 
+    if (resourceKey === 'clients') {
+        const clients = await readRecords<CrmClientDirectoryRecord>(config);
+        const recordWithId = ensureRecordId(resourceKey, clients, payload);
+        const client = normalizeCrmClientRecord(recordWithId);
+
+        clients.push(client);
+        await writeRecords(config, clients);
+
+        return res.status(201).json({ data: client });
+    }
+
+    if (resourceKey === 'invoice-items') {
+        const items = await readRecords<InvoiceCatalogItem>(config);
+        const recordWithId = ensureRecordId(resourceKey, items, payload);
+        const item = normalizeInvoiceCatalogItem(recordWithId);
+
+        items.push(item);
+        await writeRecords(config, items);
+
+        return res.status(201).json({ data: item });
+    }
+
+    if (resourceKey === 'invoice-packages') {
+        const packages = await readRecords<InvoicePackage>(config);
+        const recordWithId = ensureRecordId(resourceKey, packages, payload);
+        const invoicePackage = normalizeInvoicePackage(recordWithId);
+
+        packages.push(invoicePackage);
+        await writeRecords(config, packages);
+
+        return res.status(201).json({ data: invoicePackage });
+    }
+
     const records = await readRecords<Record<string, unknown>>(config);
     const recordWithId = ensureRecordId(resourceKey, records, payload);
     records.push(recordWithId);
@@ -620,6 +977,54 @@ async function handlePut(
         const updated = normalizeGalleryRecord(payloadWithId, galleries[index]);
         galleries[index] = updated;
         await writeRecords(config, galleries);
+
+        return res.status(200).json({ data: updated });
+    }
+
+    if (resourceKey === 'clients') {
+        const clients = await readRecords<CrmClientDirectoryRecord>(config);
+        const index = clients.findIndex((client) => client.id === id);
+
+        if (index === -1) {
+            return res.status(404).json({ error: 'Record not found.' });
+        }
+
+        const payloadWithId: Record<string, unknown> = { ...payload, id };
+        const updated = normalizeCrmClientRecord(payloadWithId, clients[index]);
+        clients[index] = updated;
+        await writeRecords(config, clients);
+
+        return res.status(200).json({ data: updated });
+    }
+
+    if (resourceKey === 'invoice-items') {
+        const items = await readRecords<InvoiceCatalogItem>(config);
+        const index = items.findIndex((item) => item.id === id);
+
+        if (index === -1) {
+            return res.status(404).json({ error: 'Record not found.' });
+        }
+
+        const payloadWithId: Record<string, unknown> = { ...payload, id };
+        const updated = normalizeInvoiceCatalogItem(payloadWithId, items[index]);
+        items[index] = updated;
+        await writeRecords(config, items);
+
+        return res.status(200).json({ data: updated });
+    }
+
+    if (resourceKey === 'invoice-packages') {
+        const packages = await readRecords<InvoicePackage>(config);
+        const index = packages.findIndex((entry) => entry.id === id);
+
+        if (index === -1) {
+            return res.status(404).json({ error: 'Record not found.' });
+        }
+
+        const payloadWithId: Record<string, unknown> = { ...payload, id };
+        const updated = normalizeInvoicePackage(payloadWithId, packages[index]);
+        packages[index] = updated;
+        await writeRecords(config, packages);
 
         return res.status(200).json({ data: updated });
     }
