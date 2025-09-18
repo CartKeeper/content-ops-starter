@@ -12,6 +12,7 @@ export type ContactRecord = {
     city: string | null;
     state: string | null;
     business: string | null;
+    status: 'lead' | 'active' | 'client' | null;
 };
 
 export type ConvertContactResponse = {

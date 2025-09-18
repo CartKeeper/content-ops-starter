@@ -22,6 +22,7 @@ const FIELD_KEY_MAP: Record<string, keyof ContactRecord | 'id'> = {
     city: 'city',
     state: 'state',
     business: 'business',
+    status: 'status',
     created_at: 'created_at',
     createdAt: 'created_at',
     updated_at: 'updated_at',
@@ -131,7 +132,7 @@ function sanitizeFields(input: Record<string, unknown>): SanitizedFields {
 
     const id = parseId(normalized.id);
 
-    const setString = (key: keyof ContactRecord) => {
+    const setString = (key: Exclude<keyof ContactRecord, 'status'>) => {
         if (Object.prototype.hasOwnProperty.call(normalized, key)) {
             values[key] = toNullableString(normalized[key]);
             touched.add(key);
@@ -148,6 +149,20 @@ function sanitizeFields(input: Record<string, unknown>): SanitizedFields {
     setString('city');
     setString('state');
     setString('business');
+
+    if (Object.prototype.hasOwnProperty.call(normalized, 'status')) {
+        const rawStatus = normalized.status;
+        if (typeof rawStatus === 'string') {
+            const normalizedStatus = rawStatus.trim().toLowerCase();
+            if (['lead', 'active', 'client'].includes(normalizedStatus)) {
+                values.status = normalizedStatus as ContactRecord['status'];
+                touched.add('status');
+            }
+        } else if (rawStatus === null) {
+            values.status = null;
+            touched.add('status');
+        }
+    }
 
     if (Object.prototype.hasOwnProperty.call(normalized, 'created_at')) {
         const iso = toIsoString(normalized.created_at);
@@ -245,6 +260,7 @@ async function handlePostLocal(req: NextApiRequest, res: NextApiResponse<Contact
         city: typeof values.city === 'string' ? values.city : null,
         state: typeof values.state === 'string' ? values.state : null,
         business: typeof values.business === 'string' ? values.business : null,
+        status: typeof values.status === 'string' ? (values.status as ContactRecord['status']) : 'lead',
         created_at: createdAt,
         updated_at: updatedAt
     };
@@ -282,6 +298,14 @@ async function handlePutLocal(req: NextApiRequest, res: NextApiResponse<Contacts
 
     touched.forEach((key) => {
         const value = values[key];
+        if (key === 'status') {
+            if (typeof value === 'string') {
+                record.status = value as ContactRecord['status'];
+            } else if (value === null) {
+                record.status = null;
+            }
+            return;
+        }
         if (typeof value === 'string' || value === null) {
             record[key] = value;
         }
