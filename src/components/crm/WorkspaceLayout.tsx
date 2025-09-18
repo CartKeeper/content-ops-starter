@@ -2,6 +2,15 @@ import * as React from 'react';
 import classNames from 'classnames';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import type { IconType } from 'react-icons';
+import {
+    SiGoogleanalytics,
+    SiGoogledrive,
+    SiGooglemeet,
+    SiGooglephotos,
+    SiTiktok
+} from 'react-icons/si';
+import { FaFacebookF, FaInstagram, FaPinterestP } from 'react-icons/fa6';
 
 import { adminUser } from '../../data/crm';
 import { useThemeMode } from '../../utils/use-theme-mode';
@@ -89,10 +98,10 @@ type QuickAccessApp = {
     id: string;
     name: string;
     href: string;
-    initials: string;
     description: string;
-    color: string;
-    textColor?: string;
+    icon: IconType;
+    background: string;
+    iconColor?: string;
 };
 
 type AppCollection = {
@@ -143,35 +152,38 @@ const appCollections: AppCollection[] = [
             {
                 id: 'analytics',
                 name: 'Google Analytics',
-                initials: 'GA',
                 description: 'Monitor marketing funnels and site traffic.',
                 href: 'https://analytics.google.com',
-                color: '#6366f1'
+                icon: SiGoogleanalytics,
+                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                iconColor: '#c2410c'
             },
             {
                 id: 'drive',
                 name: 'Google Drive',
-                initials: 'GD',
                 description: 'Browse shared folders and deliverables.',
                 href: 'https://drive.google.com',
-                color: '#10b981'
+                icon: SiGoogledrive,
+                background: 'linear-gradient(135deg, #e0f2f1 0%, #e0f7fa 100%)',
+                iconColor: '#0f9d58'
             },
             {
                 id: 'meet',
                 name: 'Google Meet',
-                initials: 'GM',
                 description: 'Launch virtual consultations and reviews.',
                 href: 'https://meet.google.com',
-                color: '#f59e0b',
-                textColor: '#111827'
+                icon: SiGooglemeet,
+                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                iconColor: '#047857'
             },
             {
                 id: 'photos',
                 name: 'Google Photos',
-                initials: 'GP',
                 description: 'Reference archived shoots and mood boards.',
                 href: 'https://photos.google.com',
-                color: '#ec4899'
+                icon: SiGooglephotos,
+                background: 'linear-gradient(135deg, #ffe4e6 0%, #fce7f3 100%)',
+                iconColor: '#db2777'
             }
         ]
     },
@@ -182,34 +194,38 @@ const appCollections: AppCollection[] = [
             {
                 id: 'instagram',
                 name: 'Instagram',
-                initials: 'IG',
                 description: 'Share teasers and behind-the-scenes reels.',
                 href: 'https://www.instagram.com',
-                color: '#f472b6'
+                icon: FaInstagram,
+                background: 'linear-gradient(135deg, #f97316 0%, #ec4899 50%, #6366f1 100%)',
+                iconColor: '#ffffff'
             },
             {
                 id: 'facebook',
                 name: 'Facebook',
-                initials: 'FB',
                 description: 'Connect with leads and publish announcements.',
                 href: 'https://www.facebook.com',
-                color: '#3b82f6'
+                icon: FaFacebookF,
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                iconColor: '#ffffff'
             },
             {
                 id: 'pinterest',
                 name: 'Pinterest',
-                initials: 'PN',
                 description: 'Curate inspiration boards for upcoming shoots.',
                 href: 'https://www.pinterest.com',
-                color: '#ef4444'
+                icon: FaPinterestP,
+                background: 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)',
+                iconColor: '#ffffff'
             },
             {
                 id: 'tiktok',
                 name: 'TikTok',
-                initials: 'TT',
                 description: 'Publish highlight reels and client testimonials.',
                 href: 'https://www.tiktok.com',
-                color: '#0ea5e9'
+                icon: SiTiktok,
+                background: 'linear-gradient(135deg, #0ea5e9 0%, #f43f5e 100%)',
+                iconColor: '#0f172a'
             }
         ]
     }
@@ -545,41 +561,46 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                     { show: isAppsOpen }
                                 )}
                             >
-                                <div className="card">
+                                <div className="card crm-quick-launch-card">
                                     <div className="card-header d-flex align-items-center justify-content-between">
                                         <h4 className="card-title mb-0">Quick launch</h4>
                                         <span className="text-secondary">Stay connected</span>
                                     </div>
-                                    <div className="card-body">
-                                        {appCollections.map((collection, index) => (
-                                            <div
-                                                key={collection.id}
-                                                className={classNames('mb-4', { 'mb-0': index === appCollections.length - 1 })}
-                                            >
+                                    <div className="card-body crm-quick-launch-body">
+                                        {appCollections.map((collection) => (
+                                            <div key={collection.id} className="crm-quick-launch-group">
                                                 <div className="crm-dropdown-label">{collection.label}</div>
                                                 <div className="crm-app-grid">
-                                                    {collection.apps.map((app) => (
-                                                        <a
-                                                            key={app.id}
-                                                            href={app.href}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="crm-app-tile"
-                                                        >
-                                                            <span
-                                                                className="crm-app-icon"
-                                                                style={{
-                                                                    backgroundColor: app.color,
-                                                                    color: app.textColor ?? '#ffffff'
-                                                                }}
-                                                                aria-hidden
+                                                    {collection.apps.map((app) => {
+                                                        const Icon = app.icon;
+                                                        const buttonStyle: React.CSSProperties = {
+                                                            background: app.background
+                                                        };
+                                                        if (app.iconColor) {
+                                                            buttonStyle.color = app.iconColor;
+                                                        }
+
+                                                        return (
+                                                            <a
+                                                                key={app.id}
+                                                                href={app.href}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="crm-app-button"
+                                                                style={buttonStyle}
+                                                                aria-label={app.name}
+                                                                title={`${app.name} – ${app.description}`}
                                                             >
-                                                                {app.initials}
-                                                            </span>
-                                                            <span className="crm-app-label">{app.name}</span>
-                                                            <span className="crm-app-description">{app.description}</span>
-                                                        </a>
-                                                    ))}
+                                                                <Icon
+                                                                    className="crm-app-button-icon"
+                                                                    size={20}
+                                                                    aria-hidden="true"
+                                                                    focusable="false"
+                                                                />
+                                                                <span className="visually-hidden">{app.name}</span>
+                                                            </a>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         ))}
