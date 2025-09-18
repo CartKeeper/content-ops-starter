@@ -15,6 +15,8 @@ export type BookingRecord = {
     location: string;
     status: BookingStatus;
     customFields?: Record<string, string | boolean>;
+    ownerId?: string;
+    ownerName?: string;
 };
 
 const statusToneMap: Record<BookingStatus, StatusTone> = {

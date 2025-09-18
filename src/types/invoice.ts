@@ -36,6 +36,8 @@ export type InvoiceRecord = {
     paymentLink?: string;
     lastSentAt?: string;
     customFields?: Record<string, string | boolean>;
+    ownerId?: string;
+    ownerName?: string;
 };
 
 export const DEFAULT_INVOICE_CURRENCY = 'USD';

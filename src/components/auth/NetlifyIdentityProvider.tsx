@@ -12,6 +12,7 @@ type IdentityContextValue = {
     roles: string[];
     isPhotographer: boolean;
     isClient: boolean;
+    isAdmin: boolean;
     open: (view?: IdentityView) => void;
     logout: () => void;
     refresh: () => Promise<void>;
@@ -28,6 +29,7 @@ const NetlifyIdentityContext = React.createContext<IdentityContextValue>({
     roles: [],
     isPhotographer: false,
     isClient: false,
+    isAdmin: false,
     open: () => undefined,
     logout: () => undefined,
     refresh: async () => undefined,
@@ -219,6 +221,7 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
             roles,
             isPhotographer: normalizedRoles.includes('photographer'),
             isClient: normalizedRoles.includes('client'),
+            isAdmin: normalizedRoles.includes('admin'),
             open,
             logout,
             refresh,

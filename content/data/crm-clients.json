@@ -10,7 +10,8 @@
             "related_projects": [
                 "Engagement Session",
                 "Wedding Weekend"
-            ]
+            ],
+            "owner": "avery-logan"
         },
         {
             "name": "Evergreen Architects",
@@ -21,7 +22,8 @@
             "related_projects": [
                 "Team Headshots",
                 "Site Progress"
-            ]
+            ],
+            "owner": "avery-logan"
         },
         {
             "name": "Sona Patel",
@@ -32,7 +34,8 @@
             "related_projects": [
                 "Brand Lifestyle",
                 "Campaign Phase 2"
-            ]
+            ],
+            "owner": "avery-logan"
         },
         {
             "name": "Harbor & Co",
@@ -43,7 +46,8 @@
             "related_projects": [
                 "Product Launch",
                 "Holiday Campaign"
-            ]
+            ],
+            "owner": "jordan-lee"
         },
         {
             "name": "Atlas Fitness",
@@ -54,7 +58,8 @@
             "related_projects": [
                 "Campaign Refresh",
                 "Brand Campaign"
-            ]
+            ],
+            "owner": "jordan-lee"
         }
     ]
 }

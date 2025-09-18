@@ -42,6 +42,7 @@ type CmsBookingEntry = {
     location?: string;
     shoot_type?: string;
     status?: string;
+    owner?: string;
 };
 
 type CmsClientEntry = {
@@ -51,6 +52,7 @@ type CmsClientEntry = {
     address?: string;
     notes?: string;
     related_projects?: string[];
+    owner?: string;
 };
 
 type CmsInvoiceEntry = {
@@ -59,6 +61,21 @@ type CmsInvoiceEntry = {
     due_date?: string;
     status?: string;
     pdf_url?: string;
+    owner?: string;
+};
+
+type CmsUserEntry = {
+    id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
+};
+
+type StudioUser = {
+    id: string;
+    name: string;
+    email?: string;
+    role: string;
 };
 
 type CmsSettings = {
@@ -75,7 +92,9 @@ type SecondaryPanelVisibility = {
     studioTasks?: boolean;
 };
 
-type DashboardMetrics = {
+type MetricSnapshot = {
+    userId: string | null;
+    label: string;
     scheduledThisWeek: number;
     scheduledChange: number;
     paidThisMonth: number;
@@ -87,6 +106,11 @@ type DashboardMetrics = {
     activeClientCount: number;
 };
 
+type DashboardMetricsCollection = {
+    overall: MetricSnapshot;
+    perUser: MetricSnapshot[];
+};
+
 type CrmPageProps = {
     bookings: BookingRecord[];
     upcomingBookings: BookingRecord[];
@@ -94,7 +118,8 @@ type CrmPageProps = {
     invoices: InvoiceRecord[];
     tasks: TaskRecord[];
     chartData: Record<Timeframe, ChartPoint[]>;
-    metrics: DashboardMetrics;
+    metrics: DashboardMetricsCollection;
+    users: StudioUser[];
     studioName: string;
     settings: CmsSettings | null;
     secondaryPanelVisibility: SecondaryPanelVisibility;
@@ -186,6 +211,93 @@ function computePercentChange(previous: number, current: number): number {
     return ((current - previous) / previous) * 100;
 }
 
+type UserResolutionContext = {
+    lookup: Map<string, StudioUser>;
+    byId: Map<string, StudioUser>;
+    defaultUser: StudioUser | null;
+};
+
+function normalizeUserKey(value: string | undefined | null): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    return trimmed.toLowerCase();
+}
+
+function createStudioUsers(entries: CmsUserEntry[]): StudioUser[] {
+    return entries
+        .map((entry, index) => {
+            const name = entry.name?.trim() || `Team member ${index + 1}`;
+            const rawId = entry.id?.trim();
+            const normalizedId = rawId?.length
+                ? rawId
+                : name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            const email = entry.email?.trim();
+            const role = entry.role?.trim().toLowerCase() || 'member';
+
+            return {
+                id: normalizedId || `user-${index + 1}`,
+                name,
+                email,
+                role
+            } satisfies StudioUser;
+        })
+        .filter((user, index, array) => array.findIndex((candidate) => candidate.id === user.id) === index);
+}
+
+function buildUserResolutionContext(users: StudioUser[]): UserResolutionContext {
+    const lookup = new Map<string, StudioUser>();
+    const byId = new Map<string, StudioUser>();
+
+    users.forEach((user) => {
+        const normalizedId = normalizeUserKey(user.id) ?? user.id;
+        lookup.set(normalizedId, user);
+        byId.set(user.id, user);
+        byId.set(normalizedId, user);
+
+        if (user.email) {
+            const normalizedEmail = normalizeUserKey(user.email);
+            if (normalizedEmail) {
+                lookup.set(normalizedEmail, user);
+            }
+        }
+    });
+
+    const defaultUser = users.find((user) => user.role === 'admin') ?? users[0] ?? null;
+
+    return { lookup, byId, defaultUser } satisfies UserResolutionContext;
+}
+
+function resolveOwner(
+    reference: string | undefined,
+    context: UserResolutionContext,
+    preferredUserId?: string | null
+): StudioUser | null {
+    const key = normalizeUserKey(reference);
+    if (key) {
+        const match = context.lookup.get(key);
+        if (match) {
+            return match;
+        }
+    }
+
+    if (preferredUserId) {
+        const normalizedPreferred = normalizeUserKey(preferredUserId) ?? preferredUserId;
+        const preferred = context.byId.get(preferredUserId) ?? context.byId.get(normalizedPreferred);
+        if (preferred) {
+            return preferred;
+        }
+    }
+
+    return context.defaultUser;
+}
+
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
     if (value === undefined) {
         return defaultValue;
@@ -259,7 +371,7 @@ function resolvePanelVisibility(settings: CmsSettings | null): SecondaryPanelVis
     return resolved;
 }
 
-function createBookingRecords(entries: CmsBookingEntry[]): BookingRecord[] {
+function createBookingRecords(entries: CmsBookingEntry[], context: UserResolutionContext): BookingRecord[] {
     return entries.map((entry, index) => {
         const name = entry.client?.trim() || `Client ${index + 1}`;
         const shootType = entry.shoot_type?.trim() || 'Custom session';
@@ -269,7 +381,7 @@ function createBookingRecords(entries: CmsBookingEntry[]): BookingRecord[] {
             : dayjs().add(index, 'day').format('YYYY-MM-DD');
         const { start, end } = parseTimeRange(entry.time);
 
-        const baseRecord: BookingRecord = {
+        const record: BookingRecord = {
             id: `booking-${index + 1}`,
             client: name,
             shootType,
@@ -280,7 +392,17 @@ function createBookingRecords(entries: CmsBookingEntry[]): BookingRecord[] {
             status: normalizeBookingStatus(entry.status)
         };
 
-        return entry.time ? { ...baseRecord, customFields: { timeframe: entry.time } } : baseRecord;
+        if (entry.time) {
+            record.customFields = { timeframe: entry.time };
+        }
+
+        const owner = resolveOwner(entry.owner, context);
+        if (owner) {
+            record.ownerId = owner.id;
+            record.ownerName = owner.name;
+        }
+
+        return record;
     });
 }
 
@@ -291,7 +413,12 @@ type ClientAggregationResult = {
     previousRetentionRate: number;
 };
 
-function buildClientRecords(cmsClients: CmsClientEntry[], bookings: BookingRecord[]): ClientAggregationResult {
+function buildClientRecords(
+    cmsClients: CmsClientEntry[],
+    bookings: BookingRecord[],
+    context: UserResolutionContext,
+    ownerFilter?: string | null
+): ClientAggregationResult {
     const now = dayjs();
     const ninetyDaysAgo = now.subtract(90, 'day');
     const oneEightyDaysAgo = now.subtract(180, 'day');
@@ -303,6 +430,7 @@ function buildClientRecords(cmsClients: CmsClientEntry[], bookings: BookingRecor
         bookings: dayjs.Dayjs[];
         phone?: string;
         email?: string;
+        ownerId?: string;
     };
 
     const statsMap = new Map<string, ClientStats>();
@@ -317,11 +445,20 @@ function buildClientRecords(cmsClients: CmsClientEntry[], bookings: BookingRecor
         return created;
     }
 
-    bookings.forEach((booking) => {
+    const normalizedFilter = ownerFilter ? normalizeUserKey(ownerFilter) : null;
+    const relevantBookings = normalizedFilter
+        ? bookings.filter((booking) => normalizeUserKey(booking.ownerId) === normalizedFilter)
+        : bookings;
+
+    relevantBookings.forEach((booking) => {
         const stats = getStats(booking.client);
         const bookingDate = dayjs(booking.date);
         stats.total += 1;
         stats.bookings.push(bookingDate);
+
+        if (booking.ownerId && !stats.ownerId) {
+            stats.ownerId = booking.ownerId;
+        }
 
         if (!stats.lastShoot || bookingDate.isAfter(stats.lastShoot)) {
             stats.lastShoot = bookingDate;
@@ -339,9 +476,25 @@ function buildClientRecords(cmsClients: CmsClientEntry[], bookings: BookingRecor
         if (!name) {
             return;
         }
-        const stats = getStats(name);
+        const existingStats = statsMap.get(name);
+
+        const owner = resolveOwner(client.owner, context, ownerFilter);
+
+        if (normalizedFilter && !existingStats) {
+            const ownerMatches = owner && normalizeUserKey(owner.id) === normalizedFilter;
+            if (!ownerMatches) {
+                return;
+            }
+        }
+
+        const stats = existingStats ?? getStats(name);
         stats.phone = client.phone ?? stats.phone;
         stats.email = client.email ?? stats.email;
+        if (owner) {
+            stats.ownerId = owner.id;
+        } else if (!stats.ownerId && ownerFilter) {
+            stats.ownerId = ownerFilter;
+        }
     });
 
     const currentActive = new Set<string>();
@@ -375,6 +528,15 @@ function buildClientRecords(cmsClients: CmsClientEntry[], bookings: BookingRecor
             lastShoot: lastShoot ?? now.format('YYYY-MM-DD'),
             status
         };
+
+        const ownerId = stats.ownerId ?? ownerFilter ?? context.defaultUser?.id;
+        if (ownerId) {
+            const owner = context.byId.get(ownerId) ?? context.byId.get(normalizeUserKey(ownerId) ?? ownerId);
+            if (owner) {
+                record.ownerId = owner.id;
+                record.ownerName = owner.name;
+            }
+        }
 
         if (stats.phone) {
             record.phone = stats.phone;
@@ -419,7 +581,7 @@ function buildClientRecords(cmsClients: CmsClientEntry[], bookings: BookingRecor
     };
 }
 
-function createInvoiceRecords(entries: CmsInvoiceEntry[]): InvoiceRecord[] {
+function createInvoiceRecords(entries: CmsInvoiceEntry[], context: UserResolutionContext): InvoiceRecord[] {
     return entries.map((entry, index) => {
         const client = entry.client?.trim() || `Client ${index + 1}`;
         const amount = Number.isFinite(entry.amount) ? Number(entry.amount) : 0;
@@ -450,6 +612,12 @@ function createInvoiceRecords(entries: CmsInvoiceEntry[]): InvoiceRecord[] {
 
         if (pdfUrl) {
             record.pdfUrl = pdfUrl;
+        }
+
+        const owner = resolveOwner(entry.owner, context);
+        if (owner) {
+            record.ownerId = owner.id;
+            record.ownerName = owner.name;
         }
 
         return record;
@@ -498,11 +666,13 @@ function buildOverviewChart(bookings: BookingRecord[], invoices: InvoiceRecord[]
     return { weekly, monthly, yearly } satisfies Record<Timeframe, ChartPoint[]>;
 }
 
-function buildDashboardMetrics(
+function buildMetricSnapshot(
+    label: string,
     bookings: BookingRecord[],
     invoices: InvoiceRecord[],
-    clientAggregation: ClientAggregationResult
-): DashboardMetrics {
+    clientAggregation: ClientAggregationResult,
+    userId: string | null
+): MetricSnapshot {
     const now = dayjs();
 
     const startOfWeek = now.startOf('week');
@@ -552,10 +722,12 @@ function buildDashboardMetrics(
 
     const outstandingChange = computePercentChange(previousOutstanding, outstandingBalance);
 
-    const retentionRate = clientAggregation.retentionRate;
-    const retentionChange = retentionRate - clientAggregation.previousRetentionRate;
+    const retentionRate = clientAggregation.retentionRate || 0;
+    const retentionChange = retentionRate - (clientAggregation.previousRetentionRate || 0);
 
     return {
+        userId,
+        label,
         scheduledThisWeek,
         scheduledChange,
         paidThisMonth,
@@ -565,7 +737,27 @@ function buildDashboardMetrics(
         retentionRate,
         retentionChange,
         activeClientCount: clientAggregation.activeClientCount
-    } satisfies DashboardMetrics;
+    } satisfies MetricSnapshot;
+}
+
+function buildMetricsCollection(
+    bookings: BookingRecord[],
+    invoices: InvoiceRecord[],
+    cmsClients: CmsClientEntry[],
+    context: UserResolutionContext,
+    users: StudioUser[]
+): DashboardMetricsCollection {
+    const overallClients = buildClientRecords(cmsClients, bookings, context);
+    const overall = buildMetricSnapshot('Studio totals', bookings, invoices, overallClients, null);
+
+    const perUser = users.map((user) => {
+        const userClients = buildClientRecords(cmsClients, bookings, context, user.id);
+        const userBookings = bookings.filter((booking) => booking.ownerId === user.id);
+        const userInvoices = invoices.filter((invoice) => invoice.ownerId === user.id);
+        return buildMetricSnapshot(user.name, userBookings, userInvoices, userClients, user.id);
+    });
+
+    return { overall, perUser } satisfies DashboardMetricsCollection;
 }
 
 async function readCmsSettings(fileName: string): Promise<CmsSettings | null> {
@@ -590,6 +782,7 @@ function CrmDashboardWorkspace({
     tasks,
     chartData,
     metrics,
+    users,
     studioName,
     settings,
     secondaryPanelVisibility
@@ -607,6 +800,53 @@ function CrmDashboardWorkspace({
     const notify = React.useCallback((type: FeedbackNotice['type'], message: string) => {
         setFeedback({ id: `${Date.now()}`, type, message });
     }, []);
+
+    const normalizedIdentityEmail = React.useMemo(() => {
+        const email = identity.user?.email;
+        return typeof email === 'string' ? email.trim().toLowerCase() : null;
+    }, [identity.user?.email]);
+
+    const currentUser = React.useMemo(() => {
+        if (!normalizedIdentityEmail) {
+            return null;
+        }
+
+        return (
+            users.find((user) => user.email && user.email.toLowerCase() === normalizedIdentityEmail) ?? null
+        );
+    }, [normalizedIdentityEmail, users]);
+
+    const isAdmin = identity.isAdmin;
+
+    const summaryMetrics = React.useMemo(() => {
+        if (isAdmin) {
+            return metrics.overall;
+        }
+
+        if (currentUser) {
+            const snapshot = metrics.perUser.find((entry) => entry.userId === currentUser.id);
+            if (snapshot) {
+                return snapshot;
+            }
+        }
+
+        return metrics.overall;
+    }, [currentUser, isAdmin, metrics.overall, metrics.perUser]);
+
+    const summaryOwnerName = summaryMetrics.userId ? summaryMetrics.label : studioName;
+
+    const orderedUserMetrics = React.useMemo(
+        () =>
+            metrics.perUser
+                .slice()
+                .sort(
+                    (first, second) =>
+                        second.paidThisMonth - first.paidThisMonth || first.label.localeCompare(second.label)
+                ),
+        [metrics.perUser]
+    );
+
+    const canManageStudio = isAdmin;
 
     const openInvoices = React.useMemo(
         () => invoiceList.filter((invoice) => invoice.status !== 'Paid'),
@@ -801,12 +1041,25 @@ function CrmDashboardWorkspace({
                     </div>
                 ) : null}
 
-                <div className="row row-cards mt-3">
+                <div className="mt-4 text-secondary text-uppercase fw-semibold small">
+                    Metrics · {summaryMetrics.label}
+                </div>
+                {summaryMetrics.userId ? (
+                    <div className="text-secondary small mt-1">
+                        Viewing activity attributed to {summaryMetrics.label}.
+                    </div>
+                ) : isAdmin ? (
+                    <div className="text-secondary small mt-1">
+                        Aggregated totals across the studio team.
+                    </div>
+                ) : null}
+
+                <div className="row row-cards mt-2">
                     <div className="col-sm-6 col-xl-3">
                         <StatCard
                             title="Shoots scheduled"
-                            value={`${metrics.scheduledThisWeek}`}
-                            change={metrics.scheduledChange}
+                            value={`${summaryMetrics.scheduledThisWeek}`}
+                            change={summaryMetrics.scheduledChange}
                             changeLabel="vs last week"
                             icon={<CalendarGlyph />}
                         />
@@ -814,8 +1067,8 @@ function CrmDashboardWorkspace({
                     <div className="col-sm-6 col-xl-3">
                         <StatCard
                             title="Invoices paid"
-                            value={formatCurrency(metrics.paidThisMonth)}
-                            change={metrics.revenueChange}
+                            value={formatCurrency(summaryMetrics.paidThisMonth)}
+                            change={summaryMetrics.revenueChange}
                             changeLabel="vs last month"
                             icon={<RevenueGlyph />}
                         />
@@ -823,8 +1076,8 @@ function CrmDashboardWorkspace({
                     <div className="col-sm-6 col-xl-3">
                         <StatCard
                             title="Outstanding balance"
-                            value={formatCurrency(metrics.outstandingBalance)}
-                            change={metrics.outstandingChange}
+                            value={formatCurrency(summaryMetrics.outstandingBalance)}
+                            change={summaryMetrics.outstandingChange}
                             changeLabel="vs prior month"
                             icon={<BalanceGlyph />}
                         />
@@ -832,13 +1085,55 @@ function CrmDashboardWorkspace({
                     <div className="col-sm-6 col-xl-3">
                         <StatCard
                             title="Active clients"
-                            value={`${metrics.activeClientCount}`}
-                            change={metrics.retentionChange}
+                            value={`${summaryMetrics.activeClientCount}`}
+                            change={summaryMetrics.retentionChange}
                             changeLabel="retention delta"
                             icon={<ClientsGlyph />}
                         />
                     </div>
                 </div>
+
+                {isAdmin && orderedUserMetrics.length > 0 ? (
+                    <div className="row row-cards mt-3">
+                        <div className="col-12">
+                            <SectionCard
+                                title="Team performance"
+                                description="Break down shoots and revenue momentum by photographer."
+                            >
+                                <div className="table-responsive">
+                                    <table className="table card-table table-vcenter">
+                                        <thead>
+                                            <tr>
+                                                <th>Team member</th>
+                                                <th>Scheduled</th>
+                                                <th>Paid this month</th>
+                                                <th>Outstanding</th>
+                                                <th>Active clients</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {orderedUserMetrics.map((entry) => (
+                                                <tr key={entry.userId ?? entry.label}>
+                                                    <td>
+                                                        <div className="fw-semibold">{entry.label}</div>
+                                                        <div className="text-secondary small">
+                                                            {entry.scheduledThisWeek} shoots scheduled ·{' '}
+                                                            {formatCurrencyExact(entry.paidThisMonth)} collected
+                                                        </div>
+                                                    </td>
+                                                    <td>{entry.scheduledThisWeek}</td>
+                                                    <td>{formatCurrencyExact(entry.paidThisMonth)}</td>
+                                                    <td>{formatCurrencyExact(entry.outstandingBalance)}</td>
+                                                    <td>{entry.activeClientCount}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </SectionCard>
+                        </div>
+                    </div>
+                ) : null}
 
                 <div className="row row-cards mt-3">
                     <div className="col-lg-7">
@@ -847,16 +1142,19 @@ function CrmDashboardWorkspace({
                     <div className="col-lg-5">
                         <DashboardCard
                             title="Studio signal"
-                            value={formatCurrencyExact(metrics.paidThisMonth + metrics.outstandingBalance)}
+                            value={formatCurrencyExact(
+                                summaryMetrics.paidThisMonth + summaryMetrics.outstandingBalance
+                            )}
                             trend={{
-                                value: `${metrics.scheduledThisWeek} sessions in pipeline`,
+                                value: `${summaryMetrics.scheduledThisWeek} sessions in pipeline`,
                                 label: 'Combined revenue potential',
-                                isPositive: metrics.scheduledChange >= 0
+                                isPositive: summaryMetrics.scheduledChange >= 0
                             }}
                         >
                             <div className="mb-2">
-                                {metrics.activeClientCount} active clients and {upcomingBookings.length} upcoming shoots keep
-                                momentum high. Finance is watching {openInvoices.length} open invoices this cycle.
+                                {summaryOwnerName} is tracking {summaryMetrics.activeClientCount} active clients with{' '}
+                                {upcomingBookings.length} upcoming shoots on the calendar. Finance is watching{' '}
+                                {openInvoices.length} open invoices this cycle.
                             </div>
                             {settings?.custom_fields && settings.custom_fields.length > 0 ? (
                                 <ul className="list-unstyled small mb-0">
@@ -923,9 +1221,13 @@ function CrmDashboardWorkspace({
                                     >
                                         <InvoiceTable
                                             invoices={openInvoices}
-                                            onUpdateStatus={handleUpdateInvoiceStatus}
-                                            onGeneratePdf={handleGenerateInvoicePdf}
-                                            onCreateCheckout={handleCreateCheckoutSession}
+                                            onUpdateStatus={
+                                                canManageStudio ? handleUpdateInvoiceStatus : undefined
+                                            }
+                                            onGeneratePdf={canManageStudio ? handleGenerateInvoicePdf : undefined}
+                                            onCreateCheckout={
+                                                canManageStudio ? handleCreateCheckoutSession : undefined
+                                            }
                                             generatingInvoiceId={pdfInvoiceId}
                                             checkoutInvoiceId={checkoutInvoiceId}
                                         />
@@ -938,7 +1240,11 @@ function CrmDashboardWorkspace({
                                     <SectionCard
                                         title="Studio Tasks"
                                         description="Keep production moving with next actions across your team."
-                                        action={<button className="btn btn-sm btn-outline-primary">Create task</button>}
+                                        action={
+                                            canManageStudio ? (
+                                                <button className="btn btn-sm btn-outline-primary">Create task</button>
+                                            ) : undefined
+                                        }
                                     >
                                         <TaskList tasks={tasks} />
                                     </SectionCard>
@@ -1006,14 +1312,18 @@ export default function CrmDashboardPage(props: CrmPageProps) {
 }
 
 export const getStaticProps: GetStaticProps<CrmPageProps> = async () => {
-    const [bookingEntries, invoiceEntries, clientEntries, settings] = await Promise.all([
+    const [bookingEntries, invoiceEntries, clientEntries, userEntries, settings] = await Promise.all([
         readCmsCollection<CmsBookingEntry>('crm-bookings.json'),
         readCmsCollection<CmsInvoiceEntry>('crm-invoices.json'),
         readCmsCollection<CmsClientEntry>('crm-clients.json'),
+        readCmsCollection<CmsUserEntry>('crm-users.json'),
         readCmsSettings('crm-settings.json')
     ]);
 
-    const bookings = createBookingRecords(bookingEntries).sort((a, b) =>
+    const users = createStudioUsers(userEntries);
+    const userContext = buildUserResolutionContext(users);
+
+    const bookings = createBookingRecords(bookingEntries, userContext).sort((a, b) =>
         dayjs(a.date).diff(dayjs(b.date)) || a.client.localeCompare(b.client)
     );
 
@@ -1022,10 +1332,10 @@ export const getStaticProps: GetStaticProps<CrmPageProps> = async () => {
         .sort((a, b) => dayjs(a.date).diff(dayjs(b.date)))
         .slice(0, 6);
 
-    const invoiceRecords = createInvoiceRecords(invoiceEntries);
-    const clientAggregation = buildClientRecords(clientEntries, bookings);
+    const invoiceRecords = createInvoiceRecords(invoiceEntries, userContext);
+    const clientAggregation = buildClientRecords(clientEntries, bookings, userContext);
     const chartData = buildOverviewChart(bookings, invoiceRecords);
-    const metrics = buildDashboardMetrics(bookings, invoiceRecords, clientAggregation);
+    const metrics = buildMetricsCollection(bookings, invoiceRecords, clientEntries, userContext, users);
     const tasks = defaultTasks;
     const studioName = settings?.custom_fields?.find((field) => field.label?.toLowerCase() === 'studio name')?.value?.trim() ??
         'Codex Studio';
@@ -1040,6 +1350,7 @@ export const getStaticProps: GetStaticProps<CrmPageProps> = async () => {
             tasks,
             chartData,
             metrics,
+            users,
             studioName,
             settings,
             secondaryPanelVisibility

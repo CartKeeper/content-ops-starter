@@ -6,42 +6,48 @@
             "amount": 2100,
             "due_date": "2025-05-31",
             "status": "Sent",
-            "pdf_url": "/invoices/invoice-1036.pdf"
+            "pdf_url": "/invoices/invoice-1036.pdf",
+            "owner": "avery-logan"
         },
         {
             "client": "Sona Patel",
             "amount": 2750,
             "due_date": "2025-06-09",
             "status": "Sent",
-            "pdf_url": "/invoices/invoice-1035.pdf"
+            "pdf_url": "/invoices/invoice-1035.pdf",
+            "owner": "avery-logan"
         },
         {
             "client": "Harrison & June",
             "amount": 1800,
             "due_date": "2025-05-25",
             "status": "Draft",
-            "pdf_url": "/invoices/invoice-1034.pdf"
+            "pdf_url": "/invoices/invoice-1034.pdf",
+            "owner": "jordan-lee"
         },
         {
             "client": "Harbor & Co",
             "amount": 2600,
             "due_date": "2024-12-12",
             "status": "Paid",
-            "pdf_url": "/invoices/invoice-1024.pdf"
+            "pdf_url": "/invoices/invoice-1024.pdf",
+            "owner": "jordan-lee"
         },
         {
             "client": "Lumen Studio",
             "amount": 3400,
             "due_date": "2024-11-16",
             "status": "Paid",
-            "pdf_url": "/invoices/invoice-1023.pdf"
+            "pdf_url": "/invoices/invoice-1023.pdf",
+            "owner": "jordan-lee"
         },
         {
             "client": "Beacon Realty",
             "amount": 1750,
             "due_date": "2024-10-05",
             "status": "Paid",
-            "pdf_url": "/invoices/invoice-1022.pdf"
+            "pdf_url": "/invoices/invoice-1022.pdf",
+            "owner": "avery-logan"
         }
     ]
 }

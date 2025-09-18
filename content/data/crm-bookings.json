@@ -7,7 +7,8 @@
             "time": "3:00 PM – 5:00 PM",
             "location": "Golden Gate Park",
             "shoot_type": "Engagement Session",
-            "status": "Confirmed"
+            "status": "Confirmed",
+            "owner": "avery-logan"
         },
         {
             "client": "Harrison & June",
@@ -15,7 +16,8 @@
             "time": "11:00 AM – 8:00 PM",
             "location": "Terranea Resort",
             "shoot_type": "Wedding Weekend",
-            "status": "Pending"
+            "status": "Pending",
+            "owner": "jordan-lee"
         },
         {
             "client": "Sona Patel",
@@ -23,7 +25,8 @@
             "time": "9:00 AM – 12:00 PM",
             "location": "Downtown Studio",
             "shoot_type": "Brand Lifestyle",
-            "status": "Editing"
+            "status": "Editing",
+            "owner": "avery-logan"
         },
         {
             "client": "Fern & Pine Studio",
@@ -31,7 +34,8 @@
             "time": "10:00 AM – 2:00 PM",
             "location": "Mission District Loft",
             "shoot_type": "Lookbook Launch",
-            "status": "Pending"
+            "status": "Pending",
+            "owner": "jordan-lee"
         },
         {
             "client": "Evergreen Architects",
@@ -39,7 +43,8 @@
             "time": "1:00 PM – 4:00 PM",
             "location": "Financial District HQ",
             "shoot_type": "Team Headshots",
-            "status": "Confirmed"
+            "status": "Confirmed",
+            "owner": "avery-logan"
         },
         {
             "client": "Evergreen Architects",
@@ -47,7 +52,8 @@
             "time": "8:00 AM – 11:00 AM",
             "location": "Oakland Waterfront",
             "shoot_type": "Site Progress",
-            "status": "Confirmed"
+            "status": "Confirmed",
+            "owner": "avery-logan"
         },
         {
             "client": "Atlas Fitness",
@@ -55,7 +61,8 @@
             "time": "7:00 AM – 10:00 AM",
             "location": "SOMA Studio",
             "shoot_type": "Campaign Refresh",
-            "status": "Editing"
+            "status": "Editing",
+            "owner": "jordan-lee"
         },
         {
             "client": "Violet & Thread",
@@ -63,7 +70,8 @@
             "time": "9:00 AM – 1:00 PM",
             "location": "Dogpatch Warehouse",
             "shoot_type": "Spring Collection",
-            "status": "Confirmed"
+            "status": "Confirmed",
+            "owner": "avery-logan"
         },
         {
             "client": "Harbor & Co",
@@ -71,7 +79,8 @@
             "time": "10:00 AM – 12:00 PM",
             "location": "Sausalito Studio",
             "shoot_type": "Product Launch",
-            "status": "Confirmed"
+            "status": "Confirmed",
+            "owner": "jordan-lee"
         },
         {
             "client": "Lumen Studio",
@@ -79,7 +88,8 @@
             "time": "1:00 PM – 5:00 PM",
             "location": "North Beach Loft",
             "shoot_type": "Agency Portfolio",
-            "status": "Editing"
+            "status": "Editing",
+            "owner": "jordan-lee"
         },
         {
             "client": "Beacon Realty",
@@ -87,7 +97,8 @@
             "time": "9:30 AM – 12:30 PM",
             "location": "Pacific Heights Residence",
             "shoot_type": "Property Showcase",
-            "status": "Confirmed"
+            "status": "Confirmed",
+            "owner": "avery-logan"
         },
         {
             "client": "Sona Patel",
@@ -95,7 +106,8 @@
             "time": "2:00 PM – 6:00 PM",
             "location": "Marin Headlands",
             "shoot_type": "Holiday Campaign",
-            "status": "Confirmed"
+            "status": "Confirmed",
+            "owner": "jordan-lee"
         }
     ]
 }
