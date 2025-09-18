@@ -46,7 +46,7 @@ const integrations = [
         initials: 'GC',
         status: 'Connected',
         description: 'Push confirmed shoots and reminders to your personal calendar.',
-        color: '#6366f1'
+        color: 'var(--crm-accent)'
     },
     {
         id: 'instagram',

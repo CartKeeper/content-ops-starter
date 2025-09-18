@@ -84,7 +84,7 @@ const invoiceStatusTone: Record<InvoiceStatus, React.ComponentProps<typeof Statu
 const SIDEBAR_STATUS_COLORS: Record<BookingStatus, { background: string; border: string }> = {
     Confirmed: { background: '#10b981', border: 'rgba(16, 185, 129, 0.25)' },
     Pending: { background: '#f59e0b', border: 'rgba(245, 158, 11, 0.25)' },
-    Editing: { background: '#6366f1', border: 'rgba(99, 102, 241, 0.25)' }
+    Editing: { background: 'var(--crm-accent)', border: 'rgba(var(--crm-accent-rgb), 0.25)' }
 };
 
 const formatCurrency = (value: number) =>

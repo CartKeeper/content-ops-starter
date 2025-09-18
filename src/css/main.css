@@ -296,8 +296,8 @@
         --fc-border-color: #e2e8f0;
         --fc-page-bg-color: transparent;
         --fc-neutral-bg-color: rgba(255, 255, 255, 0.88);
-        --fc-list-event-hover-bg-color: rgba(99, 102, 241, 0.08);
-        --fc-today-bg-color: rgba(99, 102, 241, 0.12);
+        --fc-list-event-hover-bg-color: rgba(var(--crm-accent-rgb), 0.08);
+        --fc-today-bg-color: rgba(var(--crm-accent-rgb), 0.12);
         font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
 
@@ -305,8 +305,8 @@
         --fc-border-color: #1f2937;
         --fc-neutral-bg-color: rgba(15, 23, 42, 0.9);
         --fc-page-bg-color: transparent;
-        --fc-list-event-hover-bg-color: rgba(148, 163, 184, 0.1);
-        --fc-today-bg-color: rgba(99, 102, 241, 0.25);
+        --fc-list-event-hover-bg-color: rgba(var(--crm-accent-rgb), 0.12);
+        --fc-today-bg-color: rgba(var(--crm-accent-rgb), 0.22);
         color: #e2e8f0;
     }
 
@@ -327,7 +327,10 @@
     }
 
     .crm-calendar .fc-button.fc-button-active {
-        @apply border-indigo-500 bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 dark:border-indigo-400 dark:bg-indigo-500;
+        border-color: var(--crm-accent) !important;
+        background-color: var(--crm-accent) !important;
+        color: var(--crm-accent-contrast) !important;
+        box-shadow: 0 12px 24px -18px rgba(var(--crm-accent-rgb), 0.45) !important;
     }
 
     .crm-calendar .fc-button-group {
@@ -336,6 +339,10 @@
 
     .crm-calendar .fc-button-group .fc-button {
         @apply border-none;
+    }
+
+    .crm-calendar .fc-button:focus-visible {
+        box-shadow: 0 0 0 0.2rem rgba(var(--crm-accent-rgb), 0.25) !important;
     }
 
     .crm-calendar .fc-col-header-cell-cushion {
@@ -382,12 +389,12 @@
 
     .crm-calendar .fc-timegrid-now-indicator-arrow,
     .crm-calendar .fc-timegrid-now-indicator-line {
-        border-color: #6366f1;
+        border-color: var(--crm-accent);
     }
 
     .dark .crm-calendar .fc-timegrid-now-indicator-arrow,
     .dark .crm-calendar .fc-timegrid-now-indicator-line {
-        border-color: #818cf8;
+        border-color: var(--crm-accent-bright);
     }
 
     .crm-calendar .fc-list-event .crm-event {
@@ -417,6 +424,126 @@
     --crm-accent: #6366f1;
     --crm-accent-soft: rgba(99, 102, 241, 0.22);
     --crm-accent-contrast: #ffffff;
+    --crm-accent-hover: #5b5ede;
+    --crm-accent-active: #5356ca;
+    --crm-accent-bright: #8285f4;
+    --crm-accent-rgb: 99, 102, 241;
+    --crm-accent-glow: rgba(99, 102, 241, 0.35);
+    --crm-accent-glow-strong: rgba(99, 102, 241, 0.55);
+}
+
+body[data-bs-theme='dark'] {
+    --crm-accent-soft: rgba(var(--crm-accent-rgb), 0.28);
+}
+
+.btn-primary {
+    color: var(--crm-accent-contrast);
+    background-color: var(--crm-accent);
+    border-color: var(--crm-accent);
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active,
+.btn-primary.active,
+.show > .btn-primary.dropdown-toggle {
+    color: var(--crm-accent-contrast);
+    background-color: var(--crm-accent-hover);
+    border-color: var(--crm-accent-hover);
+}
+
+.btn-primary:focus-visible {
+    box-shadow: 0 0 0 0.25rem rgba(var(--crm-accent-rgb), 0.25);
+}
+
+.btn-primary:active,
+.btn-primary.active,
+.show > .btn-primary.dropdown-toggle {
+    background-color: var(--crm-accent-active);
+    border-color: var(--crm-accent-active);
+}
+
+.btn-primary:disabled,
+.btn-primary.disabled {
+    background-color: rgba(var(--crm-accent-rgb), 0.45);
+    border-color: rgba(var(--crm-accent-rgb), 0.45);
+}
+
+.btn-outline-secondary {
+    color: var(--crm-accent);
+    border-color: rgba(var(--crm-accent-rgb), 0.45);
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active,
+.btn-outline-secondary.active,
+.show > .btn-outline-secondary.dropdown-toggle {
+    color: var(--crm-accent-contrast);
+    background-color: var(--crm-accent);
+    border-color: var(--crm-accent);
+}
+
+.btn-outline-secondary:focus-visible {
+    box-shadow: 0 0 0 0.25rem rgba(var(--crm-accent-rgb), 0.25);
+}
+
+.btn-outline-secondary:disabled,
+.btn-outline-secondary.disabled {
+    color: rgba(var(--crm-accent-rgb), 0.4);
+    background-color: rgba(var(--crm-accent-rgb), 0.05);
+    border-color: rgba(var(--crm-accent-rgb), 0.2);
+}
+
+.btn-link,
+.btn-link:focus,
+.btn-link:hover {
+    color: var(--crm-accent);
+}
+
+.btn-link:hover,
+.btn-link:focus {
+    color: var(--crm-accent-hover);
+}
+
+.text-primary,
+.link-primary,
+a.text-primary,
+a.link-primary,
+a.text-primary:hover,
+a.link-primary:hover {
+    color: var(--crm-accent) !important;
+}
+
+.bg-primary {
+    background-color: var(--crm-accent) !important;
+    color: var(--crm-accent-contrast) !important;
+}
+
+.bg-primary-lt {
+    background-color: var(--crm-accent-soft) !important;
+    color: var(--crm-accent) !important;
+}
+
+.badge.bg-primary,
+.badge.bg-primary-lt {
+    color: var(--crm-accent-contrast) !important;
+    background-color: var(--crm-accent) !important;
+}
+
+.badge.bg-primary-lt {
+    background-color: rgba(var(--crm-accent-rgb), 0.18) !important;
+    color: var(--crm-accent) !important;
+}
+
+.form-check-input:checked {
+    background-color: var(--crm-accent);
+    border-color: var(--crm-accent);
+}
+
+.form-check-input:focus {
+    border-color: rgba(var(--crm-accent-rgb), 0.65);
+    box-shadow: 0 0 0 0.2rem rgba(var(--crm-accent-rgb), 0.25);
 }
 
 .crm-top-nav {
@@ -605,14 +732,14 @@
 }
 
 .crm-page-header {
-    border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+    border-bottom: 1px solid rgba(var(--crm-accent-rgb), 0.18);
     padding: 1.5rem 0;
-    background: linear-gradient(120deg, rgba(99, 102, 241, 0.08), rgba(15, 118, 110, 0.05));
+    background: linear-gradient(120deg, rgba(var(--crm-accent-rgb), 0.12), rgba(var(--crm-accent-rgb), 0.04));
 }
 
 .theme-dark .crm-page-header {
-    border-color: rgba(71, 85, 105, 0.45);
-    background: linear-gradient(120deg, rgba(99, 102, 241, 0.14), rgba(15, 118, 110, 0.12));
+    border-color: rgba(var(--crm-accent-rgb), 0.32);
+    background: linear-gradient(120deg, rgba(var(--crm-accent-rgb), 0.22), rgba(var(--crm-accent-rgb), 0.08));
 }
 
 .crm-page-heading {
@@ -814,6 +941,68 @@
     justify-content: center;
     font-weight: 600;
     color: #ffffff;
+}
+
+body.crm-outline-mode {
+    --crm-outline-border: rgba(var(--crm-accent-rgb), 0.65);
+}
+
+body.crm-outline-mode .card,
+body.crm-outline-mode .crm-app-tile,
+body.crm-outline-mode .crm-settings-toggle,
+body.crm-outline-mode .crm-integration-item {
+    border-color: var(--crm-outline-border) !important;
+    box-shadow: 0 0 0 2px rgba(var(--crm-accent-rgb), 0.55), 0 0 36px var(--crm-accent-glow) !important;
+    transition: box-shadow 0.35s ease, border-color 0.35s ease, transform 0.35s ease;
+}
+
+body.crm-outline-mode .card:hover,
+body.crm-outline-mode .card:focus-within,
+body.crm-outline-mode .crm-app-tile:hover,
+body.crm-outline-mode .crm-app-tile:focus,
+body.crm-outline-mode .crm-settings-toggle:hover,
+body.crm-outline-mode .crm-integration-item:hover {
+    box-shadow: 0 0 0 2px rgba(var(--crm-accent-rgb), 0.8), 0 0 42px var(--crm-accent-glow-strong) !important;
+}
+
+body.crm-outline-mode .btn-primary,
+body.crm-outline-mode .btn-outline-secondary,
+body.crm-outline-mode .btn-link {
+    box-shadow: 0 0 0 2px rgba(var(--crm-accent-rgb), 0.45), 0 0 18px var(--crm-accent-glow) !important;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+body.crm-outline-mode .btn-primary:hover,
+body.crm-outline-mode .btn-primary:focus,
+body.crm-outline-mode .btn-outline-secondary:hover,
+body.crm-outline-mode .btn-outline-secondary:focus,
+body.crm-outline-mode .btn-outline-secondary:active,
+body.crm-outline-mode .btn-link:hover,
+body.crm-outline-mode .btn-link:focus {
+    box-shadow: 0 0 0 2px rgba(var(--crm-accent-rgb), 0.75), 0 0 26px var(--crm-accent-glow-strong) !important;
+}
+
+body.crm-outline-mode .crm-status-pill,
+body.crm-outline-mode .crm-project-milestone-indicator {
+    box-shadow: 0 0 16px var(--crm-accent-glow-strong) !important;
+}
+
+body.crm-outline-mode .crm-page-header {
+    box-shadow: inset 0 0 0 2px rgba(var(--crm-accent-rgb), 0.25), 0 0 40px var(--crm-accent-glow) !important;
+}
+
+body.crm-outline-mode .crm-top-nav {
+    box-shadow: 0 8px 32px rgba(var(--crm-accent-rgb), 0.25) !important;
+    border-bottom-color: rgba(var(--crm-accent-rgb), 0.35) !important;
+}
+
+body.crm-outline-mode .crm-status-pill .crm-dot {
+    box-shadow: 0 0 12px rgba(var(--crm-accent-rgb), 0.45) !important;
+}
+
+body.crm-outline-mode .crm-avatar-wrapper .avatar,
+body.crm-outline-mode .crm-app-icon {
+    box-shadow: 0 0 12px rgba(var(--crm-accent-rgb), 0.35) !important;
 }
 
 @layer utilities {
