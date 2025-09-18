@@ -589,6 +589,24 @@ a.link-primary:hover {
     color: var(--crm-accent);
 }
 
+@media (min-width: 768px) and (max-width: 1199.98px) {
+    .crm-top-nav .navbar-collapse {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .crm-top-nav .navbar-collapse .navbar-nav {
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+    }
+
+    .crm-top-nav .navbar-search {
+        flex-basis: 100%;
+        margin-left: 0 !important;
+        margin-top: 1rem !important;
+    }
+}
+
 .crm-dropdown-label {
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -848,12 +866,20 @@ a.link-primary:hover {
     position: relative;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 1199.98px) {
+    .crm-page-heading {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .crm-page-heading-actions {
+        width: 100%;
+        margin-left: 0;
         align-items: stretch;
     }
 
     .crm-page-action-grid {
+        width: 100%;
         grid-template-columns: 1fr;
     }
 
