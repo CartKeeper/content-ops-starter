@@ -2,22 +2,63 @@
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 
-function readEnv(names) {
+function readEnv(names, suffixes = []) {
     for (const name of names) {
         const value = process.env[name];
         if (typeof value === 'string' && value.trim().length > 0) {
             return value.trim();
         }
     }
+
+    if (suffixes.length > 0) {
+        for (const [key, rawValue] of Object.entries(process.env)) {
+            if (typeof rawValue !== 'string') {
+                continue;
+            }
+
+            if (suffixes.some((suffix) => key.endsWith(suffix))) {
+                const trimmed = rawValue.trim();
+                if (trimmed.length > 0) {
+                    return trimmed;
+                }
+            }
+        }
+    }
+
     return null;
 }
 
-const SUPABASE_URL = readEnv(['SUPABASE_URL', 'SUPABASE_DATABASE_URL']);
-const SUPABASE_SERVICE_ROLE_KEY = readEnv(['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_ROLE']);
+const SUPABASE_URL = readEnv(['SUPABASE_URL', 'SUPABASE_DATABASE_URL'], [
+    'SUPABASE_URL',
+    'SUPABASE_DATABASE_URL'
+]);
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn('[ensure-admin-user] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Skipping admin bootstrap.');
+const SUPABASE_SERVICE_ROLE_KEY = readEnv(['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_ROLE'], [
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPABASE_SERVICE_ROLE'
+]);
+
+const SUPABASE_ANON_KEY = readEnv(
+    ['SUPABASE_ANON_KEY', 'SUPABASE_PUBLIC_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'PUBLIC_SUPABASE_ANON_KEY'],
+    ['SUPABASE_ANON_KEY', 'SUPABASE_PUBLIC_ANON_KEY']
+);
+
+if (!SUPABASE_URL) {
+    console.warn('[ensure-admin-user] Missing SUPABASE_URL. Skipping admin bootstrap.');
     process.exit(0);
+}
+
+const SUPABASE_KEY = SUPABASE_SERVICE_ROLE_KEY ?? SUPABASE_ANON_KEY;
+
+if (!SUPABASE_KEY) {
+    console.warn('[ensure-admin-user] Missing Supabase key. Provide SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY.');
+    process.exit(0);
+}
+
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn(
+        '[ensure-admin-user] SUPABASE_SERVICE_ROLE_KEY not found. Falling back to public key; ensure row level security allows inserts.'
+    );
 }
 
 const adminEmailEnv = readEnv([
@@ -64,7 +105,7 @@ if (!passwordHash) {
 const adminName = readEnv(['ADMIN_LOGIN_NAME', 'ADMIN_NAME', 'ADMIN_USER_NAME']);
 const adminRolesRaw = readEnv(['ADMIN_LOGIN_ROLES', 'ADMIN_ROLES', 'ADMIN_USER_ROLES']);
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false }
 });
 
