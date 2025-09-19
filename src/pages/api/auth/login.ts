@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
 
-import { getSupabaseClient } from '../../../utils/supabase-client';
-import { signAuthToken } from '../../../utils/auth-token';
+import { supabaseAdmin } from '../../../lib/supabase-admin';
+import { signSession } from '../../../lib/jwt';
+import { setSessionCookie } from '../../../lib/session-cookie';
 import type { AuthUser } from '../../../types/auth';
 
 function mapUser(record: Record<string, any>): AuthUser {
@@ -30,10 +31,9 @@ export default async function handler(request: NextApiRequest, response: NextApi
     const normalizedEmail = email.trim().toLowerCase();
 
     try {
-        const supabase = getSupabaseClient();
-        const query = await supabase
+        const query = await supabaseAdmin
             .from('users')
-            .select('*')
+            .select('id,email,password_hash,name,roles,created_at')
             .eq('email', normalizedEmail)
             .maybeSingle();
 
@@ -54,9 +54,15 @@ export default async function handler(request: NextApiRequest, response: NextApi
         }
 
         const user = mapUser(userRecord);
-        const token = signAuthToken({ userId: user.id, email: user.email, roles: user.roles });
+        const token = await signSession({
+            userId: user.id,
+            email: user.email,
+            roles: user.roles
+        });
 
-        return response.status(200).json({ user, token });
+        setSessionCookie(response, token);
+
+        return response.status(200).json({ user });
     } catch (error) {
         console.error('Unexpected login error', error);
         return response.status(500).json({ error: 'Unable to log in.' });

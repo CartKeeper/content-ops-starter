@@ -1,6 +1,7 @@
 import type { NextApiRequest } from 'next';
 
-import { verifyAuthToken, type AuthTokenPayload } from './auth-token';
+import { verifySession, type SessionPayload } from '../lib/jwt';
+import { readSessionCookie } from '../lib/session-cookie';
 
 export function extractBearerToken(request: NextApiRequest): string | null {
     const authorization = request.headers.authorization;
@@ -16,11 +17,17 @@ export function extractBearerToken(request: NextApiRequest): string | null {
     return token.trim();
 }
 
-export function authenticateRequest(request: NextApiRequest): AuthTokenPayload | null {
-    const token = extractBearerToken(request);
+export async function authenticateRequest(request: NextApiRequest): Promise<SessionPayload | null> {
+    const cookieToken = readSessionCookie(request);
+    const token = cookieToken ?? extractBearerToken(request);
+
     if (!token) {
         return null;
     }
 
-    return verifyAuthToken(token);
+    try {
+        return await verifySession(token);
+    } catch {
+        return null;
+    }
 }

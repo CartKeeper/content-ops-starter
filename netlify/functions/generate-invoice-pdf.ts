@@ -2,6 +2,8 @@ import type { Handler } from '@netlify/functions';
 import PDFDocument from 'pdfkit';
 
 import type { InvoiceRecord, InvoiceLineItem } from '../../src/types/invoice';
+import { parseSessionCookieHeader } from '../../src/lib/session-cookie';
+import { verifySession } from '../../src/lib/jwt';
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
@@ -31,11 +33,30 @@ const handler: Handler = async (event) => {
         };
     }
 
-    const clientContext = event.clientContext as unknown as { user?: { app_metadata?: { roles?: unknown } } } | undefined;
-    const roles = Array.isArray(clientContext?.user?.app_metadata?.roles)
-        ? clientContext?.user?.app_metadata?.roles
-        : [];
-    const hasPhotographerRole = roles.some((role) => typeof role === 'string' && role.toLowerCase() === 'photographer');
+    const headers = event.headers as Record<string, string | undefined> | undefined;
+    const cookieHeader = headers?.cookie ?? headers?.Cookie ?? null;
+    const token = parseSessionCookieHeader(cookieHeader);
+
+    if (!token) {
+        return {
+            statusCode: 401,
+            body: JSON.stringify({ error: 'Authentication required.' })
+        };
+    }
+
+    let roles: string[] = [];
+    try {
+        const session = await verifySession(token);
+        roles = Array.isArray(session.roles) ? session.roles : [];
+    } catch (error) {
+        console.warn('generate-invoice-pdf: invalid session token', error);
+        return {
+            statusCode: 401,
+            body: JSON.stringify({ error: 'Authentication required.' })
+        };
+    }
+
+    const hasPhotographerRole = roles.some((role) => role.toLowerCase() === 'photographer' || role.toLowerCase() === 'admin');
     if (!hasPhotographerRole) {
         return {
             statusCode: 403,
