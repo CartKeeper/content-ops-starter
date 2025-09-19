@@ -68,7 +68,7 @@ const FILTER_OPTIONS: Array<{ id: ContactFilter; label: string }> = [
 
 export default function ContactsPage() {
     return (
-        <CrmAuthGuard title="Secure contacts" description="Sign in with the studio access code to add and convert contacts.">
+        <CrmAuthGuard>
             <WorkspaceLayout>
                 <Head>
                     <title>Contacts | Codex CRM</title>

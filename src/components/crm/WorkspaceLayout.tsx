@@ -121,8 +121,8 @@ type NotificationItem = {
 };
 
 const navItems: NavItem[] = [
-    { href: '/crm', label: 'Home', icon: SparklesIcon },
-    { href: '/bookings', label: 'Calendar', icon: CalendarIcon },
+    { href: '/dashboard', label: 'Home', icon: SparklesIcon },
+    { href: '/calendar', label: 'Calendar', icon: CalendarIcon },
     { href: '/contacts', label: 'Contacts', icon: AddressBookIcon },
     { href: '/clients', label: 'Clients', icon: UsersIcon },
     { href: '/galleries', label: 'Galleries', icon: PhotoIcon },
@@ -132,9 +132,9 @@ const navItems: NavItem[] = [
 ];
 
 const quickActions: QuickAction[] = [
-    { href: '/bookings', label: 'New booking', icon: CalendarIcon, variant: 'primary' },
-    { href: '/bookings', label: 'Quick set up', icon: CheckIcon, variant: 'outline' },
-    { href: '/bookings', label: 'Plan a shoot', icon: PhotoIcon, variant: 'primary' },
+    { href: '/calendar', label: 'New booking', icon: CalendarIcon, variant: 'primary' },
+    { href: '/calendar', label: 'Quick set up', icon: CheckIcon, variant: 'outline' },
+    { href: '/calendar', label: 'Plan a shoot', icon: PhotoIcon, variant: 'primary' },
     { href: '/invoices', label: 'Review billing', icon: ReceiptIcon, variant: 'outline' }
 ];
 
@@ -197,9 +197,12 @@ function matchPath(currentPath: string, target: string) {
     if (currentPath === target) {
         return true;
     }
-    if (target === '/crm' && currentPath === '/') {
+
+    const homeRoutes = new Set(['/crm', '/dashboard', '/']);
+    if (homeRoutes.has(target) && homeRoutes.has(currentPath)) {
         return true;
     }
+
     return currentPath.startsWith(target) && target !== '/';
 }
 
@@ -602,7 +605,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         <div className={classNames('page', theme === 'dark' ? 'theme-dark' : 'theme-light')}>
             <header className="navbar navbar-expand-md shadow-sm border-bottom crm-top-nav" data-bs-theme={theme}>
                 <div className="container-xl">
-                    <Link href="/crm" className="navbar-brand d-flex align-items-center gap-2">
+                    <Link href="/dashboard" className="navbar-brand d-flex align-items-center gap-2">
                         <span className="avatar avatar-sm bg-primary-lt text-primary">
                             <ApertureMark className="icon" aria-hidden />
                         </span>

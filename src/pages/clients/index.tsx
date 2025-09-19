@@ -1350,10 +1350,7 @@ function ClientsWorkspace({ invoices }: ClientsPageProps) {
 
 export default function ClientsPage(props: ClientsPageProps) {
     return (
-        <CrmAuthGuard
-            title="Client workspace"
-            description="Authenticate with the studio access code to view client relationships, invoices, and portal links."
-        >
+        <CrmAuthGuard>
             <ClientsWorkspace {...props} />
         </CrmAuthGuard>
     );

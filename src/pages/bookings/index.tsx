@@ -575,10 +575,7 @@ function LegendDot({ color, children }: LegendDotProps) {
 
 export default function BookingsPage(props: BookingsPageProps) {
     return (
-        <CrmAuthGuard
-            title="Studio calendar access"
-            description="Authenticate with the studio access code to manage private production bookings."
-        >
+        <CrmAuthGuard>
             <BookingCalendarWorkspace {...props} />
         </CrmAuthGuard>
     );

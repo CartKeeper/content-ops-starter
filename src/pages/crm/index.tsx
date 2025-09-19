@@ -1181,7 +1181,7 @@ function CrmDashboardWorkspace({
                                         title="Upcoming Shoots"
                                         description="Stay ready for every session with a quick view of the week ahead."
                                         action={
-                                            <Link href="/bookings" className="btn btn-sm btn-outline-primary">
+                                            <Link href="/calendar" className="btn btn-sm btn-outline-primary">
                                                 Open calendar
                                             </Link>
                                         }
@@ -1305,10 +1305,7 @@ function ClientsGlyph() {
 
 export default function CrmDashboardPage(props: CrmPageProps) {
     return (
-        <CrmAuthGuard
-            title="Access the studio CRM"
-            description="Use the studio passcode or Netlify Identity credentials to access client data."
-        >
+        <CrmAuthGuard>
             <CrmDashboardWorkspace {...props} />
         </CrmAuthGuard>
     );
