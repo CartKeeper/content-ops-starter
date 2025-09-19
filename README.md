@@ -110,6 +110,15 @@ The CRM API routes under `src/pages/api/` rely on [Supabase](https://supabase.co
 
 These API routes return JSON responses for GET, POST, PUT, and DELETE requests, so they can be consumed directly from front-end forms or integrations.
 
+### Bootstrap the CRM admin account
+
+Authentication now reads and writes from the Supabase `public.users` table. To ensure your administrator can sign in immediately after deploy:
+
+1. Add `ADMIN_LOGIN_EMAIL` and `ADMIN_LOGIN_PASSWORD` (or a pre-hashed `ADMIN_LOGIN_PASSWORD_HASH`) to your environment variables. Optional helpers include `ADMIN_LOGIN_NAME` and `ADMIN_LOGIN_ROLES` if you want to override the display name or append additional roles.
+2. Redeploy or run `npm run seed:admin` locally. The post-build hook runs the same script automatically during CI to insert or update the admin record using the Supabase service role key.
+
+The script keeps any existing roles on the user and guarantees the `admin` and `photographer` roles are present. Future deployments update the password hash if either the plain password or hash changes so you can rotate credentials without manual SQL.
+
 ### Using the Supabase client in your site
 
 When you need to interact with Supabase from the front end, create a client with the public environment variables that Netlify generated for your framework:
