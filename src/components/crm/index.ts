@@ -19,3 +19,6 @@ export type { ChartPoint, Timeframe } from './OverviewChart';
 export { ApertureMark } from './ApertureMark';
 export { CrmAuthGuard, useCrmAuth } from './CrmAuthGuard';
 export { WorkspaceLayout } from './WorkspaceLayout';
+export { DropboxChooserButton } from './DropboxChooserButton';
+export type { DropboxChooserFile } from './DropboxChooserButton';
+export { DropboxImportPanel } from './DropboxImportPanel';

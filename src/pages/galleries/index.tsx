@@ -10,6 +10,7 @@ import {
     StatCard,
     StatusPill,
     WorkspaceLayout,
+    DropboxImportPanel,
     useCrmAuth,
     type StatusTone
 } from '../../components/crm';
@@ -517,6 +518,13 @@ function DropboxAssetLibrary() {
                             )}
                         </SectionCard>
                     </div>
+
+                    <SectionCard
+                        title="Dropbox import pipeline"
+                        description="Launch the Dropbox Chooser, attach files to CRM galleries, and optionally notify Zapier automations."
+                    >
+                        <DropboxImportPanel galleries={galleryCollection} />
+                    </SectionCard>
 
                     <SectionCard
                         title="Dropbox asset inventory"
