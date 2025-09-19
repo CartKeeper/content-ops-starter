@@ -16,7 +16,6 @@ type IdentityContextValue = {
     open: (view?: IdentityView) => void;
     logout: () => Promise<void>;
     refresh: () => Promise<void>;
-    getToken: () => Promise<string | null>;
     error: string | null;
     clearError: () => void;
     login: (email: string, password: string) => Promise<void>;
@@ -35,7 +34,6 @@ const NetlifyIdentityContext = React.createContext<IdentityContextValue>({
     open: () => undefined,
     logout: async () => undefined,
     refresh: async () => undefined,
-    getToken: async () => null,
     error: null,
     clearError: () => undefined,
     login: async () => undefined,
@@ -46,31 +44,12 @@ type NetlifyIdentityProviderProps = {
     children: React.ReactNode;
 };
 
-const TOKEN_STORAGE_KEY = 'crm-auth-token';
-
 export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderProps) {
     const [user, setUser] = React.useState<AuthUser | null>(null);
     const [isReady, setIsReady] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
-    const tokenRef = React.useRef<string | null>(null);
-
-    const persistToken = React.useCallback((nextToken: string | null) => {
-        tokenRef.current = nextToken;
-        if (typeof window !== 'undefined') {
-            if (nextToken) {
-                window.localStorage.setItem(TOKEN_STORAGE_KEY, nextToken);
-            } else {
-                window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-            }
-        }
-    }, []);
-
     const handleSessionResponse = React.useCallback(
-        (payload: { user?: AuthUser; token?: string } | null) => {
-            if (payload?.token) {
-                persistToken(payload.token);
-            }
-
+        (payload: { user?: AuthUser } | null) => {
             if (payload?.user) {
                 setUser(payload.user);
             } else {
@@ -80,41 +59,36 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
             setError(null);
             setIsReady(true);
         },
-        [persistToken]
+        []
     );
 
-    const fetchSession = React.useCallback(
-        async (candidateToken?: string) => {
-            const activeToken = candidateToken ?? tokenRef.current;
-            if (!activeToken) {
-                setUser(null);
-                setIsReady(true);
+    const fetchSession = React.useCallback(async () => {
+        try {
+            const response = await fetch('/api/auth/session', {
+                method: 'GET',
+                credentials: 'include'
+            });
+
+            if (response.status === 401) {
+                handleSessionResponse(null);
                 return;
             }
 
-            try {
-                const response = await fetch('/api/auth/session', {
-                    method: 'GET',
-                    headers: { Authorization: `Bearer ${activeToken}` }
-                });
+            const payload = await response.json().catch(() => null);
 
-                const payload = await response.json().catch(() => null);
-
-                if (!response.ok) {
-                    throw new Error(payload?.error ?? 'Unable to refresh session.');
-                }
-
-                handleSessionResponse(payload);
-            } catch (sessionError) {
-                console.error('Session refresh failed', sessionError);
-                persistToken(null);
-                setUser(null);
-                setError(sessionError instanceof Error ? sessionError.message : 'Session expired.');
-                setIsReady(true);
+            if (!response.ok) {
+                const message = payload?.error ?? 'Unable to refresh session.';
+                throw new Error(message);
             }
-        },
-        [handleSessionResponse, persistToken]
-    );
+
+            handleSessionResponse(payload);
+        } catch (sessionError) {
+            console.error('Session refresh failed', sessionError);
+            setUser(null);
+            setError(sessionError instanceof Error ? sessionError.message : 'Session expired.');
+            setIsReady(true);
+        }
+    }, [handleSessionResponse]);
 
     React.useEffect(() => {
         if (typeof window === 'undefined') {
@@ -122,15 +96,8 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
             return;
         }
 
-        const storedToken = window.localStorage.getItem(TOKEN_STORAGE_KEY);
-        if (!storedToken) {
-            setIsReady(true);
-            return;
-        }
-
-        persistToken(storedToken);
-        void fetchSession(storedToken);
-    }, [fetchSession, persistToken]);
+        void fetchSession();
+    }, [fetchSession]);
 
     const login = React.useCallback(
         async (email: string, password: string) => {
@@ -138,6 +105,7 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ email, password })
                 });
 
@@ -152,12 +120,11 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
             } catch (loginError) {
                 setError(loginError instanceof Error ? loginError.message : 'Unable to log in.');
                 setUser(null);
-                persistToken(null);
                 setIsReady(true);
                 throw loginError instanceof Error ? loginError : new Error('Unable to log in.');
             }
         },
-        [handleSessionResponse, persistToken]
+        [handleSessionResponse]
     );
 
     const signup = React.useCallback(
@@ -166,6 +133,7 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
                 const response = await fetch('/api/auth/signup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ email, password, name })
                 });
 
@@ -180,32 +148,28 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
             } catch (signupError) {
                 setError(signupError instanceof Error ? signupError.message : 'Unable to create account.');
                 setUser(null);
-                persistToken(null);
                 setIsReady(true);
                 throw signupError instanceof Error ? signupError : new Error('Unable to create account.');
             }
         },
-        [handleSessionResponse, persistToken]
+        [handleSessionResponse]
     );
 
     const logout = React.useCallback(async () => {
-        persistToken(null);
         setUser(null);
         setError(null);
         setIsReady(true);
 
         try {
-            await fetch('/api/auth/logout', { method: 'POST' });
+            await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
         } catch (logoutError) {
             console.warn('Failed to notify logout endpoint', logoutError);
         }
-    }, [persistToken]);
+    }, []);
 
     const refresh = React.useCallback(async () => {
         await fetchSession();
     }, [fetchSession]);
-
-    const getToken = React.useCallback(async () => tokenRef.current, []);
 
     const clearError = React.useCallback(() => setError(null), []);
 
@@ -233,13 +197,12 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
             open,
             logout,
             refresh,
-            getToken,
             error,
             clearError,
             login,
             signup
         }),
-        [clearError, error, getToken, isReady, login, logout, open, refresh, roles, signup, user]
+        [clearError, error, isReady, login, logout, open, refresh, roles, signup, user]
     );
 
     return <NetlifyIdentityContext.Provider value={contextValue}>{children}</NetlifyIdentityContext.Provider>;

@@ -62,14 +62,8 @@ function CalendarWorkspace() {
         setCalendarError(null);
 
         try {
-            const token = await identity.getToken();
-            if (!token) {
-                setEvents([]);
-                return;
-            }
-
             const response = await fetch('/api/calendar/events', {
-                headers: { Authorization: `Bearer ${token}` }
+                credentials: 'include'
             });
 
             const payload = await response.json().catch(() => null);
@@ -88,7 +82,7 @@ function CalendarWorkspace() {
         } finally {
             setIsLoading(false);
         }
-    }, [identity]);
+    }, []);
 
     React.useEffect(() => {
         if (!identity.isReady || !identity.isAuthenticated) {
@@ -120,17 +114,12 @@ function CalendarWorkspace() {
             setSuccessMessage(null);
 
             try {
-                const token = await identity.getToken();
-                if (!token) {
-                    throw new Error('Authentication expired. Please sign in again.');
-                }
-
                 const response = await fetch('/api/calendar/events', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'include',
                     body: JSON.stringify({
                         title: formState.title,
                         description: formState.description,
