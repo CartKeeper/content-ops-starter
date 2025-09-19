@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { authenticateRequest, extractBearerToken } from '../../../utils/api-auth';
-import { getSupabaseClient } from '../../../utils/supabase-client';
-import { signAuthToken } from '../../../utils/auth-token';
+import { supabaseAdmin } from '../../../lib/supabase-admin';
+import { signSession, verifySession } from '../../../lib/jwt';
+import { clearSessionCookie, readSessionCookie, setSessionCookie } from '../../../lib/session-cookie';
 import type { AuthUser } from '../../../types/auth';
 
 function mapUser(record: Record<string, any>): AuthUser {
@@ -21,33 +21,42 @@ export default async function handler(request: NextApiRequest, response: NextApi
         return response.status(405).json({ error: 'Method not allowed' });
     }
 
-    const payload = authenticateRequest(request);
-    if (!payload) {
+    const cookie = readSessionCookie(request);
+    if (!cookie) {
         return response.status(401).json({ error: 'Authentication required.' });
     }
 
     try {
-        const supabase = getSupabaseClient();
-        const query = await supabase
+        const payload = await verifySession(cookie);
+        const query = await supabaseAdmin
             .from('users')
-            .select('*')
+            .select('id,email,name,roles,created_at')
             .eq('id', payload.userId)
             .maybeSingle();
 
+        if (query.error) {
+            console.error('Failed to fetch user for session', query.error);
+            return response.status(500).json({ error: 'Unable to resolve session.' });
+        }
+
         if (!query.data) {
+            clearSessionCookie(response);
             return response.status(401).json({ error: 'User session is invalid.' });
         }
 
         const user = mapUser(query.data);
-        const activeToken = extractBearerToken(request) ?? signAuthToken({
+        const refreshedToken = await signSession({
             userId: user.id,
             email: user.email,
             roles: user.roles
         });
 
-        return response.status(200).json({ user, token: activeToken });
+        setSessionCookie(response, refreshedToken);
+
+        return response.status(200).json({ user });
     } catch (error) {
         console.error('Failed to load session', error);
-        return response.status(500).json({ error: 'Unable to resolve session.' });
+        clearSessionCookie(response);
+        return response.status(401).json({ error: 'Authentication required.' });
     }
 }

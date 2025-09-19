@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
 
-import { getSupabaseClient } from '../../../utils/supabase-client';
-import { signAuthToken } from '../../../utils/auth-token';
+import { supabaseAdmin } from '../../../lib/supabase-admin';
+import { signSession } from '../../../lib/jwt';
+import { setSessionCookie } from '../../../lib/session-cookie';
 import type { AuthUser } from '../../../types/auth';
 
 function mapUser(record: Record<string, any>): AuthUser {
@@ -34,24 +35,8 @@ export default async function handler(request: NextApiRequest, response: NextApi
     const normalizedEmail = email.trim().toLowerCase();
 
     try {
-        const supabase = getSupabaseClient();
-        const existing = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', normalizedEmail)
-            .maybeSingle();
-
-        if (existing.data) {
-            return response.status(409).json({ error: 'An account with that email already exists.' });
-        }
-
-        if (existing.error && existing.error.code !== 'PGRST116') {
-            console.error('Failed to check existing user', existing.error);
-            return response.status(500).json({ error: 'Unable to create user account.' });
-        }
-
         const passwordHash = await bcrypt.hash(password, 12);
-        const insert = await supabase
+        const insert = await supabaseAdmin
             .from('users')
             .insert({
                 email: normalizedEmail,
@@ -59,18 +44,28 @@ export default async function handler(request: NextApiRequest, response: NextApi
                 name: typeof name === 'string' ? name.trim() : null,
                 roles: ['photographer']
             })
-            .select('*')
+            .select('id,email,name,roles,created_at')
             .single();
 
         if (insert.error || !insert.data) {
+            if (insert.error?.code === '23505') {
+                return response.status(409).json({ error: 'An account with that email already exists.' });
+            }
+
             console.error('Failed to insert user', insert.error);
             return response.status(500).json({ error: 'Unable to create user account.' });
         }
 
         const user = mapUser(insert.data);
-        const token = signAuthToken({ userId: user.id, email: user.email, roles: user.roles });
+        const token = await signSession({
+            userId: user.id,
+            email: user.email,
+            roles: user.roles
+        });
 
-        return response.status(201).json({ user, token });
+        setSessionCookie(response, token);
+
+        return response.status(201).json({ user });
     } catch (error) {
         console.error('Unexpected signup error', error);
         return response.status(500).json({ error: 'Unable to create user account.' });

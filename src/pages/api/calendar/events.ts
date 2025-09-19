@@ -17,7 +17,7 @@ function mapEvent(record: Record<string, any>): CalendarEventRecord {
 }
 
 export default async function handler(request: NextApiRequest, response: NextApiResponse) {
-    const auth = authenticateRequest(request);
+    const auth = await authenticateRequest(request);
     if (!auth) {
         return response.status(401).json({ error: 'Authentication required.' });
     }

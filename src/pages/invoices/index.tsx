@@ -203,17 +203,16 @@ function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
             setPdfInvoiceId(invoice.id);
 
             try {
-                const token = await identity.getToken();
-                if (!token) {
+                if (!identity.isAuthenticated) {
                     throw new Error('Authentication expired. Sign in again to generate invoices.');
                 }
 
                 const response = await fetch('/.netlify/functions/generate-invoice-pdf', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'include',
                     body: JSON.stringify({
                         invoice,
                         studio: {
@@ -262,8 +261,7 @@ function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
             setCheckoutInvoiceId(invoice.id);
 
             try {
-                const token = await identity.getToken();
-                if (!token) {
+                if (!identity.isAuthenticated) {
                     throw new Error('Authentication expired. Sign in again to create payment links.');
                 }
 
@@ -271,9 +269,9 @@ function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
                 const response = await fetch('/.netlify/functions/create-checkout-session', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'include',
                     body: JSON.stringify({
                         invoice,
                         successUrl: `${origin}/invoices?checkout=success`,
