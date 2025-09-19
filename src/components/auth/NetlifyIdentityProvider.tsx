@@ -20,6 +20,8 @@ type IdentityContextValue = {
     clearError: () => void;
     login: (email: string, password: string) => Promise<void>;
     signup: (input: { email: string; password: string; name?: string }) => Promise<void>;
+    requestPasswordReset: (email: string) => Promise<void>;
+    resetPassword: (input: { token: string; password: string }) => Promise<void>;
 };
 
 const NetlifyIdentityContext = React.createContext<IdentityContextValue>({
@@ -37,7 +39,9 @@ const NetlifyIdentityContext = React.createContext<IdentityContextValue>({
     error: null,
     clearError: () => undefined,
     login: async () => undefined,
-    signup: async () => undefined
+    signup: async () => undefined,
+    requestPasswordReset: async () => undefined,
+    resetPassword: async () => undefined
 });
 
 type NetlifyIdentityProviderProps = {
@@ -171,6 +175,66 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
         await fetchSession();
     }, [fetchSession]);
 
+    const requestPasswordReset = React.useCallback(
+        async (email: string) => {
+            try {
+                const response = await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                const payload = await response.json().catch(() => null);
+
+                if (!response.ok) {
+                    const message = payload?.error ?? 'Unable to send reset instructions.';
+                    throw new Error(message);
+                }
+
+                setError(null);
+            } catch (resetRequestError) {
+                const message =
+                    resetRequestError instanceof Error
+                        ? resetRequestError.message
+                        : 'Unable to send reset instructions.';
+                setError(message);
+                throw resetRequestError instanceof Error
+                    ? resetRequestError
+                    : new Error('Unable to send reset instructions.');
+            }
+        },
+        []
+    );
+
+    const resetPassword = React.useCallback(
+        async ({ token, password }: { token: string; password: string }) => {
+            try {
+                const response = await fetch('/api/auth/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ token, password })
+                });
+
+                const payload = await response.json().catch(() => null);
+
+                if (!response.ok) {
+                    const message = payload?.error ?? 'Unable to reset password.';
+                    throw new Error(message);
+                }
+
+                handleSessionResponse(payload);
+            } catch (resetError) {
+                const message = resetError instanceof Error ? resetError.message : 'Unable to reset password.';
+                setError(message);
+                setUser(null);
+                setIsReady(true);
+                throw resetError instanceof Error ? resetError : new Error('Unable to reset password.');
+            }
+        },
+        [handleSessionResponse]
+    );
+
     const clearError = React.useCallback(() => setError(null), []);
 
     const open = React.useCallback((view: IdentityView = 'login') => {
@@ -200,9 +264,24 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
             error,
             clearError,
             login,
-            signup
+            signup,
+            requestPasswordReset,
+            resetPassword
         }),
-        [clearError, error, isReady, login, logout, open, refresh, roles, signup, user]
+        [
+            clearError,
+            error,
+            isReady,
+            login,
+            logout,
+            open,
+            refresh,
+            requestPasswordReset,
+            resetPassword,
+            roles,
+            signup,
+            user
+        ]
     );
 
     return <NetlifyIdentityContext.Provider value={contextValue}>{children}</NetlifyIdentityContext.Provider>;
