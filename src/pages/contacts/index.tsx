@@ -1,70 +1,43 @@
 import * as React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import * as Dialog from '@radix-ui/react-dialog';
-import classNames from 'classnames';
-import dayjs from 'dayjs';
+import { useRouter } from 'next/router';
+import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
 
-import { CrmAuthGuard, WorkspaceLayout, ContactsTable, ContactModal, DashboardCard } from '../../components/crm';
-import { useNetlifyIdentity } from '../../components/auth';
-import type { ContactRecord, ConvertContactResponse } from '../../types/contact';
-import { getContactName } from '../../types/contact';
-import { useAutoDismiss } from '../../utils/use-auto-dismiss';
+import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
+import DataToolbar, { type ToolbarFilter, type SortOption } from '../../components/data/DataToolbar';
+import DataTable from '../../components/data/DataTable';
+import ContactDrawer, { type ContactProfile } from '../../components/contacts/ContactDrawer';
+import {
+    buildContactDashboardData,
+    convertContactToClient,
+    fetchContacts,
+    mapContactToRow,
+    type ContactTableRow
+} from '../../lib/api/contacts';
+import type { ContactRecord } from '../../types/contact';
+import { formatDate } from '../../lib/formatters';
 
-type FeedbackNotice = {
-    id: string;
-    tone: 'success' | 'error';
-    message: string;
+type QueryState = {
+    q?: string;
+    stage?: string;
+    tags?: string;
+    owner?: string;
+    status?: string;
+    sort?: string;
+    page?: string;
+    pageSize?: string;
 };
 
-type ContactFormState = {
-    owner_user_id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-    notes: string;
-    address: string;
-    city: string;
-    state: string;
-    business: string;
-    status: 'lead' | 'active' | 'client';
-};
-
-type ContactsApiResponse = {
-    data?: ContactRecord | ContactRecord[];
-    error?: string;
-};
-
-type ConvertApiResponse = {
-    data?: ConvertContactResponse;
-    error?: string;
-};
-
-type ContactFilter = 'all' | 'withEmail' | 'withNotes';
-
-const INITIAL_FORM: ContactFormState = {
-    owner_user_id: '',
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    notes: '',
-    address: '',
-    city: '',
-    state: '',
-    business: '',
-    status: 'lead'
-};
-
-const inputClassName =
-    'w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-indigo-300';
-
-const FILTER_OPTIONS: Array<{ id: ContactFilter; label: string }> = [
-    { id: 'all', label: 'All leads' },
-    { id: 'withEmail', label: 'Email captured' },
-    { id: 'withNotes', label: 'With notes' }
+const CONTACT_SORT_OPTIONS: Array<SortOption & { state: SortingState }> = [
+    { id: 'name-asc', label: 'Name (A-Z)', state: [{ id: 'name', desc: false }] },
+    { id: 'interaction-desc', label: 'Last interaction (newest)', state: [{ id: 'lastInteractionAt', desc: true }] },
+    { id: 'interaction-asc', label: 'Last interaction (oldest)', state: [{ id: 'lastInteractionAt', desc: false }] }
 ];
+
+const DEFAULT_CONTACT_SORT = CONTACT_SORT_OPTIONS[0];
+
+type NotificationBanner = { id: string; message: string; tone: 'success' | 'error' };
 
 export default function ContactsPage() {
     return (
@@ -80,854 +53,475 @@ export default function ContactsPage() {
 }
 
 function ContactsWorkspace() {
-    const identity = useNetlifyIdentity();
-    const [contacts, setContacts] = React.useState<ContactRecord[]>([]);
-    const [isLoading, setIsLoading] = React.useState<boolean>(true);
-    const [isRefreshing, setIsRefreshing] = React.useState<boolean>(false);
-    const [feedback, setFeedback] = React.useState<FeedbackNotice | null>(null);
-    const [isAddModalOpen, setIsAddModalOpen] = React.useState<boolean>(false);
-    const [isSubmittingContact, setIsSubmittingContact] = React.useState<boolean>(false);
-    const [formState, setFormState] = React.useState<ContactFormState>(() => ({
-        ...INITIAL_FORM,
-        owner_user_id: identity.user?.id ?? ''
-    }));
-    const [editingContactId, setEditingContactId] = React.useState<string | null>(null);
-    const [conversionTarget, setConversionTarget] = React.useState<string | null>(null);
-    const [conversionResult, setConversionResult] = React.useState<
-        { contact: ContactRecord; result: ConvertContactResponse } | null
-    >(null);
-    const [searchTerm, setSearchTerm] = React.useState<string>('');
-    const [activeFilter, setActiveFilter] = React.useState<ContactFilter>('all');
-    const [isContactModalOpen, setIsContactModalOpen] = React.useState<boolean>(false);
-    const [selectedContactId, setSelectedContactId] = React.useState<string | null>(null);
-
-    useAutoDismiss(feedback, () => setFeedback(null));
-
-    const notify = React.useCallback((tone: FeedbackNotice['tone'], message: string) => {
-        setFeedback({ id: `${Date.now()}`, tone, message });
+    const router = useRouter();
+    const parseList = React.useCallback((value: string | string[] | undefined) => {
+        if (Array.isArray(value)) {
+            return value.flatMap((entry) => entry.split(',')).filter(Boolean);
+        }
+        if (typeof value === 'string') {
+            return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+        }
+        return [];
     }, []);
 
-    const loadContacts = React.useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const response = await fetch('/api/contacts');
-            const payload = (await response.json()) as ContactsApiResponse;
+    const initialSearch = typeof router.query.q === 'string' ? router.query.q : '';
+    const initialStage = parseList(router.query.stage);
+    const initialTags = parseList(router.query.tags);
+    const initialOwner = parseList(router.query.owner);
+    const initialStatus = parseList(router.query.status);
+    const initialSortId = typeof router.query.sort === 'string' ? router.query.sort : DEFAULT_CONTACT_SORT.id;
+    const initialSortOption = CONTACT_SORT_OPTIONS.find((option) => option.id === initialSortId) ?? DEFAULT_CONTACT_SORT;
+    const initialPageIndex = (() => {
+        const value = typeof router.query.page === 'string' ? Number.parseInt(router.query.page, 10) : 1;
+        return Number.isFinite(value) && value > 0 ? value - 1 : 0;
+    })();
+    const initialPageSize = (() => {
+        const value = typeof router.query.pageSize === 'string' ? Number.parseInt(router.query.pageSize, 10) : 10;
+        return Number.isFinite(value) && value > 0 ? value : 10;
+    })();
 
-            if (!response.ok) {
-                throw new Error(payload.error ?? 'Unable to load contacts');
+    const [records, setRecords] = React.useState<ContactRecord[]>([]);
+    const [rows, setRows] = React.useState<ContactTableRow[]>([]);
+    const [isLoading, setIsLoading] = React.useState<boolean>(false);
+    const [error, setError] = React.useState<string | null>(null);
+    const [notifications, setNotifications] = React.useState<NotificationBanner[]>([]);
+    const [search, setSearch] = React.useState<string>(initialSearch);
+    const [stageFilter, setStageFilter] = React.useState<string[]>(initialStage);
+    const [tagFilter, setTagFilter] = React.useState<string[]>(initialTags);
+    const [ownerFilter, setOwnerFilter] = React.useState<string[]>(initialOwner);
+    const [statusFilter, setStatusFilter] = React.useState<string[]>(initialStatus);
+    const [sortValue, setSortValue] = React.useState<string>(initialSortOption.id);
+    const [sorting, setSorting] = React.useState<SortingState>(initialSortOption.state);
+    const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: initialPageIndex, pageSize: initialPageSize });
+    const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+    const [drawerContactId, setDrawerContactId] = React.useState<string | null>(null);
+    const [isDrawerOpen, setIsDrawerOpen] = React.useState<boolean>(false);
+    const [conversionTarget, setConversionTarget] = React.useState<string | null>(null);
+
+    const metrics = React.useMemo(() => buildContactDashboardData(records), [records]);
+
+    const contactProfiles = React.useMemo(() => {
+        const map = new Map<string, ContactProfile>();
+        rows.forEach((row) => {
+            const record = records.find((entry) => entry.id === row.id);
+            if (record) {
+                map.set(row.id, { ...row, record });
             }
+        });
+        return map;
+    }, [records, rows]);
 
-            const records = Array.isArray(payload.data) ? payload.data : [];
-            setContacts(
-                records.map((contact) => ({
-                    ...contact,
-                    status: contact.status ?? 'lead'
-                }))
-            );
-        } catch (error) {
-            console.error('Failed to load contacts', error);
-            notify('error', error instanceof Error ? error.message : 'Unable to load contacts');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [notify]);
+    const selectedProfile = drawerContactId ? contactProfiles.get(drawerContactId) ?? null : null;
 
     React.useEffect(() => {
-        void loadContacts();
-    }, [loadContacts]);
-
-    const handleFormChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value } = event.target;
-        setFormState((previous) => ({ ...previous, [name]: value }));
-    }, []);
-
-    const resetForm = React.useCallback(() => {
-        setFormState({ ...INITIAL_FORM, owner_user_id: identity.user?.id ?? '' });
-        setEditingContactId(null);
-    }, [identity.user?.id]);
-
-    const handleSubmitContact = React.useCallback(
-        async (event: React.FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            setIsSubmittingContact(true);
-
+        let active = true;
+        async function loadContacts() {
+            setIsLoading(true);
+            setError(null);
             try {
-                const nowIso = new Date().toISOString();
-                const payload = {
-                    owner_user_id: formState.owner_user_id?.trim() || null,
-                    first_name: formState.first_name.trim() || null,
-                    last_name: formState.last_name.trim() || null,
-                    email: formState.email.trim() || null,
-                    phone: formState.phone.trim() || null,
-                    notes: formState.notes.trim() || null,
-                    address: formState.address.trim() || null,
-                    city: formState.city.trim() || null,
-                    state: formState.state.trim() || null,
-                    business: formState.business.trim() || null,
-                    status: formState.status,
-                    updated_at: nowIso,
-                    ...(editingContactId ? {} : { created_at: nowIso })
-                };
-
-                const endpoint = editingContactId ? `/api/contacts/${editingContactId}` : '/api/contacts';
-                const method = editingContactId ? 'PUT' : 'POST';
-
-                const response = await fetch(endpoint, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const result = (await response.json()) as ContactsApiResponse;
-
-                if (!response.ok) {
-                    throw new Error(result.error ?? (editingContactId ? 'Unable to update contact' : 'Unable to create contact'));
-                }
-
-                notify('success', editingContactId ? 'Contact updated' : 'Contact added to CRM');
-                setIsAddModalOpen(false);
-                resetForm();
-                setIsRefreshing(true);
-                await loadContacts();
-            } catch (error) {
-                console.error('Failed to submit contact', error);
-                notify(
-                    'error',
-                    error instanceof Error
-                        ? error.message
-                        : editingContactId
-                          ? 'Unable to update contact'
-                          : 'Unable to create contact'
-                );
+                const data = await fetchContacts();
+                if (!active) return;
+                setRecords(data);
+                setRows(data.map(mapContactToRow));
+            } catch (err) {
+                if (!active) return;
+                setError(err instanceof Error ? err.message : 'Unable to load contacts');
             } finally {
-                setIsSubmittingContact(false);
-                setIsRefreshing(false);
-            }
-        },
-        [editingContactId, formState, loadContacts, notify, resetForm]
-    );
-
-    const handleConvert = React.useCallback(
-        async (contact: ContactRecord) => {
-            setConversionTarget(contact.id);
-            try {
-                const response = await fetch(`/api/contacts/${contact.id}/convert`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                const payload = (await response.json()) as ConvertApiResponse;
-
-                if (!response.ok || !payload.data) {
-                    throw new Error(payload.error ?? 'Unable to convert contact');
+                if (active) {
+                    setIsLoading(false);
                 }
-
-                setConversionResult({ contact, result: payload.data });
-                notify('success', `${getContactName(contact)} is now a client`);
-                setIsRefreshing(true);
-                await loadContacts();
-                setIsContactModalOpen(false);
-                setSelectedContactId(null);
-            } catch (error) {
-                console.error('Failed to convert contact', error);
-                notify('error', error instanceof Error ? error.message : 'Unable to convert contact');
-            } finally {
-                setConversionTarget(null);
-                setIsRefreshing(false);
             }
-        },
-        [loadContacts, notify]
-    );
-
-    const handleViewContact = React.useCallback((contactId: string) => {
-        setSelectedContactId(contactId);
-        setIsContactModalOpen(true);
-    }, []);
-
-    const handleCloseContactModal = React.useCallback(() => {
-        setIsContactModalOpen(false);
-        setSelectedContactId(null);
-    }, []);
-
-    const handleEditContact = React.useCallback(
-        (contact: ContactRecord) => {
-            setFormState({
-                owner_user_id: contact.owner_user_id ?? identity.user?.id ?? '',
-                first_name: contact.first_name ?? '',
-                last_name: contact.last_name ?? '',
-                email: contact.email ?? '',
-                phone: contact.phone ?? '',
-                notes: contact.notes ?? '',
-                address: contact.address ?? '',
-                city: contact.city ?? '',
-                state: contact.state ?? '',
-                business: contact.business ?? '',
-                status: contact.status ?? 'lead'
-            });
-            setEditingContactId(contact.id);
-            setIsAddModalOpen(true);
-            setIsContactModalOpen(false);
-            setSelectedContactId(null);
-        },
-        [identity.user?.id]
-    );
-
-    const handleDeleteContact = React.useCallback(
-        async (contact: ContactRecord) => {
-            setIsRefreshing(true);
-            try {
-                const response = await fetch(`/api/contacts/${contact.id}`, {
-                    method: 'DELETE'
-                });
-
-                const payload = (await response.json()) as ContactsApiResponse;
-
-                if (!response.ok) {
-                    throw new Error(payload.error ?? 'Unable to delete contact');
-                }
-
-                notify('success', 'Contact deleted');
-                handleCloseContactModal();
-                await loadContacts();
-            } catch (error) {
-                console.error('Failed to delete contact', error);
-                notify('error', error instanceof Error ? error.message : 'Unable to delete contact');
-            } finally {
-                setIsRefreshing(false);
-            }
-        },
-        [handleCloseContactModal, loadContacts, notify]
-    );
-
-    const handleFormModalToggle = React.useCallback(
-        (open: boolean) => {
-            setIsAddModalOpen(open);
-            if (!open) {
-                resetForm();
-            }
-        },
-        [resetForm]
-    );
-
-    const analytics = React.useMemo(() => {
-        if (contacts.length === 0) {
-            return {
-                total: 0,
-                withEmail: 0,
-                withPhone: 0,
-                withNotes: 0,
-                newThisMonth: 0,
-                staleCount: 0,
-                cityCount: 0,
-                topCity: null as string | null,
-                latestActivity: null as string | null
-            };
         }
-
-        const now = dayjs();
-        const cityCounts = new Map<string, number>();
-        let withEmail = 0;
-        let withPhone = 0;
-        let withNotes = 0;
-        let newThisMonth = 0;
-        let staleCount = 0;
-        let latestActivity: string | null = null;
-
-        contacts.forEach((contact) => {
-            if (contact.email && contact.email.trim()) {
-                withEmail += 1;
-            }
-            if (contact.phone && contact.phone.trim()) {
-                withPhone += 1;
-            }
-            if (contact.notes && contact.notes.trim()) {
-                withNotes += 1;
-            }
-            if (contact.created_at && dayjs(contact.created_at).isSame(now, 'month')) {
-                newThisMonth += 1;
-            }
-
-            const updatedSource = contact.updated_at ?? contact.created_at;
-            if (updatedSource) {
-                const updatedAt = dayjs(updatedSource);
-                if (!latestActivity || updatedAt.isAfter(dayjs(latestActivity))) {
-                    latestActivity = updatedAt.toISOString();
-                }
-                if (updatedAt.isBefore(now.subtract(21, 'day'))) {
-                    staleCount += 1;
-                }
-            }
-
-            const location = [contact.city, contact.state].filter(Boolean).join(', ');
-            if (location) {
-                cityCounts.set(location, (cityCounts.get(location) ?? 0) + 1);
-            }
-        });
-
-        const [topCity] = Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1])[0] ?? [null];
-
-        return {
-            total: contacts.length,
-            withEmail,
-            withPhone,
-            withNotes,
-            newThisMonth,
-            staleCount,
-            cityCount: cityCounts.size,
-            topCity,
-            latestActivity
+        void loadContacts();
+        return () => {
+            active = false;
         };
-    }, [contacts]);
+    }, []);
 
-    const filteredContacts = React.useMemo(() => {
-        const normalizedSearch = searchTerm.trim().toLowerCase();
+    React.useEffect(() => {
+        setRows(records.map(mapContactToRow));
+    }, [records]);
 
-        const sorted = [...contacts].sort((a, b) => {
-            const getTime = (value?: string | null) => {
-                if (!value) {
-                    return 0;
-                }
-                const timestamp = dayjs(value);
-                return timestamp.isValid() ? timestamp.valueOf() : 0;
-            };
+    const tagOptions = React.useMemo(() => {
+        const tags = new Set<string>();
+        rows.forEach((row) => row.tags.forEach((tag) => tags.add(tag)));
+        return Array.from(tags).sort();
+    }, [rows]);
 
-            return getTime(b.updated_at ?? b.created_at) - getTime(a.updated_at ?? a.created_at);
+    const ownerOptions = React.useMemo(() => {
+        const owners = new Set<string>();
+        rows.forEach((row) => {
+            if (row.owner) {
+                owners.add(row.owner);
+            }
         });
+        return Array.from(owners).sort();
+    }, [rows]);
 
-        const filteredByStage = sorted.filter((contact) => {
-            if (activeFilter === 'withEmail') {
-                return Boolean(contact.email && contact.email.trim());
+    const filters = React.useMemo<ToolbarFilter[]>(() => {
+        const stageOptions = [
+            { value: 'new', label: 'New lead' },
+            { value: 'warm', label: 'Warm lead' },
+            { value: 'hot', label: 'Converted' }
+        ];
+        const statusOptions = [
+            { value: 'lead', label: 'Lead' },
+            { value: 'active', label: 'Engaged' },
+            { value: 'client', label: 'Client' }
+        ];
+        return [
+            { id: 'stage', label: 'Stage', options: stageOptions, value: stageFilter, onChange: setStageFilter },
+            { id: 'tags', label: 'Tags', options: tagOptions.map((tag) => ({ value: tag, label: tag })), value: tagFilter, onChange: setTagFilter },
+            { id: 'owner', label: 'Owner', options: ownerOptions.map((owner) => ({ value: owner, label: owner })), value: ownerFilter, onChange: setOwnerFilter },
+            { id: 'status', label: 'Status', options: statusOptions, value: statusFilter, onChange: setStatusFilter }
+        ];
+    }, [ownerFilter, ownerOptions, setOwnerFilter, setStageFilter, setStatusFilter, setTagFilter, stageFilter, statusFilter, tagFilter, tagOptions]);
+
+    const filteredRows = React.useMemo(() => {
+        const normalizedSearch = search.trim().toLowerCase();
+        return rows.filter((row) => {
+            if (normalizedSearch) {
+                const haystack = [row.name, row.email ?? '', row.phone ?? '', row.business ?? '', row.owner ?? '']
+                    .map((value) => value.toLowerCase())
+                    .some((value) => value.includes(normalizedSearch));
+                if (!haystack) {
+                    return false;
+                }
             }
 
-            if (activeFilter === 'withNotes') {
-                return Boolean(contact.notes && contact.notes.trim());
+            if (stageFilter.length > 0 && !stageFilter.includes(row.stage)) {
+                return false;
+            }
+
+            if (tagFilter.length > 0 && !row.tags.some((tag) => tagFilter.includes(tag))) {
+                return false;
+            }
+
+            if (ownerFilter.length > 0 && (!row.owner || !ownerFilter.includes(row.owner))) {
+                return false;
+            }
+
+            if (statusFilter.length > 0 && !statusFilter.includes(row.status)) {
+                return false;
             }
 
             return true;
         });
+    }, [ownerFilter, rows, search, stageFilter, statusFilter, tagFilter]);
 
-        if (!normalizedSearch) {
-            return filteredByStage;
-        }
+    React.useEffect(() => {
+        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+        setRowSelection({});
+    }, [filteredRows.length, search, stageFilter, tagFilter, ownerFilter, statusFilter]);
 
-        return filteredByStage.filter((contact) => {
-            const haystack = [
-                contact.first_name,
-                contact.last_name,
-                contact.business,
-                contact.email,
-                contact.phone,
-                contact.city,
-                contact.state,
-                contact.notes
-            ]
-                .filter((value): value is string => Boolean(value))
-                .map((value) => value.toLowerCase());
-
-            return haystack.some((value) => value.includes(normalizedSearch));
-        });
-    }, [contacts, activeFilter, searchTerm]);
-
-    const hasContacts = contacts.length > 0;
-    const visibleContacts = hasContacts ? filteredContacts : [];
-    const isEditingContact = Boolean(editingContactId);
-
-    const handleResetFilters = React.useCallback(() => {
-        setActiveFilter('all');
-        setSearchTerm('');
+    const columns = React.useMemo<ColumnDef<ContactTableRow>[]>(() => {
+        const stageOrder: Record<ContactTableRow['stage'], number> = { new: 0, warm: 1, hot: 2 };
+        return [
+            {
+                id: 'select',
+                header: ({ table }) => (
+                    <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-400"
+                        checked={table.getIsAllPageRowsSelected()}
+                        onChange={table.getToggleAllPageRowsSelectedHandler()}
+                        aria-label="Select contacts"
+                    />
+                ),
+                cell: ({ row }) => (
+                    <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-400"
+                        checked={row.getIsSelected()}
+                        onChange={row.getToggleSelectedHandler()}
+                        onClick={(event) => event.stopPropagation()}
+                        aria-label={`Select ${row.original.name}`}
+                    />
+                ),
+                enableSorting: false,
+                size: 48
+            },
+            {
+                accessorKey: 'name',
+                header: 'Contact',
+                cell: ({ row }) => (
+                    <div className="flex flex-col">
+                        <span className="font-semibold text-white">{row.original.name}</span>
+                        <span className="text-xs text-slate-400">{row.original.email ?? 'No email'} • {row.original.phone ?? '—'}</span>
+                    </div>
+                )
+            },
+            {
+                accessorKey: 'stage',
+                header: 'Stage',
+                cell: ({ row }) => (
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStageBadge(row.original.stage)}`}>
+                        {row.original.stage.toUpperCase()}
+                    </span>
+                ),
+                sortingFn: (a, b) => stageOrder[a.original.stage] - stageOrder[b.original.stage]
+            },
+            {
+                accessorKey: 'lastInteractionAt',
+                header: 'Last interaction',
+                cell: ({ row }) => (
+                    <span className="text-sm text-slate-300">
+                        {row.original.lastInteractionAt ? formatDate(row.original.lastInteractionAt) : '—'}
+                    </span>
+                )
+            },
+            {
+                accessorKey: 'owner',
+                header: 'Owner',
+                cell: ({ row }) => <span className="text-sm text-slate-300">{row.original.owner ?? 'Unassigned'}</span>
+            },
+            {
+                id: 'actions',
+                header: 'Actions',
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div className="flex items-center gap-2 text-xs">
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setDrawerContactId(row.original.id);
+                                setIsDrawerOpen(true);
+                            }}
+                            className="rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-indigo-400 hover:text-white"
+                        >
+                            View
+                        </button>
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setDrawerContactId(row.original.id);
+                                setIsDrawerOpen(true);
+                            }}
+                            className="rounded-full border border-emerald-500/50 px-3 py-1 text-xs font-medium text-emerald-200 transition hover:border-emerald-400 hover:text-white"
+                        >
+                            Convert
+                        </button>
+                    </div>
+                )
+            }
+        ];
     }, []);
 
+    const selectedCount = Object.keys(rowSelection).length;
+
+    const hasActiveFilters =
+        stageFilter.length > 0 || tagFilter.length > 0 || ownerFilter.length > 0 || statusFilter.length > 0;
+
+    const resetFilters = () => {
+        setStageFilter([]);
+        setTagFilter([]);
+        setOwnerFilter([]);
+        setStatusFilter([]);
+    };
+
+    const addNotification = React.useCallback((message: string, tone: NotificationBanner['tone']) => {
+        setNotifications((previous) => [...previous, { id: `${Date.now()}`, message, tone }]);
+    }, []);
+
+    React.useEffect(() => {
+        if (notifications.length === 0) {
+            return;
+        }
+        const timer = window.setTimeout(() => {
+            setNotifications((previous) => previous.slice(1));
+        }, 4000);
+        return () => window.clearTimeout(timer);
+    }, [notifications]);
+
+    const queryState: QueryState = React.useMemo(() => {
+        const state: QueryState = {};
+        if (search.trim()) state.q = search.trim();
+        if (stageFilter.length > 0) state.stage = stageFilter.join(',');
+        if (tagFilter.length > 0) state.tags = tagFilter.join(',');
+        if (ownerFilter.length > 0) state.owner = ownerFilter.join(',');
+        if (statusFilter.length > 0) state.status = statusFilter.join(',');
+        if (sortValue !== DEFAULT_CONTACT_SORT.id) state.sort = sortValue;
+        if (pagination.pageIndex > 0) state.page = String(pagination.pageIndex + 1);
+        if (pagination.pageSize !== 10) state.pageSize = String(pagination.pageSize);
+        return state;
+    }, [ownerFilter, pagination.pageIndex, pagination.pageSize, search, sortValue, stageFilter, statusFilter, tagFilter]);
+
+    React.useEffect(() => {
+        if (!router.isReady) {
+            return;
+        }
+        const current: Record<string, string> = {};
+        Object.entries(router.query).forEach(([key, value]) => {
+            if (Array.isArray(value)) {
+                current[key] = value.join(',');
+            } else if (typeof value === 'string') {
+                current[key] = value;
+            }
+        });
+        const nextEntries = Object.entries(queryState);
+        const isEqual =
+            nextEntries.length === Object.keys(current).length &&
+            nextEntries.every(([key, value]) => current[key] === value);
+        if (!isEqual) {
+            void router.replace({ pathname: router.pathname, query: queryState }, undefined, { shallow: true });
+        }
+    }, [queryState, router]);
+
+    React.useEffect(() => {
+        const option = CONTACT_SORT_OPTIONS.find((entry) => entry.id === sortValue);
+        if (option) {
+            setSorting(option.state);
+        }
+    }, [sortValue]);
+
+    const handleSortingChange = React.useCallback((updater: SortingState | ((old: SortingState) => SortingState)) => {
+        setSorting((previous) => {
+            const next = typeof updater === 'function' ? updater(previous) : updater;
+            if (next.length > 0) {
+                const candidate = CONTACT_SORT_OPTIONS.find(
+                    (option) => option.state.length === next.length && option.state.every((entry, index) => entry.id === next[index]?.id && entry.desc === next[index]?.desc)
+                );
+                if (candidate) {
+                    setSortValue(candidate.id);
+                }
+            }
+            return next;
+        });
+    }, []);
+
+    const handleConvertContact = React.useCallback(
+        async (profile: ContactProfile) => {
+            setConversionTarget(profile.id);
+            try {
+                await convertContactToClient(profile.id);
+                addNotification(`${profile.name} converted to a client.`, 'success');
+                setRecords((previous) =>
+                    previous.map((record) =>
+                        record.id === profile.id
+                            ? {
+                                  ...record,
+                                  status: 'client',
+                                  updated_at: new Date().toISOString()
+                              }
+                            : record
+                    )
+                );
+            } catch (err) {
+                addNotification(err instanceof Error ? err.message : 'Unable to convert contact', 'error');
+            } finally {
+                setConversionTarget(null);
+            }
+        },
+        [addNotification]
+    );
+
     return (
-        <div className="px-4 pb-16 pt-8 sm:px-6 lg:px-10">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.4em] text-indigo-500 dark:text-indigo-300">
-                        Studio network
-                    </p>
-                    <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Contacts</h1>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-                        Keep every lead organised. Add contacts as they come in, then upgrade them to clients when projects become real.
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        type="button"
-                        onClick={() => void loadContacts()}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
-                        disabled={isRefreshing}
-                    >
-                        {isRefreshing ? 'Refreshing…' : 'Refresh'}
-                    </button>
-                    <Dialog.Root open={isAddModalOpen} onOpenChange={handleFormModalToggle}>
-                        <Dialog.Trigger asChild>
-                            <button
-                                type="button"
-                                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-transparent bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-offset-slate-950"
-                            >
-                                Add contact
-                            </button>
-                        </Dialog.Trigger>
-                        <AddContactModal
-                            onSubmit={handleSubmitContact}
-                            onChange={handleFormChange}
-                            isSubmitting={isSubmittingContact}
-                            formState={formState}
-                            isEditing={isEditingContact}
-                        />
-                    </Dialog.Root>
-                </div>
-            </div>
-
-            <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <DashboardCard
-                    title="Active contacts"
-                    value={`${analytics.total}`}
-                    trend={{
-                        value:
-                            analytics.newThisMonth > 0
-                                ? `${analytics.newThisMonth} added this month`
-                                : 'Log your next lead',
-                        label: 'Studio pipeline',
-                        isPositive: analytics.newThisMonth > 0
-                    }}
-                >
-                    <p className="mb-0 text-sm">
-                        {analytics.staleCount > 0
-                            ? `${analytics.staleCount} contacts need a follow-up touch.`
-                            : 'Every lead has been touched recently.'}
-                    </p>
-                </DashboardCard>
-                <DashboardCard
-                    title="Reachable audience"
-                    value={
-                        analytics.total > 0
-                            ? `${analytics.withEmail}/${analytics.total} emails`
-                            : '0 emails'
-                    }
-                    trend={{
-                        value: `${analytics.withPhone} phone numbers`,
-                        label: 'Contact coverage',
-                        isPositive: analytics.withEmail >= Math.ceil(analytics.total / 2)
-                    }}
-                >
-                    <p className="mb-0 text-sm">
-                        {analytics.withEmail === analytics.total
-                            ? 'Every lead can be emailed instantly.'
-                            : `${analytics.total - analytics.withEmail} contacts still need an email captured.`}
-                    </p>
-                </DashboardCard>
-                <DashboardCard
-                    title="Context captured"
-                    value={`${analytics.withNotes}`}
-                    trend={{
-                        value: `${Math.round(
-                            (analytics.total === 0 ? 0 : (analytics.withNotes / analytics.total) * 100)
-                        )}% enriched`,
-                        label: 'Discovery notes',
-                        isPositive: analytics.withNotes >= Math.ceil(Math.max(analytics.total, 1) * 0.5)
-                    }}
-                >
-                    <p className="mb-0 text-sm">
-                        {analytics.withNotes > 0
-                            ? 'Detailed notes keep handoffs smooth when projects become real.'
-                            : 'Add quick notes after intro calls to boost conversions.'}
-                    </p>
-                </DashboardCard>
-                <DashboardCard
-                    title="Regional reach"
-                    value={analytics.cityCount > 0 ? `${analytics.cityCount} cities` : '—'}
-                    trend={{
-                        value: analytics.topCity ? `Hotspot: ${analytics.topCity}` : 'Capture locations on intake',
-                        label: 'Lead geography',
-                        isPositive: Boolean(analytics.topCity)
-                    }}
-                >
-                    <p className="mb-0 text-sm">
-                        {analytics.latestActivity
-                            ? `Last update ${dayjs(analytics.latestActivity).format('MMM D, YYYY')}.`
-                            : 'No activity recorded yet.'}
-                    </p>
-                </DashboardCard>
-            </div>
-
-            <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <label htmlFor="contact-search" className="sr-only">
-                        Search contacts
-                    </label>
-                    <input
-                        id="contact-search"
-                        type="search"
-                        value={searchTerm}
-                        onChange={(event) => setSearchTerm(event.target.value)}
-                        placeholder="Search by name, company, or notes"
-                        className={`${inputClassName} w-full max-w-xs`}
-                    />
-                </div>
-                <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
-                    <div className="inline-flex rounded-full bg-slate-100 p-1 dark:bg-slate-800/60">
-                        {FILTER_OPTIONS.map((option) => (
-                            <button
-                                key={option.id}
-                                type="button"
-                                onClick={() => setActiveFilter(option.id)}
-                                className={classNames(
-                                    'rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                                    activeFilter === option.id
-                                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white'
-                                        : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-                                )}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
-                    </div>
-                    <span className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400 dark:text-slate-500">
-                        {hasContacts
-                            ? `Showing ${visibleContacts.length} of ${contacts.length}`
-                            : 'No contacts yet'}
-                    </span>
-                </div>
-            </div>
-
-            {feedback ? (
-                <div
-                    className={`mt-6 rounded-3xl border px-4 py-3 text-sm font-medium shadow-sm ${
-                        feedback.tone === 'success'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300'
-                            : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300'
-                    }`}
-                >
-                    {feedback.message}
-                </div>
-            ) : null}
-
-            <section className="mt-10">
-                {isLoading ? (
-                    <div className="flex h-48 items-center justify-center rounded-3xl border border-dashed border-slate-300 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                        Loading contacts…
-                    </div>
-                ) : !hasContacts ? (
-                    <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                        <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">No contacts yet</p>
-                        <p className="max-w-md text-sm">
-                            Start by adding your first contact. When you win the work, convert them to a client and activate billing, invoices, and a gallery.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-transparent bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-offset-slate-950"
-                        >
-                            Add your first contact
-                        </button>
-                    </div>
-                ) : visibleContacts.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 p-12 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                        <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">No matches</p>
-                        <p className="max-w-md text-sm">
-                            Adjust your search or filter to rediscover contacts hidden from view.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={handleResetFilters}
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
-                        >
-                            Clear filters
-                        </button>
-                    </div>
-                ) : (
-                    <ContactsTable contacts={visibleContacts} onSelect={handleViewContact} isLoading={isRefreshing} />
-                )}
+        <div className="flex flex-col gap-6">
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <KpiCard label="Total contacts" value={metrics.total.toString()} helper="Across your workspace" />
+                <KpiCard label="New this month" value={metrics.newThisMonth.toString()} helper="Captured in the last 30 days" />
+                <KpiCard label="Converted to client" value={metrics.converted.toString()} helper="Marked as clients" />
+                <KpiCard label="Needs follow-up" value={metrics.needsFollowUp.toString()} helper="No recent touchpoint" />
             </section>
 
-            <ContactModal
-                contactId={selectedContactId}
-                open={isContactModalOpen}
-                onClose={handleCloseContactModal}
-                onEdit={handleEditContact}
-                onConvert={handleConvert}
-                onDelete={handleDeleteContact}
-                isConverting={Boolean(conversionTarget && selectedContactId === conversionTarget)}
+            {error ? (
+                <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</div>
+            ) : null}
+
+            {notifications.map((notification) => (
+                <div
+                    key={notification.id}
+                    className={`rounded-2xl border p-3 text-sm ${
+                        notification.tone === 'success'
+                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                            : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                    }`}
+                >
+                    {notification.message}
+                </div>
+            ))}
+
+            <DataToolbar
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search contacts by name, email, phone, owner…"
+                filters={filters}
+                hasActiveFilters={hasActiveFilters}
+                onResetFilters={resetFilters}
+                sortOptions={CONTACT_SORT_OPTIONS.map(({ id, label }) => ({ id, label }))}
+                sortValue={sortValue}
+                onSortChange={setSortValue}
+                primaryAction={{ label: 'Add contact', href: '/contacts/new' }}
+                selectedCount={selectedCount}
+                bulkActions={
+                    <button
+                        type="button"
+                        disabled={selectedCount === 0}
+                        className="rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 transition enabled:hover:border-indigo-400 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Bulk actions
+                    </button>
+                }
+                pageSize={pagination.pageSize}
+                onPageSizeChange={(value) => setPagination({ pageIndex: 0, pageSize: value })}
             />
-            <ConversionSuccessModal conversion={conversionResult} onClose={() => setConversionResult(null)} />
+
+            <DataTable<ContactTableRow>
+                columns={columns}
+                data={filteredRows}
+                sorting={sorting}
+                onSortingChange={handleSortingChange}
+                pagination={pagination}
+                onPaginationChange={setPagination}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                getRowId={(row) => row.id}
+                onRowClick={(row) => {
+                    setDrawerContactId(row.id);
+                    setIsDrawerOpen(true);
+                }}
+                isLoading={isLoading}
+                emptyMessage={
+                    <div className="space-y-3">
+                        <p>No contacts match your filters.</p>
+                        <Link href="/contacts/new" className="text-indigo-300 hover:text-white">
+                            Add your next lead
+                        </Link>
+                    </div>
+                }
+            />
+
+            <ContactDrawer
+                contact={selectedProfile}
+                open={isDrawerOpen && Boolean(selectedProfile)}
+                onClose={() => setIsDrawerOpen(false)}
+                onConvert={handleConvertContact}
+                isConverting={conversionTarget === selectedProfile?.id}
+            />
         </div>
     );
 }
 
-type AddContactModalProps = {
-    onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-    formState: ContactFormState;
-    isSubmitting: boolean;
-    isEditing: boolean;
-};
-
-function AddContactModal({ onSubmit, onChange, formState, isSubmitting, isEditing }: AddContactModalProps) {
-    const heading = isEditing ? 'Edit contact' : 'Add contact';
-    const description = isEditing
-        ? 'Update the latest details so your team always has the right context.'
-        : 'Capture the essentials so you can follow up quickly and convert to a client later.';
-    const submitLabel = isSubmitting ? 'Saving…' : isEditing ? 'Save changes' : 'Create contact';
-
-    return (
-        <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm" />
-            <Dialog.Content className="fixed inset-0 z-50 mx-auto my-10 h-fit w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl transition focus:outline-none dark:border-slate-800 dark:bg-slate-950">
-                <form onSubmit={onSubmit} className="flex flex-col gap-6 p-8">
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <Dialog.Title className="text-xl font-semibold text-slate-900 dark:text-white">{heading}</Dialog.Title>
-                            <Dialog.Description className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                {description}
-                            </Dialog.Description>
-                        </div>
-                        <Dialog.Close asChild>
-                            <button
-                                type="button"
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
-                                aria-label="Close"
-                            >
-                                ×
-                            </button>
-                        </Dialog.Close>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-                            <span className="font-semibold">First name</span>
-                            <input
-                                className={inputClassName}
-                                name="first_name"
-                                value={formState.first_name}
-                                onChange={onChange}
-                                placeholder="Taylor"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-                            <span className="font-semibold">Last name</span>
-                            <input
-                                className={inputClassName}
-                                name="last_name"
-                                value={formState.last_name}
-                                onChange={onChange}
-                                placeholder="Henderson"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-                            <span className="font-semibold">Email</span>
-                            <input
-                                className={inputClassName}
-                                name="email"
-                                value={formState.email}
-                                onChange={onChange}
-                                type="email"
-                                placeholder="taylor@example.com"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-                            <span className="font-semibold">Phone</span>
-                            <input
-                                className={inputClassName}
-                                name="phone"
-                                value={formState.phone}
-                                onChange={onChange}
-                                placeholder="(415) 555-0110"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300 md:col-span-2">
-                            <span className="font-semibold">Business</span>
-                            <input
-                                className={inputClassName}
-                                name="business"
-                                value={formState.business}
-                                onChange={onChange}
-                                placeholder="Henderson Creative"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300 md:col-span-2">
-                            <span className="font-semibold">Address</span>
-                            <input
-                                className={inputClassName}
-                                name="address"
-                                value={formState.address}
-                                onChange={onChange}
-                                placeholder="100 Market Street"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-                            <span className="font-semibold">City</span>
-                            <input
-                                className={inputClassName}
-                                name="city"
-                                value={formState.city}
-                                onChange={onChange}
-                                placeholder="San Francisco"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-                            <span className="font-semibold">State</span>
-                            <input
-                                className={inputClassName}
-                                name="state"
-                                value={formState.state}
-                                onChange={onChange}
-                                placeholder="CA"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-                            <span className="font-semibold">Status</span>
-                            <select
-                                className={inputClassName}
-                                name="status"
-                                value={formState.status}
-                                onChange={onChange}
-                            >
-                                <option value="lead">Lead</option>
-                                <option value="active">Active</option>
-                                <option value="client">Client</option>
-                            </select>
-                        </label>
-                    </div>
-
-                    <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-                        <span className="font-semibold">Notes</span>
-                        <textarea
-                            className={`${inputClassName} h-28 resize-none`}
-                            name="notes"
-                            value={formState.notes}
-                            onChange={onChange}
-                            placeholder="Met at the architecture expo. Interested in a spring shoot."
-                        />
-                    </label>
-
-                    <div className="flex items-center justify-between">
-                        <div className="text-xs text-slate-400">
-                            <span className="font-semibold text-slate-500 dark:text-slate-300">Owner user ID</span>
-                            <input
-                                className={`${inputClassName} mt-1`}
-                                name="owner_user_id"
-                                value={formState.owner_user_id}
-                                onChange={onChange}
-                                placeholder="Supabase auth user ID"
-                            />
-                        </div>
-                        <div className="flex gap-3">
-                            <Dialog.Close asChild>
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
-                                >
-                                    Cancel
-                                </button>
-                            </Dialog.Close>
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="inline-flex items-center justify-center rounded-2xl border border-transparent bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-offset-slate-950"
-                            >
-                                {submitLabel}
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </Dialog.Content>
-        </Dialog.Portal>
-    );
-}
-
-type ConversionSuccessModalProps = {
-    conversion: { contact: ContactRecord; result: ConvertContactResponse } | null;
-    onClose: () => void;
-};
-
-function ConversionSuccessModal({ conversion, onClose }: ConversionSuccessModalProps) {
-    const open = Boolean(conversion);
-
-    if (!conversion) {
-        return null;
+function getStageBadge(stage: ContactTableRow['stage']): string {
+    switch (stage) {
+        case 'hot':
+            return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
+        case 'warm':
+            return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
+        default:
+            return 'border-indigo-500/40 bg-indigo-500/10 text-indigo-200';
     }
+}
 
-    const { contact, result } = conversion;
-
+function KpiCard({ label, value, helper }: { label: string; value: string; helper: string }) {
     return (
-        <Dialog.Root
-            open={open}
-            onOpenChange={(value) => {
-                if (!value) {
-                    onClose();
-                }
-            }}
-        >
-            <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm" />
-                <Dialog.Content className="fixed inset-0 z-50 mx-auto my-16 h-fit w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-8 shadow-2xl focus:outline-none dark:border-slate-700 dark:bg-slate-950">
-                    <div className="flex flex-col gap-6">
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <Dialog.Title className="text-2xl font-semibold text-slate-900 dark:text-white">
-                                    Client ready to launch
-                                </Dialog.Title>
-                                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                                    {getContactName(contact)} now has a client record with billing, invoices, calendar, and gallery tabs prepared.
-                                </p>
-                            </div>
-                            <Dialog.Close asChild>
-                                <button
-                                    type="button"
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
-                                    aria-label="Close"
-                                >
-                                    ×
-                                </button>
-                            </Dialog.Close>
-                        </div>
-
-                        <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/60">
-                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Portal modules</p>
-                            <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                                {result.portal.tabs.map((tab) => (
-                                    <li key={tab.id} className="flex items-start gap-2">
-                                        <span className="mt-0.5 text-emerald-500">✓</span>
-                                        <div>
-                                            <p className="font-semibold text-slate-700 dark:text-slate-100">{tab.label}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{tab.description}</p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        <div className="flex flex-col gap-3 rounded-3xl border border-indigo-200 bg-indigo-50/70 p-5 text-sm text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
-                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-400">Client portal</p>
-                            <p>Send the link below once you are ready for them to log in.</p>
-                            <Link
-                                href={result.portal.url}
-                                className="break-all font-semibold text-indigo-600 underline hover:text-indigo-500 dark:text-indigo-300"
-                            >
-                                {result.portal.url}
-                            </Link>
-                        </div>
-
-                        <div className="flex items-center justify-end gap-3">
-                            <Dialog.Close asChild>
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
-                                >
-                                    Close
-                                </button>
-                            </Dialog.Close>
-                            <Link
-                                href={result.portal.url}
-                                className="inline-flex items-center justify-center rounded-2xl border border-transparent bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-offset-slate-950"
-                            >
-                                Open portal
-                            </Link>
-                        </div>
-                    </div>
-                </Dialog.Content>
-            </Dialog.Portal>
-        </Dialog.Root>
+        <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
+            <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+            <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
+            <p className="mt-2 text-xs text-slate-500">{helper}</p>
+        </div>
     );
 }
+

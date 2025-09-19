@@ -158,6 +158,16 @@ Here are a few suggestions on what to do next if you're new to Netlify visual ed
 - Learn [Netlify visual editor overview](https://docs.netlify.com/visual-editor/visual-editing/)
 - Check [Netlify visual editor reference documentation](https://visual-editor-reference.netlify.com/)
 
+## CRM data tables
+
+The Clients and Contacts workspaces now share a data-table architecture powered by TanStack Table and the components under `src/components/data`. To add or remove columns:
+
+1. Update the column definitions in `src/pages/clients/index.tsx` or `src/pages/contacts/index.tsx` (look for the `columns` memo). Columns are plain TanStack definitions, so you can add custom cells, sorting functions, or width hints.
+2. If the column requires additional data, extend the corresponding loader in `src/lib/api/clients.ts` or the contact mapper in `src/lib/api/contacts.ts` to surface the new field.
+3. Adjust the `ClientDrawer` or `ContactDrawer` components if the detail view should mirror the new data.
+
+Filters and search chips live inside `DataToolbar`. Each page wires its own `ToolbarFilter[]` array—adding a filter is as simple as adding another entry with a unique `id`, a list of options, and a state hook. The toolbar automatically renders the menu and keeps query-string state in sync so the views stay shareable.
+
 ## Support
 
 If you get stuck along the way, get help in our [support forums](https://answers.netlify.com/).
