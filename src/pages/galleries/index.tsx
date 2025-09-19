@@ -398,7 +398,7 @@ function DropboxAssetLibrary() {
                                 </button>
                             ) : null}
                             <Link
-                                href="/crm"
+                                href="/dashboard"
                                 className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#5D3BFF] via-[#3D7CFF] to-[#4DE5FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4DE5FF] focus:ring-offset-slate-950"
                             >
                                 Return to CRM dashboard
@@ -734,10 +734,7 @@ function DropboxAssetLibrary() {
 
 export default function GalleriesPage() {
     return (
-        <CrmAuthGuard
-            title="Secure Dropbox asset library"
-            description="Authenticate with the studio access code to browse synced Dropbox files and confirm storage usage."
-        >
+        <CrmAuthGuard>
             <DropboxAssetLibrary />
         </CrmAuthGuard>
     );
