@@ -1,148 +1,269 @@
 import * as React from 'react';
 import Head from 'next/head';
-import dayjs from 'dayjs';
+import useSWR from 'swr';
 
-import { StatusPill, WorkspaceLayout } from '../../components/crm';
-import type { StatusTone } from '../../components/crm/StatusPill';
-import type { ProjectRecord } from '../../data/crm';
-import { projectPipeline } from '../../data/crm';
-import type { BookingStatus } from '../../components/crm';
-import type { InvoiceStatus } from '../../types/invoice';
+import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Select } from '../../components/ui/select';
+import { LayoutShell, PageHeader, Toolbar, ToolbarSection } from '../../components/dashboard';
+import { NewProjectDrawer, ProjectCard } from '../../components/projects';
+import { getSupabaseBrowserClient } from '../../lib/supabase-browser';
+import type { ProjectListResponse, ProjectRecord, ProjectStatus } from '../../types/project';
 
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-});
+const STATUS_OPTIONS: Array<ProjectStatus | 'ALL'> = ['ALL', 'PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETE', 'CANCELLED'];
 
-const bookingStatusTone: Record<BookingStatus, StatusTone> = {
-    Confirmed: 'success',
-    Pending: 'warning',
-    Editing: 'info'
+const fetcher = async <T,>(url: string): Promise<T> => {
+    const response = await fetch(url);
+    if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? 'Request failed');
+    }
+    return (await response.json()) as T;
 };
 
-const invoiceStatusTone: Record<InvoiceStatus, StatusTone> = {
-    Draft: 'neutral',
-    Sent: 'info',
-    Paid: 'success',
-    Overdue: 'danger'
+type ToastState = {
+    id: number;
+    message: string;
+    variant: 'success' | 'error';
 };
 
-function resolveProjectStatus(progress: number): { label: string; tone: StatusTone } {
-    if (progress >= 0.95) {
-        return { label: 'Completed', tone: 'success' };
+function Toast({ toast }: { toast: ToastState | null }) {
+    if (!toast) {
+        return null;
     }
-    if (progress >= 0.6) {
-        return { label: 'In progress', tone: 'info' };
-    }
-    return { label: 'Planning', tone: 'warning' };
-}
+    const variantClass =
+        toast.variant === 'success'
+            ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
+            : 'border-rose-400/40 bg-rose-500/15 text-rose-100';
 
-function formatDate(value: string) {
-    return dayjs(value).format('MMM D, YYYY');
-}
-
-function ProjectsContent({ projects }: { projects: ProjectRecord[] }) {
     return (
-        <div className="row row-cards">
-            {projects.map((project) => {
-                const progressValue = Math.round(project.progress * 100);
-                const projectStatus = resolveProjectStatus(project.progress);
-
-                return (
-                    <div key={project.id} className="col-md-6 col-xl-4">
-                        <div className="card h-100">
-                            <div className="card-body d-flex flex-column">
-                                <div className="d-flex align-items-start justify-content-between gap-3">
-                                    <div>
-                                        <StatusPill tone={projectStatus.tone}>{projectStatus.label}</StatusPill>
-                                        <h2 className="card-title mt-3 mb-1">{project.name}</h2>
-                                        <div className="text-secondary">Client: {project.client}</div>
-                                    </div>
-                                    <div className="text-end">
-                                        <span className="crm-progress-value">{progressValue}%</span>
-                                        <div className="crm-progress-label text-secondary small">completion</div>
-                                    </div>
-                                </div>
-                                <p className="text-secondary mt-3 flex-grow-0">{project.description}</p>
-                                <div className="mt-4">
-                                    <div className="crm-dropdown-label">Timeline</div>
-                                    <ul className="list-unstyled crm-project-timeline mb-0">
-                                        {project.shoots.map((milestone) => (
-                                            <li key={milestone.id} className="crm-project-milestone">
-                                                <span className="crm-project-milestone-indicator" aria-hidden />
-                                                <div className="flex-grow-1">
-                                                    <div className="d-flex align-items-center justify-content-between gap-2">
-                                                        <div className="fw-semibold">{milestone.label}</div>
-                                                        <StatusPill tone={bookingStatusTone[milestone.status]}>
-                                                            {milestone.status}
-                                                        </StatusPill>
-                                                    </div>
-                                                    <div className="text-secondary small mt-1">
-                                                        {formatDate(milestone.date)}
-                                                        {milestone.location ? ` · ${milestone.location}` : ''}
-                                                    </div>
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                                <div className="mt-4">
-                                    <div className="crm-dropdown-label">Accounts</div>
-                                    <div className="crm-project-invoices d-flex flex-column gap-3">
-                                        {project.invoices.map((invoice) => (
-                                            <div key={invoice.id} className="d-flex align-items-center justify-content-between gap-3">
-                                                <div>
-                                                    <div className="fw-semibold">Invoice #{invoice.id}</div>
-                                                    <div className="text-secondary small">
-                                                        Due {formatDate(invoice.dueDate)}
-                                                    </div>
-                                                </div>
-                                                <div className="text-end">
-                                                    <div className="fw-semibold">{currencyFormatter.format(invoice.amount)}</div>
-                                                    <StatusPill tone={invoiceStatusTone[invoice.status]}>{invoice.status}</StatusPill>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="mt-4">
-                                    <div className="progress progress-sm">
-                                        <div className="progress-bar" role="progressbar" style={{ width: `${progressValue}%` }} />
-                                    </div>
-                                    <div className="d-flex align-items-center justify-content-between text-secondary small mt-2">
-                                        <span>{dayjs(project.startDate).format('MMM D')}</span>
-                                        <span>{dayjs(project.endDate).format('MMM D')}</span>
-                                    </div>
-                                </div>
-                                <div className="mt-4 d-flex flex-wrap gap-2">
-                                    {project.tags.map((tag) => (
-                                        <span
-                                            key={tag}
-                                            className="badge bg-primary-lt text-primary fw-semibold text-uppercase"
-                                        >
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
+        <div className="pointer-events-none fixed bottom-6 right-6 z-50">
+            <div className={`pointer-events-auto rounded-2xl border px-4 py-3 text-sm shadow-lg ${variantClass}`}>
+                {toast.message}
+            </div>
         </div>
+    );
+}
+
+function useDebouncedValue<T>(value: T, delay = 300) {
+    const [debounced, setDebounced] = React.useState(value);
+
+    React.useEffect(() => {
+        const timer = window.setTimeout(() => setDebounced(value), delay);
+        return () => window.clearTimeout(timer);
+    }, [value, delay]);
+
+    return debounced;
+}
+
+function ProjectsWorkspace() {
+    const [search, setSearch] = React.useState('');
+    const [statusFilter, setStatusFilter] = React.useState<ProjectStatus | 'ALL'>('ALL');
+    const [tagFilter, setTagFilter] = React.useState<string>('');
+    const [isDrawerOpen, setDrawerOpen] = React.useState(false);
+    const [toast, setToast] = React.useState<ToastState | null>(null);
+
+    const debouncedSearch = useDebouncedValue(search.trim().toLowerCase(), 300);
+
+    React.useEffect(() => {
+        if (!toast) {
+            return undefined;
+        }
+        const timer = window.setTimeout(() => setToast(null), 3200);
+        return () => window.clearTimeout(timer);
+    }, [toast]);
+
+    const projectsKey = React.useMemo(() => {
+        const params = new URLSearchParams();
+        if (debouncedSearch.length > 0) {
+            params.set('q', debouncedSearch);
+        }
+        if (statusFilter !== 'ALL') {
+            params.set('status', statusFilter);
+        }
+        if (tagFilter.trim().length > 0) {
+            params.set('tag', tagFilter.trim());
+        }
+        params.set('page', '1');
+        params.set('pageSize', '30');
+        return `/api/projects?${params.toString()}`;
+    }, [debouncedSearch, statusFilter, tagFilter]);
+
+    const {
+        data,
+        error,
+        isLoading,
+        mutate: mutateProjects
+    } = useSWR<ProjectListResponse>(projectsKey, fetcher, {
+        revalidateOnFocus: false
+    });
+
+    const projects = data?.data ?? [];
+
+    const tagOptions = React.useMemo(() => {
+        const set = new Set<string>();
+        for (const project of projects) {
+            for (const tag of project.tags) {
+                set.add(tag);
+            }
+        }
+        return Array.from(set).sort((a, b) => a.localeCompare(b));
+    }, [projects]);
+
+    React.useEffect(() => {
+        const client = getSupabaseBrowserClient();
+        const channel = client
+            .channel('projects-board')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+                void mutateProjects();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'project_tasks' }, () => {
+                void mutateProjects();
+            })
+            .subscribe();
+
+        return () => {
+            void client.removeChannel(channel);
+        };
+    }, [mutateProjects]);
+
+    const handleProjectCreated = React.useCallback(
+        (project: ProjectRecord) => {
+            setToast({ id: Date.now(), message: `${project.title} created`, variant: 'success' });
+
+            const matchesStatus = statusFilter === 'ALL' || project.status === statusFilter;
+            const matchesTag = !tagFilter || project.tags.includes(tagFilter);
+            const matchesSearch =
+                debouncedSearch.length === 0 ||
+                project.title.toLowerCase().includes(debouncedSearch) ||
+                (project.description ?? '').toLowerCase().includes(debouncedSearch);
+
+            if (matchesStatus && matchesTag && matchesSearch) {
+                void mutateProjects(
+                    (current) => {
+                        if (!current) {
+                            return { data: [project], page: 1, pageSize: 30, total: 1 };
+                        }
+                        return {
+                            ...current,
+                            data: [project, ...current.data],
+                            total: current.total + 1
+                        };
+                    },
+                    { revalidate: true, rollbackOnError: true }
+                );
+            } else {
+                void mutateProjects();
+            }
+        },
+        [debouncedSearch, mutateProjects, statusFilter, tagFilter]
+    );
+
+    const hasError = Boolean(error);
+    const showEmptyState = !isLoading && projects.length === 0 && !hasError;
+
+    return (
+        <LayoutShell>
+            <PageHeader
+                title="Projects"
+                description="Monitor project delivery, see upcoming tasks, and keep billing in sync."
+            >
+                <Button onClick={() => setDrawerOpen(true)} className="sm:hidden">
+                    New project
+                </Button>
+            </PageHeader>
+
+            <Toolbar>
+                <ToolbarSection className="gap-4">
+                    <Input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Search projects"
+                        className="h-10 w-64"
+                    />
+                    <Select
+                        value={statusFilter}
+                        onChange={(event) => setStatusFilter(event.target.value as ProjectStatus | 'ALL')}
+                        className="h-10 w-48"
+                    >
+                        {STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                                {status === 'ALL' ? 'All statuses' : status.replace(/_/g, ' ')}
+                            </option>
+                        ))}
+                    </Select>
+                    <Select
+                        value={tagFilter}
+                        onChange={(event) => setTagFilter(event.target.value)}
+                        className="h-10 w-48"
+                    >
+                        <option value="">All tags</option>
+                        {tagOptions.map((tag) => (
+                            <option key={tag} value={tag}>
+                                {tag}
+                            </option>
+                        ))}
+                    </Select>
+                </ToolbarSection>
+                <ToolbarSection className="justify-end">
+                    <Button onClick={() => setDrawerOpen(true)} className="hidden sm:inline-flex">
+                        New project
+                    </Button>
+                </ToolbarSection>
+            </Toolbar>
+
+            {isLoading ? (
+                <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-10 text-center text-slate-400">
+                    Loading projects…
+                </div>
+            ) : null}
+
+            {hasError ? (
+                <div className="rounded-3xl border border-rose-500/40 bg-rose-500/10 p-6 text-center text-sm text-rose-200">
+                    Unable to load projects. Please try again shortly.
+                </div>
+            ) : null}
+
+            {showEmptyState ? (
+                <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-16 text-center text-slate-300">
+                    <p className="text-lg font-semibold text-white">No projects yet</p>
+                    <p className="mt-2 text-sm text-slate-400">
+                        When you create your first project it will appear here with its timeline and billing status.
+                    </p>
+                    <div className="mt-6">
+                        <Button onClick={() => setDrawerOpen(true)}>New project</Button>
+                    </div>
+                </div>
+            ) : null}
+
+            {projects.length > 0 ? (
+                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    {projects.map((project) => (
+                        <ProjectCard key={project.id} project={project} />
+                    ))}
+                </div>
+            ) : null}
+
+            <NewProjectDrawer
+                open={isDrawerOpen}
+                onOpenChange={setDrawerOpen}
+                onProjectCreated={handleProjectCreated}
+            />
+            <Toast toast={toast} />
+        </LayoutShell>
     );
 }
 
 export default function ProjectsPage() {
     return (
-        <>
-            <Head>
-                <title>Projects · Aperture Studio CRM</title>
-            </Head>
+        <CrmAuthGuard>
             <WorkspaceLayout>
-                <ProjectsContent projects={projectPipeline} />
+                <Head>
+                    <title>Projects · Aperture Studio CRM</title>
+                </Head>
+                <ProjectsWorkspace />
             </WorkspaceLayout>
-        </>
+        </CrmAuthGuard>
     );
 }
