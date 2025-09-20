@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { calendarEventUpdateSchema } from '../../../../../lib/calendar-schemas';
 import { authenticateRequest } from '../../../../../server/auth/session';
 import { getSupabaseClient } from '../../../../../utils/supabase-client';
-import { endOfDay, mapEvent, parseDate, startOfDay, toIsoString } from '../helpers';
+import { mapEvent, parseDate, startOfDay, toIsoString } from '../helpers';
 
 type EventRouteContext = { params: Promise<{ id: string }> };
 
@@ -95,6 +95,7 @@ export async function PATCH(request: NextRequest, context: EventRouteContext) {
 
     const startSource = input.start_at ?? existing.start_at;
     const endSource = input.end_at ?? existing.end_at;
+    const endProvided = input.end_at !== undefined;
 
     const startDate = parseDate(startSource);
     const endDate = parseDate(endSource);
@@ -104,7 +105,19 @@ export async function PATCH(request: NextRequest, context: EventRouteContext) {
     }
 
     const normalizedStart = allDay ? startOfDay(startDate) : startDate;
-    const normalizedEnd = allDay ? endOfDay(endDate) : endDate;
+    let normalizedEnd: Date;
+
+    if (allDay) {
+        if (endProvided) {
+            const inclusiveEnd = startOfDay(endDate);
+            inclusiveEnd.setDate(inclusiveEnd.getDate() + 1);
+            normalizedEnd = inclusiveEnd;
+        } else {
+            normalizedEnd = startOfDay(endDate);
+        }
+    } else {
+        normalizedEnd = endDate;
+    }
 
     if (normalizedEnd <= normalizedStart) {
         return NextResponse.json({ error: 'End time must be after the start time.' }, { status: 400 });

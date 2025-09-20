@@ -34,6 +34,7 @@ type DrawerState = {
     mode: DrawerMode;
     eventId: string | null;
     canEdit: boolean;
+    canChangeOwner: boolean;
     initialValues: EventFormSchema;
 };
 
@@ -84,12 +85,6 @@ function parseInputToDate(value: string, allDay: boolean): Date | null {
 function startOfDay(date: Date): Date {
     const result = new Date(date);
     result.setHours(0, 0, 0, 0);
-    return result;
-}
-
-function endOfDay(date: Date): Date {
-    const result = startOfDay(date);
-    result.setDate(result.getDate() + 1);
     return result;
 }
 
@@ -146,8 +141,12 @@ function loadStoredFilters(userId: string | null): string[] | null {
         return null;
     }
 
+    if (raw === '__none__') {
+        return [];
+    }
+
     const ids = raw.split(',').map((value) => value.trim()).filter(Boolean);
-    return ids.length > 0 ? ids : null;
+    return ids.length > 0 ? ids : [];
 }
 
 function persistFilters(userId: string | null, ids: string[]) {
@@ -155,7 +154,14 @@ function persistFilters(userId: string | null, ids: string[]) {
         return;
     }
 
-    window.localStorage.setItem(buildFilterStorageKey(userId), ids.join(','));
+    const key = buildFilterStorageKey(userId);
+
+    if (ids.length === 0) {
+        window.localStorage.setItem(key, '__none__');
+        return;
+    }
+
+    window.localStorage.setItem(key, ids.join(','));
 }
 
 const eventFormSchema = z
@@ -262,7 +268,7 @@ function buildPayload(values: EventFormSchema) {
             title: values.title.trim(),
             description: values.description?.trim() ?? '',
             start_at: startOfDay(startDate).toISOString(),
-            end_at: endOfDay(endDate).toISOString(),
+            end_at: startOfDay(endDate).toISOString(),
             all_day: true,
             owner_user_id: values.owner_user_id,
             visibility: values.visibility
@@ -284,6 +290,7 @@ function CalendarEventDrawer({
     open,
     mode,
     canEdit,
+    canChangeOwner,
     isSubmitting,
     isDeleting,
     onClose,
@@ -295,6 +302,7 @@ function CalendarEventDrawer({
     open: boolean;
     mode: DrawerMode;
     canEdit: boolean;
+    canChangeOwner: boolean;
     isSubmitting: boolean;
     isDeleting: boolean;
     onClose: () => void;
@@ -482,7 +490,7 @@ function CalendarEventDrawer({
                             <select
                                 id="owner_user_id"
                                 {...register('owner_user_id')}
-                                disabled={disabled || users.length <= 1}
+                                disabled={disabled || !canChangeOwner || users.length <= 1}
                                 className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {users.map((user) => (
@@ -491,6 +499,9 @@ function CalendarEventDrawer({
                                     </option>
                                 ))}
                             </select>
+                            {!canChangeOwner ? (
+                                <p className="mt-2 text-xs text-slate-500">Only admins can reassign events.</p>
+                            ) : null}
                         </div>
 
                         <div>
@@ -553,18 +564,29 @@ function CalendarWorkspace() {
     const calendarRef = React.useRef<any>(null);
     const rangeRef = React.useRef<{ from: string; to: string } | null>(null);
     const activeUsersKeyRef = React.useRef<string>('');
+    const hasManualViewChangeRef = React.useRef(false);
+
+    const [initialCalendarView] = React.useState<string>(() => {
+        if (typeof window === 'undefined') {
+            return 'dayGridMonth';
+        }
+
+        return window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth';
+    });
 
     const [users, setUsers] = React.useState<CalendarUser[]>([]);
     const [events, setEvents] = React.useState<CalendarEventRecord[]>([]);
     const [activeUserIds, setActiveUserIds] = React.useState<string[]>([]);
-    const [currentView, setCurrentView] = React.useState<string>('dayGridMonth');
+    const [currentView, setCurrentView] = React.useState<string>(initialCalendarView);
     const [isLoadingUsers, setIsLoadingUsers] = React.useState(false);
     const [isLoadingEvents, setIsLoadingEvents] = React.useState(false);
+    const [isAdmin, setIsAdmin] = React.useState<boolean>(() => identity.isAdmin);
     const [drawerState, setDrawerState] = React.useState<DrawerState>({
         open: false,
         mode: 'create',
         eventId: null,
         canEdit: true,
+        canChangeOwner: identity.isAdmin,
         initialValues: getDefaultEventValues(identity.user?.id ?? null)
     });
     const [formMessage, setFormMessage] = React.useState<string | null>(null);
@@ -576,14 +598,25 @@ function CalendarWorkspace() {
     useAutoDismiss(toastMessage, () => setToastMessage(null));
 
     const upsertEvent = useCalendarEventUpdater();
-
-    const isAdmin = identity.isAdmin;
     const currentUserId = identity.user?.id ?? null;
+    const canCreateEvent = identity.isAuthenticated && users.length > 0;
 
     const closeDrawer = React.useCallback(() => {
         setDrawerState((previous) => ({ ...previous, open: false }));
         setFormMessage(null);
     }, []);
+
+    React.useEffect(() => {
+        if (!identity.isAuthenticated) {
+            setIsAdmin(false);
+        }
+    }, [identity.isAuthenticated]);
+
+    React.useEffect(() => {
+        if (identity.isAdmin) {
+            setIsAdmin(true);
+        }
+    }, [identity.isAdmin]);
 
     const loadUsers = React.useCallback(async () => {
         if (!identity.isAuthenticated) {
@@ -601,15 +634,29 @@ function CalendarWorkspace() {
             }
 
             const fetchedUsers: CalendarUser[] = Array.isArray(payload?.users)
-                ? payload.users.map((user: any) => ({ id: user.id, name: user.name }))
+                ? payload.users
+                      .filter((user: any) => typeof user?.id === 'string')
+                      .map((user: any) => ({ id: user.id, name: user.name }))
                 : [];
 
             setUsers(fetchedUsers);
 
+            const apiIsAdmin = Boolean(payload?.isAdmin);
+            setIsAdmin(apiIsAdmin || identity.isAdmin);
+
             const stored = loadStoredFilters(currentUserId);
-            if (stored) {
-                setActiveUserIds(stored);
-                activeUsersKeyRef.current = stored.slice().sort().join(',');
+
+            if (stored !== null) {
+                const validStored = stored.filter((id) => fetchedUsers.some((user) => user.id === id));
+
+                if (validStored.length === 0 && stored.length > 0) {
+                    const defaultIds = fetchedUsers.map((user) => user.id);
+                    setActiveUserIds(defaultIds);
+                    activeUsersKeyRef.current = defaultIds.slice().sort().join(',');
+                } else {
+                    setActiveUserIds(validStored);
+                    activeUsersKeyRef.current = validStored.slice().sort().join(',');
+                }
             } else {
                 const defaultIds = fetchedUsers.map((user) => user.id);
                 setActiveUserIds(defaultIds);
@@ -621,7 +668,7 @@ function CalendarWorkspace() {
         } finally {
             setIsLoadingUsers(false);
         }
-    }, [currentUserId, identity.isAuthenticated]);
+    }, [currentUserId, identity.isAdmin, identity.isAuthenticated]);
 
     const fetchEvents = React.useCallback(async () => {
         if (!identity.isAuthenticated || !rangeRef.current) {
@@ -715,6 +762,30 @@ function CalendarWorkspace() {
         };
     }, [fetchEvents, identity.isAuthenticated, supabase]);
 
+    React.useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const handleResize = () => {
+            if (hasManualViewChangeRef.current) {
+                return;
+            }
+
+            const nextView = window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth';
+            const api = calendarRef.current?.getApi();
+
+            if (api && api.view.type !== nextView) {
+                api.changeView(nextView);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
+
     const calendarUsersMap = React.useMemo(() => {
         return new Map(users.map((user) => [user.id, user] as const));
     }, [users]);
@@ -731,10 +802,17 @@ function CalendarWorkspace() {
                 ...(initial ?? {})
             };
 
-            setDrawerState({ open: true, mode: 'create', eventId: null, canEdit: true, initialValues: defaults });
+            setDrawerState({
+                open: true,
+                mode: 'create',
+                eventId: null,
+                canEdit: true,
+                canChangeOwner: isAdmin,
+                initialValues: defaults
+            });
             setFormMessage(null);
         },
-        [currentUserId, users]
+        [currentUserId, isAdmin, users]
     );
 
     const handleDatesSet = React.useCallback(
@@ -787,6 +865,7 @@ function CalendarWorkspace() {
                 mode: 'edit',
                 eventId,
                 canEdit,
+                canChangeOwner: isAdmin,
                 initialValues: toFormValues(record, fallbackOwnerId)
             });
             setFormMessage(null);
@@ -819,13 +898,16 @@ function CalendarWorkspace() {
             }
 
             try {
+                const normalizedStart = allDay ? startOfDay(start) : start;
+                const normalizedEnd = allDay ? startOfDay(subtractOneDay(end)) : end;
+
                 const response = await fetch(`/api/calendar/events/${eventId}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({
-                        start_at: start.toISOString(),
-                        end_at: end.toISOString(),
+                        start_at: normalizedStart.toISOString(),
+                        end_at: normalizedEnd.toISOString(),
                         all_day: allDay
                     })
                 });
@@ -975,6 +1057,7 @@ function CalendarWorkspace() {
     }, []);
 
     const changeView = React.useCallback((view: string) => {
+        hasManualViewChangeRef.current = true;
         calendarRef.current?.getApi()?.changeView(view);
     }, []);
 
@@ -1001,26 +1084,18 @@ function CalendarWorkspace() {
 
     return (
         <WorkspaceLayout>
-            <div className="w-full max-w-[1400px] px-4 pb-10 pt-6">
-                <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold text-white">Studio calendar</h1>
-                        <p className="mt-1 text-sm text-slate-400">
-                            Coordinate your studio schedule, production milestones, and internal meetings.
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => openCreateDrawer()}
-                        className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#4DE5FF] via-cyan-400 to-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:from-cyan-300 hover:via-sky-400 hover:to-sky-500"
-                    >
-                        Add event
-                    </button>
+            <div className="w-full">
+                <div className="mx-auto w-full max-w-[1400px] px-4 pb-10 pt-6">
+                <header className="mb-6">
+                    <h1 className="text-2xl font-semibold text-white">Studio calendar</h1>
+                    <p className="mt-1 text-sm text-slate-400">
+                        Coordinate your studio schedule, production milestones, and internal meetings.
+                    </p>
                 </header>
 
-                <div className="sticky top-4 z-20 -mx-4 mb-5 rounded-2xl border border-slate-800/80 bg-slate-950/80 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-slate-950/60 sm:top-6">
+                <div className="sticky top-4 z-20 mb-5 space-y-3 rounded-2xl border border-slate-800/80 bg-slate-950/80 px-4 py-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-slate-950/60 sm:top-6">
                     <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <button
                                 type="button"
                                 onClick={goToPrev}
@@ -1046,7 +1121,7 @@ function CalendarWorkspace() {
                             </button>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2">
                             {[
                                 { id: 'dayGridMonth', label: 'Month' },
                                 { id: 'timeGridWeek', label: 'Week' },
@@ -1068,27 +1143,40 @@ function CalendarWorkspace() {
                             ))}
                         </div>
 
-                        <div className="flex flex-1 items-center justify-end">
-                            <div className="flex w-full gap-2 overflow-x-auto rounded-full border border-slate-800/70 bg-slate-950/70 p-1 text-xs text-slate-200">
-                                {users.map((user) => {
-                                    const isActive = activeUserIds.includes(user.id);
-                                    return (
-                                        <button
-                                            key={user.id}
-                                            type="button"
-                                            onClick={() => toggleUser(user.id)}
-                                            className={`whitespace-nowrap rounded-full px-3 py-1 transition ${
-                                                isActive
-                                                    ? 'bg-[#4DE5FF]/20 text-[#4DE5FF]'
-                                                    : 'text-slate-300 hover:text-white'
-                                            }`}
-                                        >
-                                            {user.name}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={() => openCreateDrawer()}
+                            disabled={!canCreateEvent}
+                            className="ml-auto inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#4DE5FF] via-cyan-400 to-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/30 transition hover:from-cyan-300 hover:via-sky-400 hover:to-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            Add event
+                        </button>
+                    </div>
+
+                    <div className="flex w-full gap-2 overflow-x-auto rounded-full border border-slate-800/70 bg-slate-950/70 p-1 text-xs text-slate-200">
+                        {isLoadingUsers ? (
+                            <span className="px-3 py-1 text-slate-400">Loading team…</span>
+                        ) : users.length > 0 ? (
+                            users.map((user) => {
+                                const isActive = activeUserIds.includes(user.id);
+                                return (
+                                    <button
+                                        key={user.id}
+                                        type="button"
+                                        onClick={() => toggleUser(user.id)}
+                                        className={`whitespace-nowrap rounded-full px-3 py-1 transition ${
+                                            isActive
+                                                ? 'bg-[#4DE5FF]/20 text-[#4DE5FF]'
+                                                : 'text-slate-300 hover:text-white'
+                                        }`}
+                                    >
+                                        {user.name}
+                                    </button>
+                                );
+                            })
+                        ) : (
+                            <span className="px-3 py-1 text-slate-400">No teammates found.</span>
+                        )}
                     </div>
                 </div>
 
@@ -1110,45 +1198,49 @@ function CalendarWorkspace() {
                     </div>
                 ) : null}
 
-                <div className="relative rounded-3xl border border-slate-800/80 bg-slate-950/60 shadow-inner">
-                    <FullCalendar
-                        ref={calendarRef}
-                        plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-                        headerToolbar={false}
-                        initialView="dayGridMonth"
-                        events={calendarEvents}
-                        selectable
-                        selectMirror
-                        select={handleSelect}
-                        eventClick={handleEventClick}
-                        eventDrop={handleEventTimingUpdate}
-                        eventResize={handleEventTimingUpdate}
-                        datesSet={handleDatesSet}
-                        height="100%"
-                        contentHeight="auto"
-                        expandRows
-                        nowIndicator
-                        weekNumbers={false}
-                        slotMinTime="06:00:00"
-                        slotMaxTime="22:00:00"
-                        dayMaxEventRows
-                    />
-                    {isLoadingEvents ? (
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-3xl bg-slate-950/60 text-sm text-slate-200">
-                            Loading events…
-                        </div>
-                    ) : null}
+                <div className="h-[calc(100vh-12rem)]">
+                    <div className="relative h-full rounded-3xl border border-slate-800/80 bg-slate-950/60 shadow-inner">
+                        <FullCalendar
+                            ref={calendarRef}
+                            plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+                            headerToolbar={false}
+                            initialView={initialCalendarView}
+                            events={calendarEvents}
+                            selectable
+                            selectMirror
+                            select={handleSelect}
+                            eventClick={handleEventClick}
+                            eventDrop={handleEventTimingUpdate}
+                            eventResize={handleEventTimingUpdate}
+                            datesSet={handleDatesSet}
+                            height="100%"
+                            contentHeight="auto"
+                            expandRows
+                            nowIndicator
+                            weekNumbers={false}
+                            slotMinTime="06:00:00"
+                            slotMaxTime="22:00:00"
+                            dayMaxEventRows
+                        />
+                        {isLoadingEvents ? (
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-3xl bg-slate-950/60 text-sm text-slate-200">
+                                Loading events…
+                            </div>
+                        ) : null}
+                    </div>
                 </div>
 
                 {!isLoaded ? (
                     <p className="mt-6 text-sm text-slate-400">Preparing your workspace…</p>
                 ) : null}
             </div>
+        </div>
 
             <CalendarEventDrawer
                 open={drawerState.open}
                 mode={drawerState.mode}
                 canEdit={drawerState.canEdit}
+                canChangeOwner={drawerState.canChangeOwner}
                 isSubmitting={isSubmitting}
                 isDeleting={isDeleting}
                 onClose={closeDrawer}

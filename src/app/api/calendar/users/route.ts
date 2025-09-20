@@ -12,12 +12,9 @@ export async function GET(request: NextRequest) {
 
     try {
         const supabase = getSupabaseClient();
-        let query = supabase.from('users').select('id, name, email, roles').order('name', { ascending: true });
+        const query = supabase.from('users').select('id, name, email, roles').order('name', { ascending: true });
 
         const isAdmin = session.roles.includes('admin');
-        if (!isAdmin) {
-            query = query.eq('id', session.userId);
-        }
 
         const { data, error } = await query;
         if (error) {
