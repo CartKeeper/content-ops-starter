@@ -34,7 +34,7 @@ type MetricsResponse = {
     total: number;
     withEmail: number;
     withPhone: number;
-    newLast30: number;
+    newLast30?: number;
 };
 
 type ContactTableRow = {
@@ -49,7 +49,7 @@ type ContactTableRow = {
     updatedAt: string | null;
 };
 
-type ToastMessage = { id: string; message: string; tone: 'success' | 'error' };
+type ToastMessage = { id: string; title: string; tone: 'success' | 'error'; description?: string };
 
 const CONTACT_SORT_OPTIONS: Array<SortOption & { state: SortingState }> = [
     { id: 'name-asc', label: 'Name (A-Z)', state: [{ id: 'name', desc: false }] },
@@ -202,7 +202,13 @@ function ContactsWorkspace() {
         return entries;
     }, [ownerFilter, ownerOptions, stageFilter, statusFilter, statusOptions]);
 
-    const metrics = metricsResponse ?? { total: 0, withEmail: 0, withPhone: 0, newLast30: 0 };
+    const metrics = React.useMemo(() => {
+        const base = metricsResponse ?? { total: 0, withEmail: 0, withPhone: 0 };
+        if (typeof metricsResponse?.newLast30 === 'number') {
+            return { ...base, newLast30: metricsResponse.newLast30 };
+        }
+        return base;
+    }, [metricsResponse]);
 
     const columns = React.useMemo<ColumnDef<ContactTableRow>[]>(() => [
         {
@@ -262,8 +268,11 @@ function ContactsWorkspace() {
 
     const hasActiveFilters = Boolean(search.trim()) || stageFilter.length > 0 || statusFilter.length > 0 || ownerFilter.length > 0;
 
-    const addNotification = React.useCallback((message: string, tone: ToastMessage['tone']) => {
-        setNotifications((previous) => [...previous, { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, message, tone }]);
+    const addNotification = React.useCallback((title: string, tone: ToastMessage['tone'], description?: string) => {
+        setNotifications((previous) => [
+            ...previous,
+            { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, title, tone, description },
+        ]);
     }, []);
 
     const handleSortingChange = React.useCallback(
@@ -287,7 +296,7 @@ function ContactsWorkspace() {
                     <button
                         type="button"
                         onClick={() => setIsDialogOpen(true)}
-                        className="inline-flex items-center justify-center rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-indigo-400"
+                        className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-600"
                     >
                         Add contact
                     </button>
@@ -304,7 +313,7 @@ function ContactsWorkspace() {
 
     const handleContactCreated = React.useCallback(
         async (record: ContactRecord) => {
-            addNotification(`${getContactName(record)} added to contacts.`, 'success');
+            addNotification('Contact added', 'success', getContactName(record));
             setPagination((previous) => ({ ...previous, pageIndex: 0 }));
             setRowSelection({});
             await Promise.all([mutateContacts(), mutateMetrics()]);
@@ -314,18 +323,33 @@ function ContactsWorkspace() {
 
     const handleContactError = React.useCallback(
         (message: string) => {
-            addNotification(message, 'error');
+            addNotification('Unable to add contact', 'error', message);
         },
         [addNotification]
     );
 
+    const kpiCards = React.useMemo(() => {
+        const cards: Array<{ id: string; label: string; value: number; helper: string }> = [
+            { id: 'total', label: 'Total contacts', value: metrics.total, helper: 'Across your workspace' },
+            { id: 'email', label: 'With email', value: metrics.withEmail, helper: 'Reachable via inbox' },
+            { id: 'phone', label: 'With phone', value: metrics.withPhone, helper: 'Ready for quick calls' },
+        ];
+
+        if (typeof metrics.newLast30 === 'number') {
+            cards.push({ id: 'recent', label: 'New (30 days)', value: metrics.newLast30, helper: 'Added in the last 30 days' });
+        }
+
+        return cards;
+    }, [metrics.newLast30, metrics.total, metrics.withEmail, metrics.withPhone]);
+
+    const kpiGridClass = kpiCards.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3';
+
     return (
         <div className="flex flex-col gap-6">
-            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard label="Total contacts" value={metrics.total} helper="Across your workspace" />
-                <KpiCard label="With email" value={metrics.withEmail} helper="Reachable via inbox" />
-                <KpiCard label="With phone" value={metrics.withPhone} helper="Ready for quick calls" />
-                <KpiCard label="New (30 days)" value={metrics.newLast30} helper="Added in the last 30 days" />
+            <section className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${kpiGridClass}`}>
+                {kpiCards.map((card) => (
+                    <KpiCard key={card.id} label={card.label} value={card.value} helper={card.helper} />
+                ))}
             </section>
 
             {contactsError ? (
@@ -341,7 +365,10 @@ function ContactsWorkspace() {
                             : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
                     }`}
                 >
-                    {notification.message}
+                    <p className="font-semibold">{notification.title}</p>
+                    {notification.description ? (
+                        <p className="mt-1 text-xs text-inherit opacity-80">{notification.description}</p>
+                    ) : null}
                 </div>
             ))}
 
@@ -396,9 +423,9 @@ function ContactsWorkspace() {
 
 function KpiCard({ label, value, helper }: { label: string; value: number; helper: string }) {
     return (
-        <div className="flex h-28 min-h-[104px] flex-col justify-between rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
+        <div className="flex min-h-[104px] max-h-32 flex-col justify-center gap-3 rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
             <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-            <p className="text-3xl font-semibold text-white">{value.toLocaleString()}</p>
+            <p className="text-3xl font-semibold leading-none text-white">{value.toLocaleString()}</p>
             <p className="text-xs text-slate-500">{helper}</p>
         </div>
     );

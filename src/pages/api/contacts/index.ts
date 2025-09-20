@@ -1,9 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { randomUUID } from 'crypto';
 
 import type { ContactRecord } from '../../../types/contact';
-import { getContactName } from '../../../types/contact';
-import { readContactsFromDisk, writeContactsToDisk } from '../../../server/contacts/local-store';
 import { getSupabaseClient } from '../../../utils/supabase-client';
 
 type ErrorResponse = { error: string };
@@ -98,32 +95,6 @@ function parseQuery(req: NextApiRequest): ParsedQuery {
     return { search, stages, statuses, owners, sort, page, pageSize };
 }
 
-function toSearchHaystack(record: ContactRecord): string {
-    return [
-        record.first_name ?? '',
-        record.last_name ?? '',
-        record.email ?? '',
-        record.phone ?? '',
-        record.business ?? '',
-    ]
-        .map((value) => value.toLowerCase())
-        .join(' ');
-}
-
-function sortContacts(records: ContactRecord[], sort: string): ContactRecord[] {
-    const comparatorMap: Record<string, (a: ContactRecord, b: ContactRecord) => number> = {
-        'name-asc': (a, b) => getContactName(a).localeCompare(getContactName(b), undefined, { sensitivity: 'base' }),
-        'name-desc': (a, b) => getContactName(b).localeCompare(getContactName(a), undefined, { sensitivity: 'base' }),
-        'created-asc': (a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime(),
-        'created-desc': (a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime(),
-        'updated-asc': (a, b) => new Date(a.updated_at ?? a.created_at ?? 0).getTime() - new Date(b.updated_at ?? b.created_at ?? 0).getTime(),
-        'updated-desc': (a, b) => new Date(b.updated_at ?? b.created_at ?? 0).getTime() - new Date(a.updated_at ?? a.created_at ?? 0).getTime(),
-    };
-
-    const comparator = comparatorMap[sort] ?? comparatorMap['name-asc'];
-    return [...records].sort(comparator);
-}
-
 function normalizeStatuses(stages: string[], statuses: string[]): Array<ContactRecord['status'] | null> {
     if (stages.length === 0 && statuses.length === 0) {
         return [];
@@ -144,74 +115,6 @@ function normalizeStatuses(stages: string[], statuses: string[]): Array<ContactR
     });
 
     return Array.from(set);
-}
-
-async function handleGetLocal(req: NextApiRequest, res: NextApiResponse<ContactsResponse>) {
-    const query = parseQuery(req);
-    const records = await readContactsFromDisk();
-
-    const normalizedStatuses = normalizeStatuses(query.stages, query.statuses);
-    const includesUnassignedOwner = query.owners.includes('unassigned');
-    const ownerIds = new Set(query.owners.filter((owner) => owner && owner !== 'unassigned'));
-
-    const normalizedSearch = query.search.toLowerCase();
-
-    const filtered = records.filter((record) => {
-        if (normalizedSearch) {
-            if (!toSearchHaystack(record).includes(normalizedSearch)) {
-                return false;
-            }
-        }
-
-        if (normalizedStatuses.length > 0) {
-            const matchesStatus = normalizedStatuses.includes(record.status ?? null);
-            if (!matchesStatus) {
-                return false;
-            }
-        }
-
-        if (ownerIds.size > 0 || includesUnassignedOwner) {
-            const owner = record.owner_user_id ?? null;
-            if (owner === null) {
-                if (!includesUnassignedOwner) {
-                    return false;
-                }
-            } else if (!ownerIds.has(owner)) {
-                return false;
-            }
-        }
-
-        return true;
-    });
-
-    const sorted = sortContacts(filtered, query.sort);
-
-    const start = (query.page - 1) * query.pageSize;
-    const end = start + query.pageSize;
-    const pageItems = sorted.slice(start, end);
-
-    const ownerOptions: OwnerOption[] = Array.from(
-        new Set(records.map((record) => record.owner_user_id).filter((value): value is string => Boolean(value)))
-    )
-        .sort()
-        .map((id) => ({ id, name: null }));
-
-    const statusOptions = Array.from(
-        new Set(records.map((record) => record.status).filter((value): value is NonNullable<ContactRecord['status']> => Boolean(value)))
-    ).sort();
-
-    res.status(200).json({
-        data: pageItems,
-        meta: {
-            page: query.page,
-            pageSize: query.pageSize,
-            total: filtered.length,
-            availableFilters: {
-                owners: ownerOptions,
-                statuses: statusOptions,
-            },
-        },
-    });
 }
 
 async function fetchSupabaseFilterOptions() {
@@ -408,53 +311,6 @@ function sanitizeString(value: unknown): string | null {
     return trimmed ? trimmed : null;
 }
 
-async function handlePostLocal(req: NextApiRequest, res: NextApiResponse<ContactsResponse>) {
-    const payload = parseContactBody(req.body);
-
-    if (!payload) {
-        res.status(400).json({ error: 'Request body must be a JSON object' });
-        return;
-    }
-
-    const name = sanitizeString(payload.name);
-
-    if (!name) {
-        res.status(400).json({ error: 'Name is required' });
-        return;
-    }
-
-    const { first, last } = splitName(name);
-    const email = sanitizeString(payload.email);
-    const phone = sanitizeString(payload.phone);
-    const business = sanitizeString(payload.business);
-    const notes = sanitizeString(payload.notes);
-
-    const now = new Date().toISOString();
-    const records = await readContactsFromDisk();
-
-    const record: ContactRecord = {
-        id: randomUUID(),
-        owner_user_id: null,
-        first_name: first,
-        last_name: last,
-        email,
-        phone,
-        notes,
-        created_at: now,
-        updated_at: now,
-        address: null,
-        city: null,
-        state: null,
-        business,
-        status: 'lead',
-    };
-
-    records.push(record);
-    await writeContactsToDisk(records);
-
-    res.status(201).json({ data: record });
-}
-
 async function handlePostSupabase(req: NextApiRequest, res: NextApiResponse<ContactsResponse>) {
     const payload = parseContactBody(req.body);
 
@@ -494,20 +350,15 @@ async function handlePostSupabase(req: NextApiRequest, res: NextApiResponse<Cont
 
     if (error || !data) {
         console.error('Failed to create contact in Supabase', error);
+        if (error && error.code === '23505') {
+            res.status(409).json({ error: 'A contact with this email already exists for this owner.' });
+            return;
+        }
         res.status(500).json({ error: error?.message ?? 'Unable to save contact' });
         return;
     }
 
     res.status(201).json({ data: data as ContactRecord });
-}
-
-function isSupabaseConfigured(): boolean {
-    try {
-        getSupabaseClient();
-        return true;
-    } catch (error) {
-        return false;
-    }
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse<ContactsResponse>) {
@@ -521,23 +372,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse<ContactsRespons
         return;
     }
 
-    const supabaseAvailable = isSupabaseConfigured();
+    try {
+        getSupabaseClient();
+    } catch (error) {
+        console.error('Supabase is not configured', error);
+        res.status(500).json({ error: 'Database configuration is missing.' });
+        return;
+    }
 
     if (method === 'GET') {
-        if (supabaseAvailable) {
-            await handleGetSupabase(req, res);
-        } else {
-            await handleGetLocal(req, res);
-        }
+        await handleGetSupabase(req, res);
         return;
     }
 
     if (method === 'POST') {
-        if (supabaseAvailable) {
-            await handlePostSupabase(req, res);
-        } else {
-            await handlePostLocal(req, res);
-        }
+        await handlePostSupabase(req, res);
     }
 }
 

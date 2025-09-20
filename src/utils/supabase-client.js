@@ -49,14 +49,7 @@ export function getSupabaseClient() {
         return cachedClient;
     }
 
-    const url = resolveUrl();
-    const key = resolveKey();
-
-    if (!url || !key) {
-        throw new Error(
-            'Missing Supabase configuration. Set Supabase URL and key environment variables (e.g. SUPABASE_URL/SUPABASE_DATABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY).'
-        );
-    }
+    const { url, key } = getSupabaseConfig();
 
     cachedClient = createClient(url, key, {
         auth: {
@@ -69,4 +62,17 @@ export function getSupabaseClient() {
 
 export function resetSupabaseClient() {
     cachedClient = null;
+}
+
+export function getSupabaseConfig() {
+    const url = resolveUrl();
+    const key = resolveKey();
+
+    if (!url || !key) {
+        throw new Error(
+            'Missing Supabase configuration. Set Supabase URL and key environment variables (e.g. SUPABASE_URL/SUPABASE_DATABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY).'
+        );
+    }
+
+    return { url, key };
 }
