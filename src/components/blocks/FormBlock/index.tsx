@@ -6,17 +6,22 @@ import { mapStylesToClassNames as mapStyles } from '../../../utils/map-styles-to
 import SubmitButtonFormControl from './SubmitButtonFormControl';
 
 export default function FormBlock(props) {
-    const formRef = React.createRef<HTMLFormElement>();
+    const formRef = React.useRef<HTMLFormElement | null>(null);
     const { fields = [], elementId, submitButton, className, styles = {}, 'data-sb-field-path': fieldPath } = props;
 
     if (fields.length === 0) {
         return null;
     }
 
-    function handleSubmit(event) {
+    function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
-        const data = new FormData(formRef.current);
+        const formElement = formRef.current;
+        if (!formElement) {
+            return;
+        }
+
+        const data = new FormData(formElement);
         const value = Object.fromEntries(data.entries());
         alert(`Form data: ${JSON.stringify(value)}`);
     }
