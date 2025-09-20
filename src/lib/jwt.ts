@@ -86,6 +86,32 @@ function findSupabaseServiceRoleKey(): string | null {
     return null;
 }
 
+function findSupabaseJwtSecret(): string | null {
+    const directKeys = ['SUPABASE_JWT_SECRET'];
+
+    for (const key of directKeys) {
+        const candidate = normalize(process.env[key]);
+        if (candidate) {
+            return candidate;
+        }
+    }
+
+    for (const [key, rawValue] of Object.entries(process.env)) {
+        if (typeof rawValue !== 'string') {
+            continue;
+        }
+
+        if (key.endsWith('SUPABASE_JWT_SECRET')) {
+            const candidate = normalize(rawValue);
+            if (candidate) {
+                return candidate;
+            }
+        }
+    }
+
+    return null;
+}
+
 function resolveSecret(): string {
     const explicitSecret = normalize(process.env.AUTH_JWT_SECRET) ?? normalize(process.env.JWT_SECRET);
     if (explicitSecret) {
@@ -97,8 +123,13 @@ function resolveSecret(): string {
         return supabaseServiceRoleKey;
     }
 
+    const supabaseJwtSecret = findSupabaseJwtSecret();
+    if (supabaseJwtSecret) {
+        return supabaseJwtSecret;
+    }
+
     throw new Error(
-        'Missing AUTH_JWT_SECRET environment variable. Provide AUTH_JWT_SECRET or SUPABASE_SERVICE_ROLE_KEY.'
+        'Missing AUTH_JWT_SECRET environment variable. Provide AUTH_JWT_SECRET, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_JWT_SECRET.'
     );
 }
 

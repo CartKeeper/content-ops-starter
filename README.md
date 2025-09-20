@@ -105,7 +105,7 @@ The CRM API routes under `src/pages/api/` rely on [Supabase](https://supabase.co
 
 1. Create a Supabase project and note the project URL and service role key from the dashboard.
 2. Create `clients` and `projects` tables with the columns your application needs (for example: `id`, `name`, `email`, `notes`, timestamps, etc.).
-3. For local development, add the Supabase variables to `.env.local`. The starter recognises either `SUPABASE_URL` or `SUPABASE_DATABASE_URL` for the project URL and prefers `SUPABASE_SERVICE_ROLE_KEY` (falling back to anonymous/public keys if provided).
+3. For local development, add the Supabase variables to `.env.local`. The starter recognises either `SUPABASE_URL` or `SUPABASE_DATABASE_URL` for the project URL and prefers `SUPABASE_SERVICE_ROLE_KEY` (falling back to anonymous/public keys if provided). Ensure that either `AUTH_JWT_SECRET`, a Supabase service-role key, or the project's `SUPABASE_JWT_SECRET` environment variable is available so `/api/auth/login` can mint sessions.
 4. Redeploy or restart the Next.js server so the API routes can pick up the new variables.
 
 These API routes return JSON responses for GET, POST, PUT, and DELETE requests, so they can be consumed directly from front-end forms or integrations.
