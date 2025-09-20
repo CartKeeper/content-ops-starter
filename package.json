@@ -10,6 +10,8 @@
     "dependencies": {
         "@algolia/autocomplete-js": "^1.17.1",
         "@algolia/autocomplete-theme-classic": "^1.17.1",
+        "@dnd-kit/core": "^6.3.1",
+        "@dnd-kit/sortable": "^10.0.0",
         "@fullcalendar/core": "^6.1.19",
         "@fullcalendar/daygrid": "^6.1.19",
         "@fullcalendar/interaction": "^6.1.19",
@@ -41,8 +43,8 @@
         "next": "15.5.3",
         "pdfkit": "^0.17.2",
         "react": "^19.1.0",
-        "react-hook-form": "^7.63.0",
         "react-dom": "^19.1.0",
+        "react-hook-form": "^7.63.0",
         "react-icons": "^5.5.0",
         "react-redux": "^9.2.0",
         "recharts": "^3.2.1",
