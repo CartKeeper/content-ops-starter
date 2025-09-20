@@ -19,7 +19,7 @@ type IdentityContextValue = {
     error: string | null;
     clearError: () => void;
     login: (email: string, password: string) => Promise<void>;
-    signup: (input: { email: string; password: string; name?: string }) => Promise<void>;
+    signup: () => Promise<void>;
     requestPasswordReset: (email: string) => Promise<void>;
     resetPassword: (input: { token: string; password: string }) => Promise<void>;
 };
@@ -131,33 +131,13 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
         [handleSessionResponse]
     );
 
-    const signup = React.useCallback(
-        async ({ email, password, name }: { email: string; password: string; name?: string }) => {
-            try {
-                const response = await fetch('/api/auth/signup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ email, password, name })
-                });
-
-                const payload = await response.json().catch(() => null);
-
-                if (!response.ok) {
-                    const message = payload?.error ?? 'Unable to create account.';
-                    throw new Error(message);
-                }
-
-                handleSessionResponse(payload);
-            } catch (signupError) {
-                setError(signupError instanceof Error ? signupError.message : 'Unable to create account.');
-                setUser(null);
-                setIsReady(true);
-                throw signupError instanceof Error ? signupError : new Error('Unable to create account.');
-            }
-        },
-        [handleSessionResponse]
-    );
+    const signup = React.useCallback(async () => {
+        const message = 'Ask an administrator to create your account.';
+        setError(message);
+        setUser(null);
+        setIsReady(true);
+        throw new Error(message);
+    }, []);
 
     const logout = React.useCallback(async () => {
         setUser(null);
@@ -247,6 +227,16 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
     }, []);
 
     const roles = user?.roles ?? [];
+    const role = user?.role ?? 'standard';
+    const permissions =
+        user?.permissions ??
+        ({
+            canManageUsers: false,
+            canEditSettings: false,
+            canViewGalleries: true,
+            canManageIntegrations: true,
+            canManageCalendar: true
+        } satisfies AuthUser['permissions']);
 
     const contextValue = React.useMemo<IdentityContextValue>(
         () => ({
@@ -255,9 +245,9 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
             isAuthenticated: Boolean(user),
             user,
             roles,
-            isPhotographer: roles.includes('photographer') || roles.includes('admin'),
+            isPhotographer: role !== 'restricted',
             isClient: roles.includes('client'),
-            isAdmin: roles.includes('admin'),
+            isAdmin: role === 'admin' || permissions.canManageUsers,
             open,
             logout,
             refresh,
@@ -278,6 +268,8 @@ export function NetlifyIdentityProvider({ children }: NetlifyIdentityProviderPro
             refresh,
             requestPasswordReset,
             resetPassword,
+            permissions,
+            role,
             roles,
             signup,
             user

@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import type { SessionPayload } from '../../../lib/jwt';
 import type { ContactRecord } from '../../../types/contact';
+import { authenticateRequest } from '../../../utils/api-auth';
 import { getSupabaseClient } from '../../../utils/supabase-client';
 
 type ErrorResponse = { error: string };
@@ -117,13 +119,19 @@ function normalizeStatuses(stages: string[], statuses: string[]): Array<ContactR
     return Array.from(set);
 }
 
-async function fetchSupabaseFilterOptions() {
+async function fetchSupabaseFilterOptions(ownerUserId: string | null, canViewAll: boolean) {
     const supabase = getSupabaseClient();
 
-    const { data: ownerRows } = await supabase
+    let ownerQuery = supabase
         .from('contacts')
         .select('owner_user_id', { distinct: true })
         .not('owner_user_id', 'is', null);
+
+    if (!canViewAll && ownerUserId) {
+        ownerQuery = ownerQuery.eq('owner_user_id', ownerUserId);
+    }
+
+    const { data: ownerRows } = await ownerQuery;
 
     const ownerIds = Array.from(
         new Set<string>(
@@ -152,10 +160,13 @@ async function fetchSupabaseFilterOptions() {
         }
     }
 
-    const { data: statusRows } = await supabase
-        .from('contacts')
-        .select('status', { distinct: true })
-        .not('status', 'is', null);
+    let statusQuery = supabase.from('contacts').select('status', { distinct: true }).not('status', 'is', null);
+
+    if (!canViewAll && ownerUserId) {
+        statusQuery = statusQuery.eq('owner_user_id', ownerUserId);
+    }
+
+    const { data: statusRows } = await statusQuery;
 
     const statuses = Array.from(
         new Set<NonNullable<ContactRecord['status']>>(
@@ -196,18 +207,29 @@ function applySupabaseSorting(query: ReturnType<typeof getSupabaseClient>['from'
     }
 }
 
-async function handleGetSupabase(req: NextApiRequest, res: NextApiResponse<ContactsResponse>) {
+async function handleGetSupabase(
+    req: NextApiRequest,
+    res: NextApiResponse<ContactsResponse>,
+    session: SessionPayload
+) {
     const queryState = parseQuery(req);
     const supabase = getSupabaseClient();
 
+    const canViewAll = session.role === 'admin' || session.permissions.canManageUsers;
     const normalizedStatuses = normalizeStatuses(queryState.stages, queryState.statuses);
     const includeUnassignedOwner = queryState.owners.includes('unassigned');
-    const ownerIds = queryState.owners.filter((owner) => owner && owner !== 'unassigned');
+    const ownerIds = canViewAll
+        ? queryState.owners.filter((owner) => owner && owner !== 'unassigned')
+        : [session.userId];
 
     const from = (queryState.page - 1) * queryState.pageSize;
     const to = from + queryState.pageSize - 1;
 
     let query = supabase.from('contacts').select('*', { count: 'exact' });
+
+    if (!canViewAll) {
+        query = query.eq('owner_user_id', session.userId);
+    }
 
     if (queryState.search) {
         const escaped = queryState.search.replace(/%/g, '\\%').replace(/_/g, '\\_');
@@ -257,7 +279,7 @@ async function handleGetSupabase(req: NextApiRequest, res: NextApiResponse<Conta
         return;
     }
 
-    const filters = await fetchSupabaseFilterOptions();
+    const filters = await fetchSupabaseFilterOptions(canViewAll ? null : session.userId, canViewAll);
 
     res.status(200).json({
         data: data ?? [],
@@ -311,7 +333,11 @@ function sanitizeString(value: unknown): string | null {
     return trimmed ? trimmed : null;
 }
 
-async function handlePostSupabase(req: NextApiRequest, res: NextApiResponse<ContactsResponse>) {
+async function handlePostSupabase(
+    req: NextApiRequest,
+    res: NextApiResponse<ContactsResponse>,
+    session: SessionPayload
+) {
     const payload = parseContactBody(req.body);
 
     if (!payload) {
@@ -346,7 +372,11 @@ async function handlePostSupabase(req: NextApiRequest, res: NextApiResponse<Cont
         updated_at: now,
     } satisfies Partial<ContactRecord>;
 
-    const { data, error } = await supabase.from('contacts').insert(insertPayload).select().single();
+    const { data, error } = await supabase
+        .from('contacts')
+        .insert({ ...insertPayload, owner_user_id: session.userId })
+        .select()
+        .single();
 
     if (error || !data) {
         console.error('Failed to create contact in Supabase', error);
@@ -380,13 +410,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse<ContactsRespons
         return;
     }
 
+    const session = await authenticateRequest(req);
+    if (!session) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+    }
+
+    if (!session.emailVerified) {
+        res.status(403).json({ error: 'Verify your email to manage contacts.' });
+        return;
+    }
+
     if (method === 'GET') {
-        await handleGetSupabase(req, res);
+        await handleGetSupabase(req, res, session);
         return;
     }
 
     if (method === 'POST') {
-        await handlePostSupabase(req, res);
+        await handlePostSupabase(req, res, session);
     }
 }
 

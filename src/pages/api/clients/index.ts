@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
+import type { SessionPayload } from '../../../lib/jwt';
 import { supabaseAdmin } from '../../../lib/supabase-admin';
+import { authenticateRequest } from '../../../utils/api-auth';
 
 const STATUS_VALUES = ['Lead', 'Active', 'Inactive'] as const;
 
@@ -167,7 +169,11 @@ function parseStatusFilters(value: string | string[] | undefined): ClientStatus[
         .filter((entry): entry is ClientStatus => Boolean(entry) && allowed.has(entry as ClientStatus));
 }
 
-async function handleGet(req: NextApiRequest, res: NextApiResponse<ClientsResponse | { error: string }>) {
+async function handleGet(
+    req: NextApiRequest,
+    res: NextApiResponse<ClientsResponse | { error: string }>,
+    session: SessionPayload
+) {
     const searchParam = typeof req.query.search === 'string' ? req.query.search : '';
     const statusFilters = parseStatusFilters(req.query.status);
     const sortKey = typeof req.query.sort === 'string' ? req.query.sort : 'name-asc';
@@ -180,6 +186,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse<ClientsRespon
 
     const sortOption = SORT_MAP[sortKey] ?? SORT_MAP['name-asc'];
 
+    const canViewAll = session.role === 'admin' || session.permissions.canManageUsers;
+
     let query = supabaseAdmin
         .from('clients')
         .select(
@@ -187,6 +195,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse<ClientsRespon
             { count: 'exact' }
         )
         .order(sortOption.column, { ascending: sortOption.ascending, nullsFirst: sortOption.nullsFirst });
+
+    if (!canViewAll) {
+        query = query.eq('owner_user_id', session.userId);
+    }
 
     if (searchParam.trim()) {
         const value = normaliseSearch(searchParam);
@@ -215,7 +227,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse<ClientsRespon
     });
 }
 
-async function handlePost(req: NextApiRequest, res: NextApiResponse<{ data: ClientRecord } | { error: string; fieldErrors?: Record<string, string> }>) {
+async function handlePost(
+    req: NextApiRequest,
+    res: NextApiResponse<{ data: ClientRecord } | { error: string; fieldErrors?: Record<string, string> }>,
+    session: SessionPayload
+) {
     const parseResult = createClientSchema.safeParse(req.body ?? {});
 
     if (!parseResult.success) {
@@ -246,7 +262,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse<{ data: Clie
         last_activity: null,
         first_name,
         last_name,
-        client_number: clientNumber
+        client_number: clientNumber,
+        owner_user_id: session.userId
     };
 
     const { data, error } = await supabaseAdmin
@@ -270,13 +287,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse<{ data: Clie
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.setHeader('Content-Type', 'application/json');
 
+    const session = await authenticateRequest(req);
+    if (!session) {
+        return res.status(401).json({ error: 'Authentication required.' });
+    }
+
+    if (!session.emailVerified) {
+        return res.status(403).json({ error: 'Verify your email to access clients.' });
+    }
+
     if (req.method === 'GET') {
-        return handleGet(req, res);
+        return handleGet(req, res, session);
     }
 
     if (req.method === 'POST') {
         try {
-            return await handlePost(req, res);
+            return await handlePost(req, res, session);
         } catch (error) {
             console.error('Unhandled error creating client', error);
             return res.status(500).json({ error: 'Failed to create client' });

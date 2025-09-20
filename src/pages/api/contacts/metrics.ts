@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import type { PostgrestError } from '@supabase/supabase-js';
 
+import type { SessionPayload } from '../../../lib/jwt';
+import { authenticateRequest } from '../../../utils/api-auth';
 import { getSupabaseClient, getSupabaseConfig } from '../../../utils/supabase-client';
 
 type MetricsResponse = {
@@ -13,7 +15,13 @@ type MetricsResponse = {
 
 type ErrorResponse = { error: string };
 
-async function fetchMetricsWithGraphql(): Promise<MetricsResponse | null> {
+async function fetchMetricsWithGraphql(session: SessionPayload): Promise<MetricsResponse | null> {
+    const canViewAll = session.role === 'admin' || session.permissions.canManageUsers;
+
+    if (!canViewAll) {
+        return null;
+    }
+
     let config;
     try {
         config = getSupabaseConfig();
@@ -100,15 +108,20 @@ async function fetchMetricsWithGraphql(): Promise<MetricsResponse | null> {
     return result;
 }
 
-async function fetchMetricsWithRest(): Promise<MetricsResponse | null> {
+async function fetchMetricsWithRest(session: SessionPayload): Promise<MetricsResponse | null> {
     const supabase = getSupabaseClient();
     const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
+    const baseFilter = (query: ReturnType<typeof supabase['from']>) => {
+        const canViewAll = session.role === 'admin' || session.permissions.canManageUsers;
+        return canViewAll ? query : query.eq('owner_user_id', session.userId);
+    };
+
     const [totalResult, emailResult, phoneResult, recentResult] = await Promise.all([
-        supabase.from('contacts').select('id', { head: true, count: 'exact' }),
-        supabase.from('contacts').select('id', { head: true, count: 'exact' }).not('email', 'is', null).neq('email', ''),
-        supabase.from('contacts').select('id', { head: true, count: 'exact' }).not('phone', 'is', null).neq('phone', ''),
-        supabase.from('contacts').select('id', { head: true, count: 'exact' }).gte('created_at', thirtyDaysAgoIso),
+        baseFilter(supabase.from('contacts')).select('id', { head: true, count: 'exact' }),
+        baseFilter(supabase.from('contacts')).select('id', { head: true, count: 'exact' }).not('email', 'is', null).neq('email', ''),
+        baseFilter(supabase.from('contacts')).select('id', { head: true, count: 'exact' }).not('phone', 'is', null).neq('phone', ''),
+        baseFilter(supabase.from('contacts')).select('id', { head: true, count: 'exact' }).gte('created_at', thirtyDaysAgoIso),
     ]);
 
     const metrics: MetricsResponse = {
@@ -147,14 +160,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
     res.setHeader('Content-Type', 'application/json');
 
+    const session = await authenticateRequest(req);
+    if (!session) {
+        res.status(401).json({ error: 'Authentication required.' });
+        return;
+    }
+
+    if (!session.emailVerified) {
+        res.status(403).json({ error: 'Verify your email to access metrics.' });
+        return;
+    }
+
     try {
-        const graphqlMetrics = await fetchMetricsWithGraphql();
+        const graphqlMetrics = await fetchMetricsWithGraphql(session);
         if (graphqlMetrics) {
             res.status(200).json(graphqlMetrics);
             return;
         }
 
-        const restMetrics = await fetchMetricsWithRest();
+        const restMetrics = await fetchMetricsWithRest(session);
         if (restMetrics) {
             res.status(200).json(restMetrics);
             return;

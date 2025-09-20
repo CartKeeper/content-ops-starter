@@ -95,21 +95,23 @@ function brightenRgb(color: RgbTuple, amount: number): RgbTuple {
     return mixRgb(color, [255, 255, 255], amount);
 }
 
-function formatRoleFromRoles(roles: string[] | null | undefined): string | null {
-    if (!Array.isArray(roles) || roles.length === 0) {
-        return null;
-    }
-
-    const primary = roles[0];
-    switch (primary) {
+function formatRoleLabel(role: string | null | undefined, roles: string[] | null | undefined): string | null {
+    const resolvedRole = role ?? (Array.isArray(roles) && roles.length > 0 ? roles[0] : null);
+    switch (resolvedRole) {
         case 'admin':
             return 'Administrator';
+        case 'standard':
         case 'photographer':
-            return 'Photographer';
+            return 'Team Member';
+        case 'restricted':
+            return 'Restricted Access';
         case 'client':
             return 'Client';
         default:
-            return primary.charAt(0).toUpperCase() + primary.slice(1);
+            if (typeof resolvedRole === 'string' && resolvedRole.length > 0) {
+                return resolvedRole.charAt(0).toUpperCase() + resolvedRole.slice(1);
+            }
+            return null;
     }
 }
 
@@ -424,7 +426,9 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
     const displayName = trimmedName.length > 0 ? trimmedName : trimmedEmail || 'Your profile';
     const displayEmail = trimmedEmail;
     const profileRole =
-        trimmedRoleTitle.length > 0 ? trimmedRoleTitle : formatRoleFromRoles(identity.user?.roles);
+        trimmedRoleTitle.length > 0
+            ? trimmedRoleTitle
+            : formatRoleLabel(identity.user?.role ?? null, identity.user?.roles);
     const statusLabel = trimmedStatus.length > 0 ? trimmedStatus : identity.isAuthenticated ? 'Online' : null;
 
 

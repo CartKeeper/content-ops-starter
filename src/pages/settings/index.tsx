@@ -5,6 +5,7 @@ import { useNetlifyIdentity } from '../../components/auth';
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
 import { useIntegrations, type IntegrationStatus } from '../../components/crm/integration-context';
 import { INTEGRATION_CATEGORIES } from '../../data/integrations';
+import { UserManagementPanel } from '../../components/settings/UserManagementPanel';
 import type { UserProfile } from '../../types/user';
 
 const notificationPreferences = [
@@ -353,6 +354,9 @@ function SettingsWorkspace() {
     );
 
     const orderedIntegrations = React.useMemo(() => connectedIntegrations, [connectedIntegrations]);
+    const canManageUsers =
+        identity.user?.role === 'admin' || identity.user?.permissions?.canManageUsers === true;
+    const currentUserId = profile?.id ?? identity.user?.id ?? null;
 
     const statusBadgeTone: Record<IntegrationStatus, string> = {
         Connected: 'bg-success-lt text-success',
@@ -365,7 +369,8 @@ function SettingsWorkspace() {
     };
 
     return (
-        <div className="row row-cards">
+        <>
+            <div className="row row-cards">
             <div className="col-xl-6">
                 <div className="card h-100">
                     <div className="card-header d-flex align-items-center justify-content-between">
@@ -694,6 +699,8 @@ function SettingsWorkspace() {
                     </div>
                 </div>
             </div>
-        </div>
+            </div>
+            {canManageUsers ? <UserManagementPanel currentUserId={currentUserId} /> : null}
+        </>
     );
 }
