@@ -286,7 +286,7 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
 
             if (folderSelections.length > 0 && !dropboxAccessToken) {
                 setErrorMessage(
-                    'Selecting Dropbox folders requires NEXT_PUBLIC_DROPBOX_ACCESS_TOKEN. Update your environment or choose individual files.'
+                    'Selecting Dropbox folders requires NEXT_PUBLIC_DROPBOX_ACCESS_TOKEN (or DROPBOX_ACCESS_TOKEN) in your environment. Update the configuration or choose individual files.'
                 );
                 return;
             }
