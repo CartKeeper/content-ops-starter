@@ -12,7 +12,12 @@ function mapUser(record: Record<string, any>): AuthUser {
         email: record.email,
         name: record.name ?? record.full_name ?? null,
         roles: Array.isArray(record.roles) ? record.roles : [],
-        createdAt: record.created_at
+        createdAt: record.created_at,
+        roleTitle: record.role_title ?? null,
+        phone: record.phone ?? null,
+        welcomeMessage: record.welcome_message ?? null,
+        avatarUrl: record.avatar_url ?? null,
+        status: record.status ?? null
     };
 }
 
@@ -33,7 +38,9 @@ export default async function handler(request: NextApiRequest, response: NextApi
     try {
         const query = await supabaseAdmin
             .from('users')
-            .select('id,email,password_hash,name,roles,created_at')
+            .select(
+                'id,email,password_hash,name,roles,created_at,role_title,phone,welcome_message,avatar_url,status'
+            )
             .eq('email', normalizedEmail)
             .maybeSingle();
 

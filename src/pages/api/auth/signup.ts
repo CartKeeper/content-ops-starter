@@ -12,7 +12,12 @@ function mapUser(record: Record<string, any>): AuthUser {
         email: record.email,
         name: record.name ?? record.full_name ?? null,
         roles: Array.isArray(record.roles) ? record.roles : [],
-        createdAt: record.created_at
+        createdAt: record.created_at,
+        roleTitle: record.role_title ?? null,
+        phone: record.phone ?? null,
+        welcomeMessage: record.welcome_message ?? null,
+        avatarUrl: record.avatar_url ?? null,
+        status: record.status ?? null
     };
 }
 
@@ -42,9 +47,10 @@ export default async function handler(request: NextApiRequest, response: NextApi
                 email: normalizedEmail,
                 password_hash: passwordHash,
                 name: typeof name === 'string' ? name.trim() : null,
-                roles: ['photographer']
+                roles: ['photographer'],
+                role_title: 'Studio Admin'
             })
-            .select('id,email,name,roles,created_at')
+            .select('id,email,name,roles,created_at,role_title,phone,welcome_message,avatar_url,status')
             .single();
 
         if (insert.error || !insert.data) {

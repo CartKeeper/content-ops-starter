@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import type { IconType } from 'react-icons';
 
-import { adminUser } from '../../data/crm';
 import { INTEGRATION_CATEGORIES } from '../../data/integrations';
 import { useThemeMode } from '../../utils/use-theme-mode';
+import { useNetlifyIdentity } from '../auth';
 import { ApertureMark } from './ApertureMark';
 import {
     AddressBookIcon,
@@ -23,6 +23,7 @@ import {
     SunIcon,
     UsersIcon
 } from './icons';
+import { useCrmAuth } from './CrmAuthGuard';
 import { useIntegrations } from './integration-context';
 
 type WorkspaceLayoutProps = {
@@ -92,6 +93,24 @@ function darkenRgb(color: RgbTuple, amount: number): RgbTuple {
 
 function brightenRgb(color: RgbTuple, amount: number): RgbTuple {
     return mixRgb(color, [255, 255, 255], amount);
+}
+
+function formatRoleFromRoles(roles: string[] | null | undefined): string | null {
+    if (!Array.isArray(roles) || roles.length === 0) {
+        return null;
+    }
+
+    const primary = roles[0];
+    switch (primary) {
+        case 'admin':
+            return 'Administrator';
+        case 'photographer':
+            return 'Photographer';
+        case 'client':
+            return 'Client';
+        default:
+            return primary.charAt(0).toUpperCase() + primary.slice(1);
+    }
 }
 
 type QuickAccessApp = {
@@ -391,6 +410,23 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
     const { theme, setTheme, toggleTheme } = useThemeMode();
     const [isNavOpen, setIsNavOpen] = React.useState(false);
     const { connectedIntegrations } = useIntegrations();
+    const identity = useNetlifyIdentity();
+    const { signOut } = useCrmAuth();
+
+    const trimmedName = typeof identity.user?.name === 'string' ? identity.user.name.trim() : '';
+    const trimmedEmail = typeof identity.user?.email === 'string' ? identity.user.email.trim() : '';
+    const trimmedAvatar = typeof identity.user?.avatarUrl === 'string' ? identity.user.avatarUrl.trim() : '';
+    const trimmedRoleTitle =
+        typeof identity.user?.roleTitle === 'string' ? identity.user.roleTitle.trim() : '';
+    const trimmedStatus = typeof identity.user?.status === 'string' ? identity.user.status.trim() : '';
+
+    const profileAvatar = trimmedAvatar.length > 0 ? trimmedAvatar : '/images/avatar1.svg';
+    const displayName = trimmedName.length > 0 ? trimmedName : trimmedEmail || 'Your profile';
+    const displayEmail = trimmedEmail;
+    const profileRole =
+        trimmedRoleTitle.length > 0 ? trimmedRoleTitle : formatRoleFromRoles(identity.user?.roles);
+    const statusLabel = trimmedStatus.length > 0 ? trimmedStatus : identity.isAuthenticated ? 'Online' : null;
+
 
     const {
         isOpen: isAppsOpen,
@@ -424,6 +460,15 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         placement: profilePlacement,
         alignment: profileAlignment
     } = useDropdown<HTMLDivElement>({ defaultAlignment: 'end' });
+
+    const handleSignOut = React.useCallback(async () => {
+        closeProfile();
+        try {
+            await signOut();
+        } catch (error) {
+            console.error('Sign out failed', error);
+        }
+    }, [closeProfile, signOut]);
 
     const [accent, setAccent] = React.useState<string>(() => {
         if (typeof window === 'undefined') {
@@ -978,17 +1023,19 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                     <span className="crm-avatar-wrapper">
                                         <span
                                             className="avatar avatar-sm"
-                                            style={{ backgroundImage: `url(${adminUser.avatar})` }}
+                                            style={{ backgroundImage: `url(${profileAvatar})` }}
                                         />
-                                        {adminUser.status ? <span className="crm-avatar-status" aria-hidden /> : null}
+                                        {statusLabel ? <span className="crm-avatar-status" aria-hidden /> : null}
                                     </span>
                                     <span className="crm-profile-card-details">
-                                        <span className="crm-profile-card-name">{adminUser.name}</span>
-                                        {adminUser.status ? (
+                                        <span className="crm-profile-card-name">{displayName}</span>
+                                        {statusLabel ? (
                                             <span className="crm-profile-card-status">
                                                 <span className="crm-dot" aria-hidden />
-                                                {adminUser.status}
+                                                {statusLabel}
                                             </span>
+                                        ) : profileRole ? (
+                                            <span className="crm-profile-card-status">{profileRole}</span>
                                         ) : null}
                                     </span>
                                 </span>
@@ -1008,14 +1055,19 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                         <div className="d-flex align-items-center gap-3">
                                             <span
                                                 className="avatar avatar-lg"
-                                                style={{ backgroundImage: `url(${adminUser.avatar})` }}
+                                                style={{ backgroundImage: `url(${profileAvatar})` }}
                                             />
                                             <div>
-                                                <div className="fw-semibold">{adminUser.name}</div>
-                                                <div className="text-secondary">{adminUser.email}</div>
-                                                {adminUser.status ? (
+                                                <div className="fw-semibold">{displayName}</div>
+                                                {displayEmail ? (
+                                                    <div className="text-secondary">{displayEmail}</div>
+                                                ) : null}
+                                                {profileRole ? (
+                                                    <div className="text-secondary small mt-1">{profileRole}</div>
+                                                ) : null}
+                                                {statusLabel ? (
                                                     <span className="badge bg-success-lt text-success mt-2">
-                                                        {adminUser.status}
+                                                        {statusLabel}
                                                     </span>
                                                 ) : null}
                                             </div>
@@ -1027,7 +1079,12 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                             <Link href="/" className="btn btn-outline-secondary">
                                                 View public site
                                             </Link>
-                                            <button type="button" className="btn btn-primary">
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary"
+                                                onClick={handleSignOut}
+                                                disabled={!identity.isAuthenticated}
+                                            >
                                                 Sign out
                                             </button>
                                         </div>
