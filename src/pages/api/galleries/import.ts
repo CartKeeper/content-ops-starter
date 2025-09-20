@@ -3,6 +3,8 @@ import dayjs from 'dayjs';
 
 import { getDropboxClient, type DropboxClient } from '../../../server/dropbox/client';
 import type { DropboxFileMetadata } from '../../../types/dropbox';
+import type { DropboxChooserFile } from '../../../types/dropbox-chooser';
+import { collectAssetsFromSelection, type DropboxImportAsset } from '../../../utils/dropbox-import';
 import { getSupabaseClient } from '../../../utils/supabase-client';
 
 const ALLOWED_METHODS = ['POST'] as const;
@@ -15,25 +17,14 @@ const DROPBOX_STATUS = {
     archived: 'Archived'
 } as const;
 
-type ImportAsset = {
-    dropboxFileId: string;
-    dropboxPath: string;
-    fileName: string;
-    sizeInBytes: number;
-    previewUrl?: string | null;
-    thumbnailUrl?: string | null;
-    link?: string | null;
-    clientModified?: string | null;
-    serverModified?: string | null;
-};
-
 type ImportBody = {
     galleryId?: string;
     galleryName?: string | null;
     clientName?: string | null;
     folderPath?: string | null;
     triggerZapier?: boolean;
-    assets?: ImportAssetRequest[];
+    assets?: ImportAssetPayload[];
+    selection?: DropboxChooserFile[];
 };
 
 type ImportResponse = {
@@ -46,6 +37,8 @@ type ImportAssetRequest = {
     dropboxPath?: string;
     fileName?: string;
 };
+
+type ImportAssetPayload = Partial<DropboxImportAsset> & ImportAssetRequest;
 
 type ResolvedDropboxAsset = {
     dropboxFileId: string;
@@ -240,7 +233,91 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         const clientName = typeof body.clientName === 'string' ? body.clientName : null;
         const folderPath = typeof body.folderPath === 'string' ? body.folderPath : null;
         const triggerZapier = body.triggerZapier !== false;
-        const requestedAssets = ensureArray<ImportAssetRequest>(body.assets);
+        const assetCandidates = ensureArray<ImportAssetPayload>(body.assets);
+        const chooserSelection = ensureArray<DropboxChooserFile>(body.selection);
+
+        const assetsByKey = new Map<string, ImportAssetRequest>();
+
+        for (const asset of assetCandidates) {
+            if (!asset) {
+                continue;
+            }
+
+            const dropboxFileId =
+                typeof asset.dropboxFileId === 'string' && asset.dropboxFileId.trim().length > 0
+                    ? asset.dropboxFileId.trim()
+                    : undefined;
+            const dropboxPath =
+                typeof asset.dropboxPath === 'string' && asset.dropboxPath.trim().length > 0
+                    ? asset.dropboxPath.trim()
+                    : undefined;
+            const fileName =
+                typeof asset.fileName === 'string' && asset.fileName.trim().length > 0 ? asset.fileName.trim() : undefined;
+
+            const key = dropboxFileId ?? dropboxPath;
+            if (!key) {
+                continue;
+            }
+
+            assetsByKey.set(key, { dropboxFileId, dropboxPath, fileName });
+        }
+
+        if (chooserSelection.length > 0) {
+            const accessToken =
+                process.env.DROPBOX_ACCESS_TOKEN ??
+                process.env.NEXT_PUBLIC_DROPBOX_ACCESS_TOKEN ??
+                process.env.NEXT_PUBLIC_DROPBOX_TOKEN ??
+                null;
+
+            try {
+                const expandedAssets = await collectAssetsFromSelection({
+                    selection: chooserSelection,
+                    accessToken
+                });
+
+                for (const asset of expandedAssets) {
+                    if (!asset) {
+                        continue;
+                    }
+
+                    const dropboxFileId =
+                        typeof asset.dropboxFileId === 'string' && asset.dropboxFileId.trim().length > 0
+                            ? asset.dropboxFileId.trim()
+                            : undefined;
+                    const dropboxPath =
+                        typeof asset.dropboxPath === 'string' && asset.dropboxPath.trim().length > 0
+                            ? asset.dropboxPath.trim()
+                            : undefined;
+                    const fileName =
+                        typeof asset.fileName === 'string' && asset.fileName.trim().length > 0
+                            ? asset.fileName.trim()
+                            : undefined;
+
+                    const key = dropboxFileId ?? dropboxPath;
+                    if (!key) {
+                        continue;
+                    }
+
+                    assetsByKey.set(key, { dropboxFileId, dropboxPath, fileName });
+                }
+            } catch (error) {
+                console.error('Failed to expand Dropbox selection', error);
+
+                if (!accessToken) {
+                    res.status(400).json({
+                        error:
+                            'Selecting Dropbox folders requires DROPBOX_ACCESS_TOKEN or NEXT_PUBLIC_DROPBOX_ACCESS_TOKEN in the environment.'
+                    });
+                } else {
+                    res.status(502).json({
+                        error: 'Failed to load files from the selected Dropbox folder. Confirm Dropbox API access and try again.'
+                    });
+                }
+                return;
+            }
+        }
+
+        const requestedAssets = Array.from(assetsByKey.values());
 
         if (!galleryId) {
             res.status(400).json({ error: 'galleryId is required to import Dropbox assets.' });
