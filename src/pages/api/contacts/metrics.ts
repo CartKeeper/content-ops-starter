@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import type { PostgrestError } from '@supabase/supabase-js';
+
 import { getSupabaseClient, getSupabaseConfig } from '../../../utils/supabase-client';
 
 type MetricsResponse = {
@@ -63,13 +65,25 @@ async function fetchMetricsWithGraphql(): Promise<MetricsResponse | null> {
         errors?: Array<{ message?: string }>;
     };
 
-    if (payload.errors && payload.errors.length > 0) {
-        console.error('GraphQL metrics errors', payload.errors);
+    if (!payload.data || !payload.data.total) {
+        if (payload.errors && payload.errors.length > 0) {
+            console.error('GraphQL metrics errors', payload.errors);
+        }
         return null;
     }
 
-    if (!payload.data || !payload.data.total) {
+    const errors = payload.errors ?? [];
+    const createdAtMissing = errors.some((error) =>
+        typeof error.message === 'string' && error.message.toLowerCase().includes('created_at')
+    );
+
+    if (errors.length > 0 && !createdAtMissing) {
+        console.error('GraphQL metrics errors', errors);
         return null;
+    }
+
+    if (errors.length > 0 && createdAtMissing) {
+        console.warn('Created_at column missing; omitting recent-contact metric');
     }
 
     const result: MetricsResponse = {
@@ -90,30 +104,34 @@ async function fetchMetricsWithRest(): Promise<MetricsResponse | null> {
     const supabase = getSupabaseClient();
     const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const [{ count: totalCount, error: totalError }, { count: emailCount, error: emailError }, { count: phoneCount, error: phoneError }, recentResult] = await Promise.all([
+    const [totalResult, emailResult, phoneResult, recentResult] = await Promise.all([
         supabase.from('contacts').select('id', { head: true, count: 'exact' }),
         supabase.from('contacts').select('id', { head: true, count: 'exact' }).not('email', 'is', null).neq('email', ''),
         supabase.from('contacts').select('id', { head: true, count: 'exact' }).not('phone', 'is', null).neq('phone', ''),
-        supabase
-            .from('contacts')
-            .select('id', { head: true, count: 'exact' })
-            .gte('created_at', thirtyDaysAgoIso)
-            .then((result) => ({ count: result.count ?? undefined, error: result.error })),
+        supabase.from('contacts').select('id', { head: true, count: 'exact' }).gte('created_at', thirtyDaysAgoIso),
     ]);
 
-    const errors = [totalError, emailError, phoneError, recentResult?.error].filter(Boolean);
-    if (errors.length > 0) {
-        console.error('REST metrics fallback failed', errors[0]);
+    const metrics: MetricsResponse = {
+        total: totalResult.count ?? 0,
+        withEmail: emailResult.count ?? 0,
+        withPhone: phoneResult.count ?? 0,
+    };
+
+    const listErrors = [totalResult.error, emailResult.error, phoneResult.error].filter(Boolean);
+    if (listErrors.length > 0) {
+        console.error('REST metrics fallback failed', listErrors[0]);
         return null;
     }
 
-    const metrics: MetricsResponse = {
-        total: totalCount ?? 0,
-        withEmail: emailCount ?? 0,
-        withPhone: phoneCount ?? 0,
-    };
-
-    if (typeof recentResult?.count === 'number') {
+    if (recentResult.error) {
+        const recentError = recentResult.error as PostgrestError;
+        const message = typeof recentError.message === 'string' ? recentError.message.toLowerCase() : '';
+        const missingCreatedAt = recentError.code === '42703' || message.includes('created_at');
+        if (!missingCreatedAt) {
+            console.error('REST metrics fallback failed', recentError);
+            return null;
+        }
+    } else if (typeof recentResult.count === 'number') {
         metrics.newLast30 = recentResult.count;
     }
 

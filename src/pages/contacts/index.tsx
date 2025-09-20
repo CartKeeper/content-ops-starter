@@ -145,7 +145,8 @@ function ContactsWorkspace() {
 
     const ownerLabelMap = React.useMemo(() => {
         const map = new Map<string, string | null>();
-        contactsResponse?.meta.availableFilters.owners.forEach((owner) => {
+        const owners = contactsResponse?.meta.availableFilters.owners ?? [];
+        owners.forEach((owner) => {
             map.set(owner.id, owner.name ?? owner.id);
         });
         return map;
@@ -297,7 +298,8 @@ function ContactsWorkspace() {
     );
 
     const emptyMessage = React.useMemo(() => {
-        const workspaceEmpty = metrics.total === 0;
+        const totalKnown = contactsResponse?.meta.total ?? metrics.total;
+        const workspaceEmpty = totalKnown === 0;
         if (workspaceEmpty) {
             return (
                 <div className="space-y-4">
@@ -319,7 +321,7 @@ function ContactsWorkspace() {
         }
 
         return <p>No contacts found.</p>;
-    }, [hasActiveFilters, metrics.total]);
+    }, [contactsResponse?.meta.total, hasActiveFilters, metrics.total]);
 
     const handleContactCreated = React.useCallback(
         async (record: ContactRecord) => {
@@ -437,7 +439,7 @@ function ContactsWorkspace() {
 
 function KpiCard({ label, value }: { label: string; value: number }) {
     return (
-        <div className="flex h-28 flex-col justify-between rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
+        <div className="flex min-h-[104px] max-h-[128px] flex-col items-start justify-center gap-2 rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
             <p className="text-4xl font-semibold leading-none text-white">{value.toLocaleString()}</p>
             <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
         </div>
