@@ -16,6 +16,8 @@ const DROPBOX_STATUS = {
     archived: 'Archived'
 } as const;
 
+type DropboxStatus = (typeof DROPBOX_STATUS)[keyof typeof DROPBOX_STATUS];
+
 type ImportAsset = {
     dropboxFileId: string;
     dropboxPath: string;
@@ -40,6 +42,20 @@ type ImportBody = {
 type ImportResponse = {
     data?: { imported: number; skipped: number };
     error?: string;
+};
+
+type ZapierAsset = {
+    dropboxFileId: string;
+    dropboxPath: string;
+    fileName: string;
+    sizeInBytes: number | null;
+    status: DropboxStatus;
+    storageBucket: string | null;
+    storagePath: string | null;
+    storageUrl: string | null;
+    previewUrl: string | null;
+    thumbnailUrl: string | null;
+    error?: string | null;
 };
 
 function ensureArray<T>(value: unknown): T[] {
@@ -233,6 +249,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         }[] = [];
 
         const failures: { asset: ImportAsset; error: unknown }[] = [];
+        const zapierAssets: ZapierAsset[] = [];
 
         for (const asset of assets) {
             const baseRecord = {
@@ -250,6 +267,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             } as const;
 
             try {
+                const dropboxPreviewUrl = asset.previewUrl ?? asset.link ?? null;
                 const { buffer, metadata, contentType } = await downloadDropboxAsset(
                     dropboxAccessToken,
                     asset
@@ -285,22 +303,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
                         ? metadataSize
                         : buffer.byteLength || asset.sizeInBytes || null;
 
-                const payload =
-                    metadata || asset.previewUrl || asset.link
-                        ? {
-                              dropboxMetadata: metadata ?? null,
-                              dropboxPreviewUrl: asset.previewUrl ?? asset.link ?? null
-                          }
-                        : null;
+                const payloadEntries: Record<string, unknown> = {};
+                if (metadata) {
+                    payloadEntries.dropboxMetadata = metadata;
+                }
+                if (dropboxPreviewUrl) {
+                    payloadEntries.dropboxPreviewUrl = dropboxPreviewUrl;
+                }
+                if (publicUrl) {
+                    payloadEntries.storagePublicUrl = publicUrl;
+                }
+                const payload = Object.keys(payloadEntries).length > 0 ? payloadEntries : null;
 
                 records.push({
                     ...baseRecord,
                     size_in_bytes: resolvedSize,
-                    preview_url: publicUrl ?? asset.previewUrl ?? asset.link ?? null,
+                    preview_url: dropboxPreviewUrl,
                     status: DROPBOX_STATUS.synced,
                     storage_bucket: DROPBOX_STORAGE_BUCKET,
                     storage_path: storagePath,
                     payload
+                });
+
+                zapierAssets.push({
+                    dropboxFileId: asset.dropboxFileId,
+                    dropboxPath: asset.dropboxPath,
+                    fileName: asset.fileName,
+                    sizeInBytes: resolvedSize,
+                    status: DROPBOX_STATUS.synced,
+                    storageBucket: DROPBOX_STORAGE_BUCKET,
+                    storagePath: storagePath,
+                    storageUrl: publicUrl,
+                    previewUrl: dropboxPreviewUrl,
+                    thumbnailUrl: asset.thumbnailUrl ?? null
                 });
             } catch (assetError) {
                 console.error('Failed to mirror Dropbox asset to Supabase storage', {
@@ -310,17 +345,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
                 });
                 failures.push({ asset, error: assetError });
 
+                const dropboxPreviewUrl = asset.previewUrl ?? asset.link ?? null;
+                const errorMessage =
+                    assetError instanceof Error
+                        ? assetError.message
+                        : 'Unable to sync Dropbox asset to storage.';
+
                 records.push({
                     ...baseRecord,
                     size_in_bytes: asset.sizeInBytes ?? null,
-                    preview_url: asset.previewUrl ?? asset.link ?? null,
+                    preview_url: dropboxPreviewUrl,
                     status: DROPBOX_STATUS.error,
                     storage_bucket: null,
                     storage_path: null,
-                    payload:
-                        assetError instanceof Error
-                            ? { error: assetError.message }
-                            : { error: 'Unable to sync Dropbox asset to storage.' }
+                    payload: dropboxPreviewUrl
+                        ? { error: errorMessage, dropboxPreviewUrl }
+                        : { error: errorMessage }
+                });
+
+                zapierAssets.push({
+                    dropboxFileId: asset.dropboxFileId,
+                    dropboxPath: asset.dropboxPath,
+                    fileName: asset.fileName,
+                    sizeInBytes: asset.sizeInBytes ?? null,
+                    status: DROPBOX_STATUS.error,
+                    storageBucket: null,
+                    storagePath: null,
+                    storageUrl: null,
+                    previewUrl: dropboxPreviewUrl,
+                    thumbnailUrl: asset.thumbnailUrl ?? null,
+                    error: errorMessage
                 });
             }
         }
@@ -340,19 +394,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         const skipped = assets.length - imported;
 
         if (triggerZapier) {
-            const zapierAssets = records.map((record) => ({
-                dropboxFileId: record.dropbox_file_id,
-                dropboxPath: record.dropbox_path,
-                fileName: record.file_name,
-                sizeInBytes: record.size_in_bytes,
-                status: record.status,
-                storageBucket: record.storage_bucket,
-                storagePath: record.storage_path,
-                previewUrl: record.preview_url,
-                thumbnailUrl: record.thumbnail_url,
-                error: (record.payload as { error?: string } | null)?.error
-            }));
-
             await supabase.from('zapier_webhook_events').insert({
                 event_type: 'gallery.imported',
                 status: 'processed',

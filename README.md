@@ -127,6 +127,7 @@ The galleries dashboard now includes a Dropbox Chooser workflow and Zapier webho
 - **Supabase storage** (`supabase/migrations/20250218000000_enable_dropbox_storage.sql`)
   - `dropbox_assets` bucket mirrors each Dropbox binary so the CRM can serve files without expiring share links.
   - Storage policies allow public reads for gallery downloads while reserving writes for the service role.
+  - Zapier webhook payloads now surface `storageBucket`, `storagePath`, and `storageUrl` so downstream automations can fetch mirrored binaries straight from Supabase.
 - **Next.js API routes**
   - `POST /api/galleries/import` – persists Dropbox Chooser selections and optionally enqueues Zapier events.
   - `GET|POST /api/galleries` – list or create galleries with publish-ready metadata.
