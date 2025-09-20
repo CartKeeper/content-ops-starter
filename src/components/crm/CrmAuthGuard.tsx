@@ -7,13 +7,13 @@ import { ApertureMark } from './ApertureMark';
 type CrmAuthContextValue = {
     isAuthenticated: boolean;
     guardEnabled: boolean;
-    signOut: () => void;
+    signOut: () => Promise<void>;
 };
 
 const CrmAuthContext = React.createContext<CrmAuthContextValue>({
     isAuthenticated: false,
     guardEnabled: true,
-    signOut: () => undefined
+    signOut: async () => undefined
 });
 
 export function useCrmAuth(): CrmAuthContextValue {

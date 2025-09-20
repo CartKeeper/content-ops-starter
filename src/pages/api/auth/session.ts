@@ -11,7 +11,12 @@ function mapUser(record: Record<string, any>): AuthUser {
         email: record.email,
         name: record.name ?? record.full_name ?? null,
         roles: Array.isArray(record.roles) ? record.roles : [],
-        createdAt: record.created_at
+        createdAt: record.created_at,
+        roleTitle: record.role_title ?? null,
+        phone: record.phone ?? null,
+        welcomeMessage: record.welcome_message ?? null,
+        avatarUrl: record.avatar_url ?? null,
+        status: record.status ?? null
     };
 }
 
@@ -30,7 +35,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
         const payload = await verifySession(cookie);
         const query = await supabaseAdmin
             .from('users')
-            .select('id,email,name,roles,created_at')
+            .select('id,email,name,roles,created_at,role_title,phone,welcome_message,avatar_url,status')
             .eq('id', payload.userId)
             .maybeSingle();
 
