@@ -17,8 +17,10 @@ import {
 import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
 
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
-import DataToolbar, { type SortOption, type ToolbarFilter } from '../../components/data/DataToolbar';
+import { ToolbarFilterChip, type SortOption, type ToolbarFilter } from '../../components/data/DataToolbar';
 import DataTable from '../../components/data/DataTable';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
 import { formatDate } from '../../lib/formatters';
 import type { ContactRecord } from '../../types/contact';
 import { getContactName } from '../../types/contact';
@@ -37,13 +39,6 @@ type ContactsApiResponse = {
             statuses: Array<NonNullable<ContactRecord['status']>>;
         };
     };
-};
-
-type MetricsResponse = {
-    total: number;
-    withEmail: number;
-    withPhone: number;
-    newLast30?: number;
 };
 
 type ContactTableRow = {
@@ -91,7 +86,7 @@ export default function ContactsPage() {
         <CrmAuthGuard>
             <WorkspaceLayout>
                 <Head>
-                    <title>Contacts | Codex CRM</title>
+                    <title>Contacts · Aperture Studio CRM</title>
                 </Head>
                 <ContactsWorkspace />
             </WorkspaceLayout>
@@ -101,6 +96,7 @@ export default function ContactsPage() {
 
 function ContactsWorkspace() {
     const [search, setSearch] = React.useState('');
+    const [searchInput, setSearchInput] = React.useState('');
     const [stageFilter, setStageFilter] = React.useState<string[]>([]);
     const [statusFilter, setStatusFilter] = React.useState<string[]>([]);
     const [ownerFilter, setOwnerFilter] = React.useState<string[]>([]);
@@ -134,9 +130,23 @@ function ContactsWorkspace() {
         revalidateOnFocus: false,
     });
 
-    const { data: metricsResponse, mutate: mutateMetrics } = useSWR<MetricsResponse>('/api/contacts/metrics', fetcher, {
-        revalidateOnFocus: false,
-    });
+    React.useEffect(() => {
+        setSearchInput(search);
+    }, [search]);
+
+    React.useEffect(() => {
+        const timeout = window.setTimeout(() => {
+            if (search === searchInput) {
+                return;
+            }
+            setSearch(searchInput);
+            setPagination((previous) =>
+                previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 }
+            );
+        }, 250);
+
+        return () => window.clearTimeout(timeout);
+    }, [search, searchInput]);
 
     React.useEffect(() => {
         const match = CONTACT_SORT_OPTIONS.find((option) => option.id === sortValue);
@@ -211,14 +221,6 @@ function ContactsWorkspace() {
 
         return entries;
     }, [ownerFilter, ownerOptions, stageFilter, statusFilter, statusOptions]);
-
-    const metrics = React.useMemo(() => {
-        const base = metricsResponse ?? { total: 0, withEmail: 0, withPhone: 0 };
-        if (typeof metricsResponse?.newLast30 === 'number') {
-            return { ...base, newLast30: metricsResponse.newLast30 };
-        }
-        return base;
-    }, [metricsResponse]);
 
     const columns = React.useMemo<ColumnDef<ContactTableRow>[]>(() => [
         {
@@ -298,20 +300,16 @@ function ContactsWorkspace() {
     );
 
     const emptyMessage = React.useMemo(() => {
-        const totalKnown = contactsResponse?.meta.total ?? metrics.total;
+        const totalKnown = contactsResponse?.meta.total ?? 0;
         const workspaceEmpty = totalKnown === 0;
         if (workspaceEmpty) {
             return (
                 <div className="space-y-4">
                     <p className="text-base font-semibold text-white">No contacts yet</p>
                     <p className="text-sm text-slate-300">Start building your network.</p>
-                    <button
-                        type="button"
-                        onClick={() => setIsDialogOpen(true)}
-                        className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-600"
-                    >
+                    <Button type="button" onClick={() => setIsDialogOpen(true)}>
                         Add contact
-                    </button>
+                    </Button>
                 </div>
             );
         }
@@ -321,16 +319,16 @@ function ContactsWorkspace() {
         }
 
         return <p>No contacts found.</p>;
-    }, [contactsResponse?.meta.total, hasActiveFilters, metrics.total]);
+    }, [contactsResponse?.meta.total, hasActiveFilters]);
 
     const handleContactCreated = React.useCallback(
         async (record: ContactRecord) => {
             addNotification('Contact added', 'success', getContactName(record));
             setPagination((previous) => ({ ...previous, pageIndex: 0 }));
             setRowSelection({});
-            await Promise.all([mutateContacts(), mutateMetrics()]);
+            await mutateContacts();
         },
-        [addNotification, mutateContacts, mutateMetrics]
+        [addNotification, mutateContacts]
     );
 
     const handleContactError = React.useCallback(
@@ -340,108 +338,159 @@ function ContactsWorkspace() {
         [addNotification]
     );
 
-    const kpiCards = React.useMemo(() => {
-        const cards: Array<{ id: string; label: string; value: number }> = [
-            { id: 'total', label: 'Total contacts', value: metrics.total },
-            { id: 'email', label: 'With email', value: metrics.withEmail },
-            { id: 'phone', label: 'With phone', value: metrics.withPhone },
-        ];
-
-        if (typeof metrics.newLast30 === 'number') {
-            cards.push({ id: 'recent', label: 'New in last 30 days', value: metrics.newLast30 });
-        }
-
-        return cards;
-    }, [metrics.newLast30, metrics.total, metrics.withEmail, metrics.withPhone]);
-
-    const kpiGridClass = kpiCards.length >= 4 ? 'lg:grid-cols-4 xl:grid-cols-4' : 'lg:grid-cols-3 xl:grid-cols-3';
+    const handleResetFilters = React.useCallback(() => {
+        setStageFilter([]);
+        setStatusFilter([]);
+        setOwnerFilter([]);
+    }, [setOwnerFilter, setStageFilter, setStatusFilter]);
 
     return (
-        <div className="flex flex-col gap-6">
-            <section className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${kpiGridClass} items-stretch`}>
-                {kpiCards.map((card) => (
-                    <KpiCard key={card.id} label={card.label} value={card.value} />
-                ))}
-            </section>
+        <div className="w-full">
+            <div className="mx-auto w-full max-w-[1400px] px-4 pb-10 pt-6">
+                <header className="mb-4 sm:mb-6">
+                    <h1 className="text-2xl font-semibold text-white md:text-3xl">Contacts</h1>
+                    <p className="mt-1 text-sm text-slate-400">Manage your studio’s contact list.</p>
+                </header>
 
-            {contactsError ? (
-                <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{contactsError.message}</div>
-            ) : null}
-
-            {notifications.length > 0 ? (
-                <div aria-live="polite" className="space-y-3">
-                    {notifications.map((notification) => (
-                        <div
-                            key={notification.id}
-                            className={`rounded-2xl border p-3 text-sm ${
-                                notification.tone === 'success'
-                                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                                    : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                            }`}
-                        >
-                            <p className="font-semibold">{notification.title}</p>
-                            {notification.description ? (
-                                <p className="mt-1 text-xs text-inherit opacity-80">{notification.description}</p>
+                <section className="rounded-2xl border border-slate-800/70 bg-slate-950/60 p-4 shadow-xl shadow-slate-950/40">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="relative min-w-[220px] flex-1">
+                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    className="h-4 w-4"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M9 3.5a5.5 5.5 0 1 0 3.473 9.8l3.613 3.614a.75.75 0 1 0 1.06-1.061l-3.613-3.613A5.5 5.5 0 0 0 9 3.5Zm-4 5.5a4 4 0 1 1 8 0a4 4 0 0 1-8 0Z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                            </span>
+                            <Input
+                                type="search"
+                                value={searchInput}
+                                onChange={(event) => setSearchInput(event.target.value)}
+                                placeholder="Search contacts by name, email, or phone"
+                                aria-label="Search contacts"
+                                className="pl-9"
+                            />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {filters.map((filter) => (
+                                <ToolbarFilterChip key={filter.id} filter={filter} />
+                            ))}
+                            {hasActiveFilters ? (
+                                <button
+                                    type="button"
+                                    className="rounded-full border border-transparent bg-slate-800/60 px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-slate-700 hover:bg-slate-800"
+                                    onClick={handleResetFilters}
+                                >
+                                    Clear filters
+                                </button>
                             ) : null}
                         </div>
-                    ))}
+                        <Button
+                            type="button"
+                            onClick={() => setIsDialogOpen(true)}
+                            className="w-full md:ml-auto md:w-auto"
+                        >
+                            Add contact
+                        </Button>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-3 md:justify-end">
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                            <label htmlFor="contact-sort" className="hidden md:block">
+                                Sort by
+                            </label>
+                            <select
+                                id="contact-sort"
+                                className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                                value={sortValue}
+                                onChange={(event) => setSortValue(event.target.value)}
+                            >
+                                {CONTACT_SORT_OPTIONS.map(({ id, label }) => (
+                                    <option key={id} value={id}>
+                                        {label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                            Show
+                            <select
+                                className="rounded-xl border border-slate-700 bg-slate-900/80 px-2 py-1 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                                value={pagination.pageSize}
+                                onChange={(event) =>
+                                    setPagination({ pageIndex: 0, pageSize: Number.parseInt(event.target.value, 10) })
+                                }
+                            >
+                                {[10, 25, 50, 100].map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
+                            rows
+                        </div>
+                    </div>
+                </section>
+
+                {contactsError ? (
+                    <div className="mt-4 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">
+                        {contactsError.message}
+                    </div>
+                ) : null}
+
+                {notifications.length > 0 ? (
+                    <div aria-live="polite" className="mt-4 space-y-3">
+                        {notifications.map((notification) => (
+                            <div
+                                key={notification.id}
+                                className={`rounded-2xl border p-3 text-sm ${
+                                    notification.tone === 'success'
+                                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                                        : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                                }`}
+                            >
+                                <p className="font-semibold">{notification.title}</p>
+                                {notification.description ? (
+                                    <p className="mt-1 text-xs text-inherit opacity-80">{notification.description}</p>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+
+                <div className="mt-4">
+                    <DataTable<ContactTableRow>
+                        columns={columns}
+                        data={tableRows}
+                        sorting={sorting}
+                        onSortingChange={handleSortingChange}
+                        pagination={pagination}
+                        onPaginationChange={setPagination}
+                        rowSelection={rowSelection}
+                        onRowSelectionChange={setRowSelection}
+                        manualPagination
+                        manualSorting
+                        pageCount={pageCount}
+                        getRowId={(row) => row.id}
+                        isLoading={isContactsLoading && !contactsResponse}
+                        emptyMessage={emptyMessage}
+                    />
                 </div>
-            ) : null}
 
-            <DataToolbar
-                searchValue={search}
-                onSearchChange={(value) => {
-                    setSearch(value);
-                    setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-                }}
-                searchPlaceholder="Search contacts by name, email, or phone"
-                filters={filters}
-                hasActiveFilters={hasActiveFilters}
-                onResetFilters={() => {
-                    setStageFilter([]);
-                    setStatusFilter([]);
-                    setOwnerFilter([]);
-                }}
-                sortOptions={CONTACT_SORT_OPTIONS.map(({ id, label }) => ({ id, label }))}
-                sortValue={sortValue}
-                onSortChange={setSortValue}
-                primaryAction={{ label: 'Add contact', onClick: () => setIsDialogOpen(true) }}
-                pageSize={pagination.pageSize}
-                onPageSizeChange={(pageSize) => setPagination({ pageIndex: 0, pageSize })}
-            />
-
-            <DataTable<ContactTableRow>
-                columns={columns}
-                data={tableRows}
-                sorting={sorting}
-                onSortingChange={handleSortingChange}
-                pagination={pagination}
-                onPaginationChange={setPagination}
-                rowSelection={rowSelection}
-                onRowSelectionChange={setRowSelection}
-                manualPagination
-                manualSorting
-                pageCount={pageCount}
-                getRowId={(row) => row.id}
-                isLoading={isContactsLoading && !contactsResponse}
-                emptyMessage={emptyMessage}
-            />
-
-            <AddContactDialog
-                open={isDialogOpen}
-                onOpenChange={setIsDialogOpen}
-                onSuccess={handleContactCreated}
-                onError={handleContactError}
-            />
-        </div>
-    );
-}
-
-function KpiCard({ label, value }: { label: string; value: number }) {
-    return (
-        <div className="flex min-h-[104px] max-h-[128px] flex-col items-start justify-center gap-2 rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
-            <p className="text-4xl font-semibold leading-none text-white">{value.toLocaleString()}</p>
-            <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+                <AddContactDialog
+                    open={isDialogOpen}
+                    onOpenChange={setIsDialogOpen}
+                    onSuccess={handleContactCreated}
+                    onError={handleContactError}
+                />
+            </div>
         </div>
     );
 }

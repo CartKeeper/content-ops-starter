@@ -177,7 +177,7 @@ export function DataToolbar({
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
                     {filters.map((filter) => (
-                        <FilterPopover key={filter.id} filter={filter} />
+                        <ToolbarFilterChip key={filter.id} filter={filter} />
                     ))}
                     {hasActiveFilters && onResetFilters ? (
                         <button
@@ -219,7 +219,7 @@ export function DataToolbar({
     );
 }
 
-function FilterPopover({ filter }: { filter: ToolbarFilter }) {
+export function ToolbarFilterChip({ filter }: { filter: ToolbarFilter }) {
     const [open, setOpen] = React.useState(false);
     const containerRef = React.useRef<HTMLDivElement | null>(null);
 
