@@ -435,8 +435,8 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
                 </div>
             ) : null}
 
-            <div className="mt-8 grid gap-10 lg:grid-cols-5">
-                <div className="lg:col-span-2">
+            <div className="mt-8 flex flex-col gap-10 xl:flex-row xl:items-start xl:justify-between">
+                <div className="xl:flex-1 xl:min-w-[300px]">
                     <h3 className="text-sm font-semibold text-slate-200">Invite a new teammate</h3>
                     <p className="mt-2 text-xs text-slate-400">
                         They will receive a temporary password and verification link to finish setup.
@@ -536,7 +536,7 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
                         </button>
                     </form>
                 </div>
-                <div className="lg:col-span-3">
+                <div className="xl:flex-[1.3] xl:min-w-[320px]">
                     <h3 className="text-sm font-semibold text-slate-200">Team roster</h3>
                     {loading ? (
                         <p className="mt-4 text-sm text-slate-400">Loading users…</p>
@@ -593,8 +593,12 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
                         </div>
                     )}
 
+                </div>
+
+                <div className="xl:flex-1 xl:min-w-[300px]">
+                    <h3 className="text-sm font-semibold text-slate-200">Manage teammate</h3>
                     {selectedUser && editForm ? (
-                        <form className="mt-6 space-y-4 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6" onSubmit={handleEditSubmit}>
+                        <form className="mt-4 space-y-4 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6" onSubmit={handleEditSubmit}>
                             <h4 className="text-sm font-semibold text-slate-200">Manage {selectedUser.name ?? selectedUser.email}</h4>
                             <div className="grid gap-4 md:grid-cols-2">
                                 <div>
@@ -702,7 +706,11 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
                                 </button>
                             </div>
                         </form>
-                    ) : null}
+                    ) : (
+                        <div className="mt-4 rounded-2xl border border-dashed border-slate-800/80 bg-slate-950/40 p-6 text-sm text-slate-400">
+                            Select a teammate from the roster to manage their settings.
+                        </div>
+                    )}
                 </div>
             </div>
         </section>
