@@ -46,6 +46,7 @@ type DropboxDownloadResult = {
 export type DropboxClient = {
     listFolder: (path: string) => Promise<DropboxFileMetadata[]>;
     downloadFile: (input: { path?: string; id?: string }) => Promise<DropboxDownloadResult>;
+    getTemporaryLink: (input: { path?: string; id?: string }) => Promise<string>;
 };
 
 let cachedToken: DropboxAccessTokenCache | null = null;
@@ -225,9 +226,44 @@ async function downloadFile(input: { path?: string; id?: string }): Promise<Drop
     } satisfies DropboxDownloadResult;
 }
 
+type DropboxTemporaryLinkResponse = {
+    link?: string;
+};
+
+async function getTemporaryLink(input: { path?: string; id?: string }): Promise<string> {
+    const token = await fetchAccessToken();
+    const selector = input.id || input.path;
+
+    if (!selector) {
+        throw new Error('Dropbox getTemporaryLink requires either a file id or path.');
+    }
+
+    const response = await fetch(`${DROPBOX_API_BASE_URL}/files/get_temporary_link`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ path: selector })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Dropbox get_temporary_link failed with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as DropboxTemporaryLinkResponse;
+
+    if (!data.link) {
+        throw new Error('Dropbox get_temporary_link response did not include a link.');
+    }
+
+    return data.link;
+}
+
 export function getDropboxClient(): DropboxClient {
     return {
         listFolder,
-        downloadFile
+        downloadFile,
+        getTemporaryLink
     } satisfies DropboxClient;
 }

@@ -63,6 +63,7 @@ export type GalleryRecord = {
     storageSummary?: GalleryStorageSummary;
     dropboxSyncCursor?: string | null;
     dropboxFiles?: string[];
+    dropboxFolderPath?: string | null;
     customFields?: Record<string, string | boolean>;
     portalSettings?: GalleryPortalSettings;
 };
