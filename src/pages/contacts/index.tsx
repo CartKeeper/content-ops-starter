@@ -2,9 +2,18 @@ import * as React from 'react';
 import Head from 'next/head';
 import useSWR from 'swr';
 import { useForm } from 'react-hook-form';
-import * as Dialog from '@radix-ui/react-dialog';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '../../components/ui/dialog';
 import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
 
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
@@ -292,7 +301,8 @@ function ContactsWorkspace() {
         if (workspaceEmpty) {
             return (
                 <div className="space-y-4">
-                    <p className="text-slate-300">No contacts yet. Start building your network.</p>
+                    <p className="text-base font-semibold text-white">No contacts yet</p>
+                    <p className="text-sm text-slate-300">Start building your network.</p>
                     <button
                         type="button"
                         onClick={() => setIsDialogOpen(true)}
@@ -329,26 +339,26 @@ function ContactsWorkspace() {
     );
 
     const kpiCards = React.useMemo(() => {
-        const cards: Array<{ id: string; label: string; value: number; helper: string }> = [
-            { id: 'total', label: 'Total contacts', value: metrics.total, helper: 'Across your workspace' },
-            { id: 'email', label: 'With email', value: metrics.withEmail, helper: 'Reachable via inbox' },
-            { id: 'phone', label: 'With phone', value: metrics.withPhone, helper: 'Ready for quick calls' },
+        const cards: Array<{ id: string; label: string; value: number }> = [
+            { id: 'total', label: 'Total contacts', value: metrics.total },
+            { id: 'email', label: 'With email', value: metrics.withEmail },
+            { id: 'phone', label: 'With phone', value: metrics.withPhone },
         ];
 
         if (typeof metrics.newLast30 === 'number') {
-            cards.push({ id: 'recent', label: 'New (30 days)', value: metrics.newLast30, helper: 'Added in the last 30 days' });
+            cards.push({ id: 'recent', label: 'New in last 30 days', value: metrics.newLast30 });
         }
 
         return cards;
     }, [metrics.newLast30, metrics.total, metrics.withEmail, metrics.withPhone]);
 
-    const kpiGridClass = kpiCards.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3';
+    const kpiGridClass = kpiCards.length >= 4 ? 'lg:grid-cols-4 xl:grid-cols-4' : 'lg:grid-cols-3 xl:grid-cols-3';
 
     return (
         <div className="flex flex-col gap-6">
-            <section className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${kpiGridClass}`}>
+            <section className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${kpiGridClass} items-stretch`}>
                 {kpiCards.map((card) => (
-                    <KpiCard key={card.id} label={card.label} value={card.value} helper={card.helper} />
+                    <KpiCard key={card.id} label={card.label} value={card.value} />
                 ))}
             </section>
 
@@ -356,21 +366,25 @@ function ContactsWorkspace() {
                 <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{contactsError.message}</div>
             ) : null}
 
-            {notifications.map((notification) => (
-                <div
-                    key={notification.id}
-                    className={`rounded-2xl border p-3 text-sm ${
-                        notification.tone === 'success'
-                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                            : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                    }`}
-                >
-                    <p className="font-semibold">{notification.title}</p>
-                    {notification.description ? (
-                        <p className="mt-1 text-xs text-inherit opacity-80">{notification.description}</p>
-                    ) : null}
+            {notifications.length > 0 ? (
+                <div aria-live="polite" className="space-y-3">
+                    {notifications.map((notification) => (
+                        <div
+                            key={notification.id}
+                            className={`rounded-2xl border p-3 text-sm ${
+                                notification.tone === 'success'
+                                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                                    : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                            }`}
+                        >
+                            <p className="font-semibold">{notification.title}</p>
+                            {notification.description ? (
+                                <p className="mt-1 text-xs text-inherit opacity-80">{notification.description}</p>
+                            ) : null}
+                        </div>
+                    ))}
                 </div>
-            ))}
+            ) : null}
 
             <DataToolbar
                 searchValue={search}
@@ -421,12 +435,11 @@ function ContactsWorkspace() {
     );
 }
 
-function KpiCard({ label, value, helper }: { label: string; value: number; helper: string }) {
+function KpiCard({ label, value }: { label: string; value: number }) {
     return (
-        <div className="flex min-h-[104px] max-h-32 flex-col justify-center gap-3 rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
+        <div className="flex h-28 flex-col justify-between rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
+            <p className="text-4xl font-semibold leading-none text-white">{value.toLocaleString()}</p>
             <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-            <p className="text-3xl font-semibold leading-none text-white">{value.toLocaleString()}</p>
-            <p className="text-xs text-slate-500">{helper}</p>
         </div>
     );
 }
@@ -478,6 +491,11 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
     });
 
     const [isSubmitting, setIsSubmitting] = React.useState(false);
+    const nameInputRef = React.useRef<HTMLInputElement | null>(null);
+
+    const nameField = register('name');
+    const emailField = register('email');
+    const phoneField = register('phone');
 
     React.useEffect(() => {
         if (!open) {
@@ -515,109 +533,115 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
     });
 
     return (
-        <Dialog.Root open={open} onOpenChange={(next) => (!isSubmitting ? onOpenChange(next) : undefined)}>
-            <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur" />
-                <Dialog.Content className="fixed inset-0 z-50 mx-auto my-12 flex h-fit w-full max-w-lg flex-col gap-6 rounded-3xl border border-slate-800 bg-slate-950/95 p-6 text-slate-100 shadow-2xl focus:outline-none">
-                    <header className="flex items-start justify-between gap-4">
-                        <div>
-                            <Dialog.Title className="text-xl font-semibold text-white">Add contact</Dialog.Title>
-                            <Dialog.Description className="text-sm text-slate-400">Capture a new lead without leaving the table.</Dialog.Description>
-                        </div>
-                        <Dialog.Close
-                            asChild
-                            disabled={isSubmitting}
+        <Dialog open={open} onOpenChange={(next) => (!isSubmitting ? onOpenChange(next) : undefined)}>
+            <DialogContent
+                onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    if (typeof window !== 'undefined') {
+                        window.requestAnimationFrame(() => {
+                            nameInputRef.current?.focus();
+                        });
+                    }
+                }}
+            >
+                <DialogHeader className="flex flex-row items-start justify-between gap-4">
+                    <div>
+                        <DialogTitle>Add contact</DialogTitle>
+                        <DialogDescription>Capture a new lead without leaving the table.</DialogDescription>
+                    </div>
+                    <DialogClose asChild disabled={isSubmitting}>
+                        <button
+                            type="button"
+                            className="rounded-full border border-transparent bg-slate-800/80 p-2 text-slate-300 transition hover:border-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label="Close dialog"
                         >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+                                <path
+                                    fillRule="evenodd"
+                                    d="M5.22 5.22a.75.75 0 0 1 1.06 0L10 8.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L11.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06L8.94 10L5.22 6.28a.75.75 0 0 1 0-1.06Z"
+                                    clipRule="evenodd"
+                                />
+                            </svg>
+                        </button>
+                    </DialogClose>
+                </DialogHeader>
+
+                <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="contact-name" className="text-sm font-medium text-slate-200">
+                            Name <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                            id="contact-name"
+                            type="text"
+                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                            placeholder="Jamie Rivera"
+                            {...nameField}
+                            ref={(element) => {
+                                nameField.ref(element);
+                                nameInputRef.current = element;
+                            }}
+                            disabled={isSubmitting}
+                        />
+                        {errors.name ? <p className="text-xs text-rose-300">{errors.name.message}</p> : null}
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="contact-email" className="text-sm font-medium text-slate-200">
+                            Email
+                        </label>
+                        <input
+                            id="contact-email"
+                            type="email"
+                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                            placeholder="jamie@example.com"
+                            {...emailField}
+                            disabled={isSubmitting}
+                        />
+                        {errors.email ? <p className="text-xs text-rose-300">{errors.email.message}</p> : null}
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="contact-phone" className="text-sm font-medium text-slate-200">
+                            Phone
+                        </label>
+                        <input
+                            id="contact-phone"
+                            type="tel"
+                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                            placeholder="(555) 010-1234"
+                            {...phoneField}
+                            disabled={isSubmitting}
+                        />
+                        {errors.phone ? <p className="text-xs text-rose-300">{errors.phone.message}</p> : null}
+                    </div>
+
+                    <DialogFooter className="pt-2">
+                        <DialogClose asChild disabled={isSubmitting}>
                             <button
                                 type="button"
-                                className="rounded-full border border-transparent bg-slate-800/80 p-2 text-slate-300 transition hover:border-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                aria-label="Close"
+                                className="rounded-full border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M5.22 5.22a.75.75 0 0 1 1.06 0L10 8.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L11.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06L8.94 10L5.22 6.28a.75.75 0 0 1 0-1.06Z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
+                                Cancel
                             </button>
-                        </Dialog.Close>
-                    </header>
-
-                    <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-                        <div className="flex flex-col gap-1">
-                            <label htmlFor="contact-name" className="text-sm font-medium text-slate-200">
-                                Name <span className="text-rose-400">*</span>
-                            </label>
-                            <input
-                                id="contact-name"
-                                type="text"
-                                className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                                placeholder="Jamie Rivera"
-                                {...register('name')}
-                                autoFocus
-                                disabled={isSubmitting}
-                            />
-                            {errors.name ? <p className="text-xs text-rose-300">{errors.name.message}</p> : null}
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                            <label htmlFor="contact-email" className="text-sm font-medium text-slate-200">
-                                Email
-                            </label>
-                            <input
-                                id="contact-email"
-                                type="email"
-                                className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                                placeholder="jamie@example.com"
-                                {...register('email')}
-                                disabled={isSubmitting}
-                            />
-                            {errors.email ? <p className="text-xs text-rose-300">{errors.email.message}</p> : null}
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                            <label htmlFor="contact-phone" className="text-sm font-medium text-slate-200">
-                                Phone
-                            </label>
-                            <input
-                                id="contact-phone"
-                                type="tel"
-                                className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                                placeholder="(555) 010-1234"
-                                {...register('phone')}
-                                disabled={isSubmitting}
-                            />
-                            {errors.phone ? <p className="text-xs text-rose-300">{errors.phone.message}</p> : null}
-                        </div>
-
-                        <div className="flex justify-end gap-3 pt-2">
-                            <Dialog.Close asChild disabled={isSubmitting}>
-                                <button
-                                    type="button"
-                                    className="rounded-full border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    Cancel
-                                </button>
-                            </Dialog.Close>
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {isSubmitting ? (
-                                    <span className="inline-flex items-center gap-2">
-                                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />
-                                        Saving…
-                                    </span>
-                                ) : (
-                                    'Save contact'
-                                )}
-                            </button>
-                        </div>
-                    </form>
-                </Dialog.Content>
-            </Dialog.Portal>
-        </Dialog.Root>
+                        </DialogClose>
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {isSubmitting ? (
+                                <span className="inline-flex items-center gap-2">
+                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />
+                                    Saving…
+                                </span>
+                            ) : (
+                                'Save contact'
+                            )}
+                        </button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
