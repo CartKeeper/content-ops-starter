@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import dayjs from 'dayjs';
 
+import type { DropboxChooserFile } from '../../../types/dropbox-chooser';
+import { collectAssetsFromSelection, type DropboxImportAsset } from '../../../utils/dropbox-import';
 import { getSupabaseClient } from '../../../utils/supabase-client';
 
 const ALLOWED_METHODS = ['POST'] as const;
@@ -13,25 +15,14 @@ const DROPBOX_STATUS = {
     archived: 'Archived'
 } as const;
 
-type ImportAsset = {
-    dropboxFileId: string;
-    dropboxPath: string;
-    fileName: string;
-    sizeInBytes: number;
-    previewUrl?: string | null;
-    thumbnailUrl?: string | null;
-    link?: string | null;
-    clientModified?: string | null;
-    serverModified?: string | null;
-};
-
 type ImportBody = {
     galleryId?: string;
     galleryName?: string | null;
     clientName?: string | null;
     folderPath?: string | null;
     triggerZapier?: boolean;
-    assets?: ImportAsset[];
+    assets?: DropboxImportAsset[];
+    selection?: DropboxChooserFile[];
 };
 
 type ImportResponse = {
@@ -60,12 +51,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         const clientName = typeof body.clientName === 'string' ? body.clientName : null;
         const folderPath = typeof body.folderPath === 'string' ? body.folderPath : null;
         const triggerZapier = body.triggerZapier !== false;
-        const assets = ensureArray<ImportAsset>(body.assets).filter((asset) => typeof asset?.dropboxFileId === 'string');
 
         if (!galleryId) {
             res.status(400).json({ error: 'galleryId is required to import Dropbox assets.' });
             return;
         }
+
+        const payloadAssets = ensureArray<DropboxImportAsset>(body.assets).filter((asset) =>
+            typeof asset?.dropboxFileId === 'string' || typeof asset?.dropboxPath === 'string'
+        );
+        const chooserSelection = ensureArray<DropboxChooserFile>(body.selection);
+
+        const assetsByKey = new Map<string, DropboxImportAsset>();
+
+        for (const asset of payloadAssets) {
+            const key = (asset.dropboxFileId ?? '') || asset.dropboxPath;
+            if (key) {
+                assetsByKey.set(key, asset);
+            }
+        }
+
+        if (chooserSelection.length > 0) {
+            const accessToken =
+                process.env.DROPBOX_ACCESS_TOKEN ??
+                process.env.NEXT_PUBLIC_DROPBOX_ACCESS_TOKEN ??
+                process.env.NEXT_PUBLIC_DROPBOX_TOKEN ??
+                null;
+
+            try {
+                const expandedAssets = await collectAssetsFromSelection({
+                    selection: chooserSelection,
+                    accessToken
+                });
+
+                for (const asset of expandedAssets) {
+                    const key = (asset.dropboxFileId ?? '') || asset.dropboxPath;
+                    if (key) {
+                        assetsByKey.set(key, asset);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to expand Dropbox selection', error);
+                if (!accessToken) {
+                    res.status(400).json({
+                        error:
+                            'Selecting Dropbox folders requires DROPBOX_ACCESS_TOKEN or NEXT_PUBLIC_DROPBOX_ACCESS_TOKEN in the environment.'
+                    });
+                } else {
+                    res.status(502).json({
+                        error: 'Failed to load files from the selected Dropbox folder. Confirm Dropbox API access and try again.'
+                    });
+                }
+                return;
+            }
+        }
+
+        const assets = Array.from(assetsByKey.values());
 
         if (assets.length === 0) {
             res.status(400).json({ error: 'Provide at least one Dropbox asset to import.' });
