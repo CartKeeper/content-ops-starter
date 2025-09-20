@@ -12,7 +12,7 @@ import {
     type ProjectTaskStatus
 } from '../../types/project';
 
-const projectStatusMap: Record<ProjectStatus, { label: string; badgeClass: string }> = {
+const projectStatusMap = {
     PLANNING: {
         label: 'Planning',
         badgeClass: 'border-amber-400/40 bg-amber-500/15 text-amber-200'
@@ -33,14 +33,14 @@ const projectStatusMap: Record<ProjectStatus, { label: string; badgeClass: strin
         label: 'Cancelled',
         badgeClass: 'border-rose-400/40 bg-rose-500/15 text-rose-200'
     }
-};
+} satisfies Record<ProjectStatus, { label: string; badgeClass: string }>;
 
-const taskStatusMap: Record<ProjectTaskStatus, { label: string; className: string }> = {
+const taskStatusMap = {
     PENDING: { label: 'Pending', className: 'border-amber-400/40 bg-amber-500/15 text-amber-200' },
     CONFIRMED: { label: 'Confirmed', className: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200' },
     EDITING: { label: 'Editing', className: 'border-sky-400/40 bg-sky-500/15 text-sky-200' },
     COMPLETE: { label: 'Complete', className: 'border-indigo-400/40 bg-indigo-500/15 text-indigo-200' }
-};
+} satisfies Record<ProjectTaskStatus, { label: string; className: string }>;
 
 const invoiceStatusMap: Record<ProjectInvoiceSnippet['status'], string> = {
     PAID: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200',
@@ -48,6 +48,56 @@ const invoiceStatusMap: Record<ProjectInvoiceSnippet['status'], string> = {
     OVERDUE: 'border-rose-400/40 bg-rose-500/15 text-rose-200',
     DRAFT: 'border-slate-400/40 bg-slate-500/15 text-slate-200'
 };
+
+const neutralBadgeClass = 'border-slate-500/40 bg-slate-500/15 text-slate-200';
+
+function formatStatusLabel(rawStatus?: string | null): string {
+    if (!rawStatus) {
+        return 'Unknown Status';
+    }
+
+    const cleaned = rawStatus
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!cleaned) {
+        return 'Unknown Status';
+    }
+
+    return cleaned
+        .split(' ')
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+}
+
+function getProjectStatusMeta(status: string | undefined) {
+    const meta = projectStatusMap[status as keyof typeof projectStatusMap];
+
+    if (meta) {
+        return meta;
+    }
+
+    return {
+        label: formatStatusLabel(status),
+        badgeClass: neutralBadgeClass
+    };
+}
+
+function getTaskStatusMeta(status: string | undefined) {
+    const meta = taskStatusMap[status as keyof typeof taskStatusMap];
+
+    if (meta) {
+        return meta;
+    }
+
+    return {
+        label: formatStatusLabel(status),
+        className: neutralBadgeClass
+    };
+}
 
 function sortTasks(tasks: ProjectTaskRecord[]): ProjectTaskRecord[] {
     return [...tasks].sort((a, b) => {
@@ -72,7 +122,7 @@ function formatInvoiceLine(invoice: ProjectInvoiceSnippet) {
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
-    const statusMeta = projectStatusMap[project.status];
+    const statusMeta = getProjectStatusMeta(project.status);
     const tasks = sortTasks(project.tasks);
     const hasTimeline = tasks.length > 0;
     const hasDateRange = project.startDate && project.endDate;
@@ -104,7 +154,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
                     <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Timeline</h3>
                     <ul className="space-y-3">
                         {tasks.map((task) => {
-                            const tone = taskStatusMap[task.status];
+                            const tone = getTaskStatusMeta(task.status);
                             return (
                                 <li key={task.id} className="flex items-start gap-3">
                                     <span className="mt-1 h-2 w-2 rounded-full bg-slate-600" aria-hidden />
