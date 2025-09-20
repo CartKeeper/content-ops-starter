@@ -25,6 +25,9 @@ type DataTableProps<TData> = {
     onRowClick?: (row: TData) => void;
     isLoading?: boolean;
     emptyMessage?: React.ReactNode;
+    manualPagination?: boolean;
+    manualSorting?: boolean;
+    pageCount?: number;
 };
 
 export function DataTable<TData>({
@@ -39,7 +42,10 @@ export function DataTable<TData>({
     getRowId,
     onRowClick,
     isLoading = false,
-    emptyMessage
+    emptyMessage,
+    manualPagination = false,
+    manualSorting = false,
+    pageCount
 }: DataTableProps<TData>) {
     const table = useReactTable({
         data,
@@ -50,9 +56,12 @@ export function DataTable<TData>({
         onPaginationChange,
         onRowSelectionChange,
         getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
-        autoResetPageIndex: false
+        ...(manualSorting ? {} : { getSortedRowModel: getSortedRowModel() }),
+        ...(manualPagination ? {} : { getPaginationRowModel: getPaginationRowModel() }),
+        manualPagination,
+        manualSorting,
+        pageCount,
+        autoResetPageIndex: !manualPagination
     });
 
     const { pageIndex, pageSize } = table.getState().pagination;
