@@ -1,10 +1,53 @@
 import { SignJWT, jwtVerify } from 'jose';
 
+import type { UserPermissions, UserRole } from '../types/user';
+
 export type SessionPayload = {
     userId: string;
     email: string;
     roles: string[];
+    role: UserRole;
+    permissions: UserPermissions;
+    emailVerified: boolean;
 };
+
+const FALLBACK_PERMISSIONS: UserPermissions = {
+    canManageUsers: false,
+    canEditSettings: false,
+    canViewGalleries: true,
+    canManageIntegrations: true,
+    canManageCalendar: true
+};
+
+export function normalizePermissions(value: unknown): UserPermissions {
+    if (!value || typeof value !== 'object') {
+        return { ...FALLBACK_PERMISSIONS };
+    }
+
+    const source = value as Record<string, unknown>;
+    return {
+        canManageUsers: Boolean(source.canManageUsers ?? source.can_manage_users),
+        canEditSettings: Boolean(source.canEditSettings ?? source.can_edit_settings),
+        canViewGalleries: 'canViewGalleries' in source || 'can_view_galleries' in source
+            ? Boolean(source.canViewGalleries ?? source.can_view_galleries)
+            : FALLBACK_PERMISSIONS.canViewGalleries,
+        canManageIntegrations:
+            'canManageIntegrations' in source || 'can_manage_integrations' in source
+                ? Boolean(source.canManageIntegrations ?? source.can_manage_integrations)
+                : FALLBACK_PERMISSIONS.canManageIntegrations,
+        canManageCalendar:
+            'canManageCalendar' in source || 'can_manage_calendar' in source
+                ? Boolean(source.canManageCalendar ?? source.can_manage_calendar)
+                : FALLBACK_PERMISSIONS.canManageCalendar
+    };
+}
+
+export function normalizeRole(value: unknown): UserRole {
+    if (value === 'admin' || value === 'standard' || value === 'restricted') {
+        return value;
+    }
+    return 'standard';
+}
 
 const ISSUER = 'content-ops-starter';
 
@@ -80,9 +123,17 @@ export async function verifySession(token: string): Promise<SessionPayload> {
         throw new Error('Invalid session payload.');
     }
 
+    const normalizedRoles = roles.filter((role): role is string => typeof role === 'string');
+    const role = normalizeRole((payload as Record<string, unknown>).role);
+    const permissions = normalizePermissions((payload as Record<string, unknown>).permissions);
+    const emailVerified = Boolean((payload as Record<string, unknown>).emailVerified);
+
     return {
         userId,
         email,
-        roles: roles.filter((role): role is string => typeof role === 'string')
+        roles: normalizedRoles,
+        role,
+        permissions,
+        emailVerified
     };
 }

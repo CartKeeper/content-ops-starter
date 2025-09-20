@@ -8,46 +8,12 @@ import { useNetlifyIdentity } from '../components/auth';
 export default function SignupPage() {
     const identity = useNetlifyIdentity();
     const router = useRouter();
-    const [name, setName] = React.useState('');
-    const [email, setEmail] = React.useState('');
-    const [password, setPassword] = React.useState('');
-    const [confirmPassword, setConfirmPassword] = React.useState('');
-    const [submitting, setSubmitting] = React.useState(false);
-    const [formError, setFormError] = React.useState<string | null>(null);
 
     React.useEffect(() => {
         if (identity.isReady && identity.isAuthenticated) {
             void router.replace('/dashboard');
         }
     }, [identity.isAuthenticated, identity.isReady, router]);
-
-    const handleSubmit = React.useCallback(
-        async (event: React.FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            if (submitting) {
-                return;
-            }
-
-            if (password !== confirmPassword) {
-                setFormError('Passwords must match.');
-                return;
-            }
-
-            setSubmitting(true);
-            setFormError(null);
-
-            try {
-                await identity.signup({ email, password, name });
-                await router.replace('/dashboard');
-            } catch (error) {
-                const message = error instanceof Error ? error.message : 'Unable to create account.';
-                setFormError(message);
-            } finally {
-                setSubmitting(false);
-            }
-        },
-        [confirmPassword, email, identity, name, password, router, submitting]
-    );
 
     return (
         <>
@@ -63,79 +29,16 @@ export default function SignupPage() {
                             Sign up to connect calendars, manage contacts, and ship projects faster.
                         </p>
                     </div>
-                    <form className="space-y-6" onSubmit={handleSubmit}>
-                        <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-slate-200">
-                                Name
-                            </label>
-                            <input
-                                id="name"
-                                type="text"
-                                autoComplete="name"
-                                value={name}
-                                onChange={(event) => setName(event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                placeholder="Avery Carter"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-slate-200">
-                                Email
-                            </label>
-                            <input
-                                id="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                value={email}
-                                onChange={(event) => setEmail(event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                placeholder="you@studio.com"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-slate-200">
-                                Password
-                            </label>
-                            <input
-                                id="password"
-                                type="password"
-                                autoComplete="new-password"
-                                required
-                                value={password}
-                                onChange={(event) => setPassword(event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                placeholder="Minimum 8 characters"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-200">
-                                Confirm password
-                            </label>
-                            <input
-                                id="confirmPassword"
-                                type="password"
-                                autoComplete="new-password"
-                                required
-                                value={confirmPassword}
-                                onChange={(event) => setConfirmPassword(event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                placeholder="Re-enter your password"
-                            />
-                        </div>
-                        {formError ? (
-                            <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                                {formError}
-                            </p>
-                        ) : null}
-                        <button
-                            type="submit"
-                            className="flex w-full items-center justify-center rounded-xl bg-[#4DE5FF] px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-[#86f0ff]"
-                            disabled={submitting}
-                        >
-                            {submitting ? 'Creating account…' : 'Create account'}
-                        </button>
-                    </form>
+                    <div className="space-y-6 rounded-2xl border border-slate-800/60 bg-slate-950/60 p-6">
+                        <p className="text-sm text-slate-300">
+                            Accounts are created by an administrator so we can assign the correct role and permissions from day
+                            one. Ask your studio admin to send an invitation email.
+                        </p>
+                        <p className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-xs text-slate-400">
+                            Invites include a verification link and a temporary password so you can sign in securely and finish
+                            setting up your profile.
+                        </p>
+                    </div>
                     <p className="mt-6 text-center text-sm text-slate-400">
                         Already have an account?{' '}
                         <Link href="/login" className="font-semibold text-[#4DE5FF] hover:text-white">
