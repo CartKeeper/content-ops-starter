@@ -2,6 +2,7 @@ import * as React from 'react';
 import Head from 'next/head';
 
 import { SectionCard, WorkspaceLayout } from '../../components/crm';
+import { ZapierTemplatesWidget } from '../../components/integrations/ZapierTemplatesWidget';
 import type { ZapierWebhookEventRecord } from '../../types/zapier';
 
 function formatDate(value?: string | null): string {
@@ -129,6 +130,13 @@ export default function ZapierIntegrationPage() {
                                 </ul>
                             </div>
                         </div>
+                    </SectionCard>
+
+                    <SectionCard
+                        title="Zapier automation templates"
+                        description="Launch Slack, Notion, and Dropbox automations that mirror the CRM workflow."
+                    >
+                        <ZapierTemplatesWidget />
                     </SectionCard>
 
                     <SectionCard title="Recent webhook activity" description="Latest deliveries logged to Supabase">
