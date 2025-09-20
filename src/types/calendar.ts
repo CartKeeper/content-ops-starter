@@ -1,9 +1,12 @@
 export type CalendarEventRecord = {
     id: string;
-    userId: string;
+    ownerUserId: string;
     title: string;
     description: string | null;
-    startTime: string;
-    endTime: string;
-    createdAt: string;
+    startAt: string;
+    endAt: string;
+    allDay: boolean;
+    visibility: 'team' | 'private';
+    createdAt: string | null;
+    updatedAt: string | null;
 };

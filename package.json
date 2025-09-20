@@ -16,6 +16,7 @@
         "@fullcalendar/list": "^6.1.19",
         "@fullcalendar/react": "^6.1.19",
         "@fullcalendar/timegrid": "^6.1.19",
+        "@hookform/resolvers": "^3.10.0",
         "@netlify/functions": "^2.7.0",
         "@radix-ui/react-dialog": "^1.1.15",
         "@react-pdf/renderer": "^4.3.0",
@@ -41,6 +42,7 @@
         "next": "15.5.3",
         "pdfkit": "^0.17.2",
         "react": "^19.1.0",
+        "react-hook-form": "^7.53.0",
         "react-dom": "^19.1.0",
         "react-icons": "^5.5.0",
         "react-redux": "^9.2.0",
@@ -48,7 +50,8 @@
         "stripe": "^18.5.0",
         "swiper": "^11.1.4",
         "swr": "^2.3.6",
-        "tailwindcss": "^3.4.3"
+        "tailwindcss": "^3.4.3",
+        "zod": "^3.24.4"
     },
     "devDependencies": {
         "@base2/pretty-print-object": "^1.0.2",
