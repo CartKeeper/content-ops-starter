@@ -1,522 +1,634 @@
 import * as React from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import dayjs from 'dayjs';
-import type { GetStaticProps } from 'next';
-import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
+import useSWR from 'swr';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
-import DataToolbar, { type ToolbarFilter, type SortOption } from '../../components/data/DataToolbar';
-import DataTable from '../../components/data/DataTable';
-import ClientDrawer from '../../components/clients/ClientDrawer';
+import { Button } from '../../components/ui/button';
+import { Badge } from '../../components/ui/badge';
 import {
-    loadClientDashboardData,
-    type ClientDashboardData,
-    type ClientTableRow,
-    type ClientProfile
-} from '../../lib/api/clients';
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
+} from '../../components/ui/dialog';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { Select } from '../../components/ui/select';
+import { Textarea } from '../../components/ui/textarea';
 import { formatCurrency, formatDate } from '../../lib/formatters';
 
-type ClientsPageProps = ClientDashboardData;
+const STATUS_OPTIONS = ['Lead', 'Active', 'Inactive'] as const;
 
-type QueryState = {
-    q?: string;
-    status?: string;
-    tags?: string;
-    balance?: string;
-    portal?: string;
-    activity?: string;
-    sort?: string;
-    page?: string;
-    pageSize?: string;
+type ClientStatus = (typeof STATUS_OPTIONS)[number];
+
+type ClientRecord = {
+    id: string;
+    created_at: string;
+    updated_at: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    status: ClientStatus;
+    outstanding_cents: number;
+    last_activity: string | null;
+    upcoming_shoot: string | null;
+    portal_url: string | null;
+    portal_enabled: boolean;
+    tags: string[] | null;
 };
 
-const SORT_OPTIONS: Array<SortOption & { state: SortingState }> = [
-    { id: 'name-asc', label: 'Name (A-Z)', state: [{ id: 'name', desc: false }] },
-    { id: 'name-desc', label: 'Name (Z-A)', state: [{ id: 'name', desc: true }] },
-    { id: 'activity-desc', label: 'Last activity (newest)', state: [{ id: 'lastActivityAt', desc: true }] },
-    { id: 'activity-asc', label: 'Last activity (oldest)', state: [{ id: 'lastActivityAt', desc: false }] },
-    { id: 'invoices-desc', label: 'Invoices (high to low)', state: [{ id: 'invoices', desc: true }] },
-    { id: 'balance-desc', label: 'Balance (high to low)', state: [{ id: 'outstandingBalanceCents', desc: true }] }
-];
-
-const DEFAULT_SORT_OPTION = SORT_OPTIONS[0];
-
-export const getStaticProps: GetStaticProps<ClientsPageProps> = async () => {
-    const data = await loadClientDashboardData();
-    return { props: data };
+type ClientsApiResponse = {
+    data: ClientRecord[];
+    page: number;
+    pageSize: number;
+    total: number;
 };
 
-export default function ClientsPage(props: ClientsPageProps) {
+type MetricsResponse = {
+    activeCount: number;
+    outstandingCents: number;
+    upcomingCount60d: number;
+    portalReadyCount: number;
+};
+
+const SORT_OPTIONS = [
+    { id: 'name-asc', label: 'Name (A–Z)' },
+    { id: 'name-desc', label: 'Name (Z–A)' },
+    { id: 'created-desc', label: 'Newest first' },
+    { id: 'created-asc', label: 'Oldest first' },
+    { id: 'status-asc', label: 'Status (A–Z)' },
+    { id: 'status-desc', label: 'Status (Z–A)' },
+    { id: 'outstanding-desc', label: 'Outstanding (high)' },
+    { id: 'upcoming-asc', label: 'Upcoming shoot (soonest)' },
+    { id: 'upcoming-desc', label: 'Upcoming shoot (latest)' }
+] as const;
+
+type SortOptionId = (typeof SORT_OPTIONS)[number]['id'];
+
+const fetcher = async <T,>(url: string): Promise<T> => {
+    const response = await fetch(url);
+    if (!response.ok) {
+        let message = 'Request failed';
+        try {
+            const body = (await response.json()) as { error?: string };
+            if (body?.error) {
+                message = body.error;
+            }
+        } catch (error) {
+            // ignore
+        }
+        throw new Error(message);
+    }
+    return (await response.json()) as T;
+};
+
+function useDebouncedValue<T>(value: T, delay = 300): T {
+    const [debounced, setDebounced] = React.useState<T>(value);
+
+    React.useEffect(() => {
+        const timer = window.setTimeout(() => setDebounced(value), delay);
+        return () => window.clearTimeout(timer);
+    }, [value, delay]);
+
+    return debounced;
+}
+
+type CreateClientFormValues = {
+    name: string;
+    email: string;
+    phone: string;
+    status: ClientStatus;
+    upcoming_shoot: string;
+    tags: string;
+};
+
+const createClientFormSchema = z.object({
+    name: z.string().trim().min(1, 'Name is required'),
+    email: z
+        .union([z.string().trim().email('Enter a valid email'), z.literal('')])
+        .optional(),
+    phone: z.union([z.string().trim(), z.literal('')]).optional(),
+    status: z.enum(STATUS_OPTIONS),
+    upcoming_shoot: z
+        .union([z.string().trim(), z.literal('')])
+        .optional()
+        .refine((value) => {
+            if (!value || value.length === 0) {
+                return true;
+            }
+            return !Number.isNaN(Date.parse(value));
+        }, 'Enter a valid date'),
+    tags: z.union([z.string(), z.literal('')]).optional()
+});
+
+export default function ClientsPage() {
     return (
         <CrmAuthGuard>
             <WorkspaceLayout>
                 <Head>
                     <title>Clients | Codex CRM</title>
                 </Head>
-                <ClientsWorkspace {...props} />
+                <ClientsWorkspace />
             </WorkspaceLayout>
         </CrmAuthGuard>
     );
 }
 
-function ClientsWorkspace({ rows, profiles }: ClientsPageProps) {
-    const router = useRouter();
+type ToastState = {
+    id: number;
+    message: string;
+    variant: 'success' | 'error';
+};
 
-    const parseQueryList = React.useCallback((value: string | string[] | undefined): string[] => {
-        if (Array.isArray(value)) {
-            return value.flatMap((item) => item.split(',')).filter(Boolean);
-        }
-        if (typeof value === 'string') {
-            return value.split(',').map((entry) => entry.trim()).filter(Boolean);
-        }
-        return [];
-    }, []);
+function ClientsWorkspace() {
+    const [search, setSearch] = React.useState('');
+    const [statusFilter, setStatusFilter] = React.useState<ClientStatus | 'All'>('All');
+    const [sort, setSort] = React.useState<SortOptionId>('name-asc');
+    const [isDialogOpen, setDialogOpen] = React.useState(false);
+    const [toast, setToast] = React.useState<ToastState | null>(null);
 
-    const initialSearch = typeof router.query.q === 'string' ? router.query.q : '';
-    const initialStatus = parseQueryList(router.query.status);
-    const initialTags = parseQueryList(router.query.tags);
-    const initialBalance = parseQueryList(router.query.balance);
-    const initialPortal = parseQueryList(router.query.portal);
-    const initialActivity = parseQueryList(router.query.activity);
-    const initialSortId = typeof router.query.sort === 'string' ? router.query.sort : DEFAULT_SORT_OPTION.id;
-    const initialSort = SORT_OPTIONS.find((option) => option.id === initialSortId) ?? DEFAULT_SORT_OPTION;
-    const initialPageIndex = (() => {
-        const value = typeof router.query.page === 'string' ? Number.parseInt(router.query.page, 10) : 1;
-        return Number.isFinite(value) && value > 0 ? value - 1 : 0;
-    })();
-    const initialPageSize = (() => {
-        const value = typeof router.query.pageSize === 'string' ? Number.parseInt(router.query.pageSize, 10) : 10;
-        return Number.isFinite(value) && value > 0 ? value : 10;
-    })();
-
-    const [search, setSearch] = React.useState<string>(initialSearch);
-    const [statusFilter, setStatusFilter] = React.useState<string[]>(initialStatus);
-    const [tagFilter, setTagFilter] = React.useState<string[]>(initialTags);
-    const [balanceFilter, setBalanceFilter] = React.useState<string[]>(initialBalance);
-    const [portalFilter, setPortalFilter] = React.useState<string[]>(initialPortal);
-    const [activityFilter, setActivityFilter] = React.useState<string[]>(initialActivity);
-    const [sortValue, setSortValue] = React.useState<string>(initialSort.id);
-    const [sorting, setSorting] = React.useState<SortingState>(initialSort.state);
-    const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: initialPageIndex, pageSize: initialPageSize });
-    const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
-    const [drawerClientId, setDrawerClientId] = React.useState<string | null>(null);
-    const [isDrawerOpen, setIsDrawerOpen] = React.useState<boolean>(false);
-    const [copiedPortalId, setCopiedPortalId] = React.useState<string | null>(null);
+    const debouncedSearch = useDebouncedValue(search, 300);
 
     React.useEffect(() => {
-        if (!copiedPortalId) {
-            return;
+        if (!toast) {
+            return undefined;
         }
-        const timer = window.setTimeout(() => setCopiedPortalId(null), 2000);
+        const timer = window.setTimeout(() => setToast(null), 3200);
         return () => window.clearTimeout(timer);
-    }, [copiedPortalId]);
+    }, [toast]);
 
-    const tagOptions = React.useMemo(() => {
-        const unique = new Set<string>();
-        rows.forEach((row) => {
-            row.tags.forEach((tag) => unique.add(tag));
-        });
-        return Array.from(unique).sort();
-    }, [rows]);
-
-    const filters = React.useMemo<ToolbarFilter[]>(() => {
-        const statusFilterOptions = [
-            { value: 'Active', label: 'Active' },
-            { value: 'Lead', label: 'Lead' },
-            { value: 'Lost', label: 'Lost' }
-        ];
-
-        const balanceOptions = [
-            { value: 'with-balance', label: 'With balance' },
-            { value: 'zero-balance', label: 'Balance cleared' }
-        ];
-
-        const portalOptions = [{ value: 'portal-ready', label: 'Portal ready' }];
-
-        const activityOptions = [
-            { value: 'last-30', label: 'Last 30 days' },
-            { value: 'last-90', label: 'Last 90 days' },
-            { value: 'no-activity', label: 'No recent activity' }
-        ];
-
-        return [
-            { id: 'status', label: 'Status', options: statusFilterOptions, value: statusFilter, onChange: setStatusFilter },
-            {
-                id: 'tags',
-                label: 'Tags',
-                options: tagOptions.map((tag) => ({ value: tag, label: tag })),
-                value: tagFilter,
-                onChange: setTagFilter
-            },
-            { id: 'balance', label: 'Balance', options: balanceOptions, value: balanceFilter, onChange: setBalanceFilter },
-            { id: 'activity', label: 'Last activity', options: activityOptions, value: activityFilter, onChange: setActivityFilter },
-            { id: 'portal', label: 'Portal', options: portalOptions, value: portalFilter, onChange: setPortalFilter }
-        ];
-    }, [activityFilter, balanceFilter, portalFilter, setActivityFilter, setBalanceFilter, setPortalFilter, setStatusFilter, setTagFilter, statusFilter, tagFilter, tagOptions]);
-
-    const filteredRows = React.useMemo(() => {
-        const normalizedSearch = search.trim().toLowerCase();
-        const now = dayjs();
-
-        return rows.filter((row) => {
-            if (normalizedSearch) {
-                const haystack = [row.name, row.email ?? '', row.phone ?? '', row.owner ?? '']
-                    .map((value) => value.toLowerCase())
-                    .some((value) => value.includes(normalizedSearch));
-                if (!haystack) {
-                    return false;
-                }
-            }
-
-            if (statusFilter.length > 0 && !statusFilter.includes(row.status)) {
-                return false;
-            }
-
-            if (tagFilter.length > 0 && !row.tags.some((tag) => tagFilter.includes(tag))) {
-                return false;
-            }
-
-            if (balanceFilter.includes('with-balance') && row.outstandingBalanceCents <= 0) {
-                return false;
-            }
-
-            if (balanceFilter.includes('zero-balance') && row.outstandingBalanceCents > 0) {
-                return false;
-            }
-
-            if (portalFilter.includes('portal-ready') && !row.hasPortal) {
-                return false;
-            }
-
-            if (activityFilter.length > 0) {
-                const lastActivity = row.lastActivityAt ? dayjs(row.lastActivityAt) : null;
-                const matchesActivity = activityFilter.some((filter) => {
-                    if (filter === 'last-30') {
-                        return lastActivity ? now.diff(lastActivity, 'day') <= 30 : false;
-                    }
-                    if (filter === 'last-90') {
-                        return lastActivity ? now.diff(lastActivity, 'day') <= 90 : false;
-                    }
-                    if (filter === 'no-activity') {
-                        return !row.lastActivityAt;
-                    }
-                    return true;
-                });
-
-                if (!matchesActivity) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-    }, [activityFilter, balanceFilter, portalFilter, rows, search, statusFilter, tagFilter]);
-
-    React.useEffect(() => {
-        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-        setRowSelection({});
-    }, [filteredRows.length, search, statusFilter, tagFilter, balanceFilter, portalFilter, activityFilter]);
-
-    React.useEffect(() => {
-        const maxPageIndex = Math.max(0, Math.ceil(filteredRows.length / pagination.pageSize) - 1);
-        if (pagination.pageIndex > maxPageIndex) {
-            setPagination((previous) => ({ ...previous, pageIndex: maxPageIndex }));
+    const clientsKey = React.useMemo(() => {
+        const params = new URLSearchParams();
+        if (debouncedSearch.trim()) {
+            params.set('search', debouncedSearch.trim());
         }
-    }, [filteredRows.length, pagination.pageIndex, pagination.pageSize]);
+        if (statusFilter !== 'All') {
+            params.set('status', statusFilter);
+        }
+        if (sort !== 'name-asc') {
+            params.set('sort', sort);
+        }
+        params.set('page', '1');
+        params.set('pageSize', '50');
+        const queryString = params.toString();
+        return queryString.length > 0 ? `/api/clients?${queryString}` : '/api/clients?page=1&pageSize=50';
+    }, [debouncedSearch, sort, statusFilter]);
 
-    const metrics = React.useMemo(() => {
-        const activeClients = filteredRows.filter((row) => row.status === 'Active').length;
-        const outstandingBalance = filteredRows.reduce((sum, row) => sum + row.outstandingBalanceCents, 0);
-        const upcomingShoots = filteredRows.filter((row) => row.upcomingShootAt && dayjs(row.upcomingShootAt).isAfter(dayjs())).length;
-        const portalReady = filteredRows.filter((row) => row.hasPortal).length;
-        return { activeClients, outstandingBalance, upcomingShoots, portalReady };
-    }, [filteredRows]);
+    const {
+        data: clientsData,
+        error: clientsError,
+        isLoading: isLoadingClients,
+        mutate: mutateClients
+    } = useSWR<ClientsApiResponse>(clientsKey, fetcher);
 
-    const columns = React.useMemo<ColumnDef<ClientTableRow>[]>(() => {
-        return [
-            {
-                id: 'select',
-                header: ({ table }) => (
-                    <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-400"
-                        checked={table.getIsAllPageRowsSelected()}
-                        onChange={table.getToggleAllPageRowsSelectedHandler()}
-                        aria-label="Select all clients"
-                    />
-                ),
-                cell: ({ row }) => (
-                    <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-400"
-                        checked={row.getIsSelected()}
-                        onChange={row.getToggleSelectedHandler()}
-                        onClick={(event) => event.stopPropagation()}
-                        aria-label={`Select ${row.original.name}`}
-                    />
-                ),
-                enableSorting: false,
-                size: 48
-            },
-            {
-                accessorKey: 'name',
-                header: 'Client',
-                cell: ({ row }) => {
-                    const record = row.original;
-                    return (
-                        <div className="flex flex-col">
-                            <span className="font-semibold text-white">{record.name}</span>
-                            <span className="text-xs text-slate-400">{record.email ?? 'No email'} • {record.phone ?? '—'}</span>
-                        </div>
-                    );
-                }
-            },
-            {
-                accessorKey: 'status',
-                header: 'Status',
-                cell: ({ row }) => (
-                    <span className="inline-flex items-center rounded-full border border-indigo-400/50 bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold text-indigo-100">
-                        {row.original.status}
-                    </span>
-                )
-            },
-            {
-                accessorKey: 'invoices',
-                header: 'Invoices',
-                cell: ({ row }) => <span className="font-medium text-slate-100">{row.original.invoices}</span>
-            },
-            {
-                accessorKey: 'outstandingBalanceCents',
-                header: 'Outstanding',
-                cell: ({ row }) => (
-                    <span className="font-semibold text-slate-100">{formatCurrency(row.original.outstandingBalanceCents)}</span>
-                )
-            },
-            {
-                accessorKey: 'lastActivityAt',
-                header: 'Last activity',
-                cell: ({ row }) => (
-                    <span className="text-sm text-slate-300">
-                        {row.original.lastActivityAt ? formatDate(row.original.lastActivityAt) : '—'}
-                    </span>
-                )
-            },
-            {
-                accessorKey: 'upcomingShootAt',
-                header: 'Upcoming shoot',
-                cell: ({ row }) => (
-                    <span className="text-sm text-slate-300">
-                        {row.original.upcomingShootAt ? formatDate(row.original.upcomingShootAt) : '—'}
-                    </span>
-                )
-            },
-            {
-                id: 'portal',
-                header: 'Portal link',
-                cell: ({ row }) => (
-                    <button
-                        type="button"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            void navigator.clipboard.writeText(row.original.portalUrl ?? '');
-                            setCopiedPortalId(row.original.id);
-                        }}
-                        className="text-xs font-medium text-indigo-300 transition hover:text-white"
-                    >
-                        {copiedPortalId === row.original.id ? 'Copied!' : 'Copy link'}
-                    </button>
-                )
-            },
-            {
-                id: 'actions',
-                header: 'Actions',
-                cell: ({ row }) => (
-                    <div className="flex items-center gap-2 text-xs">
-                        <button
-                            type="button"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                setDrawerClientId(row.original.id);
-                                setIsDrawerOpen(true);
-                            }}
-                            className="rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-indigo-400 hover:text-white"
-                        >
-                            View
-                        </button>
-                        <Link
-                            href={`/projects`}
-                            onClick={(event) => event.stopPropagation()}
-                            className="rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-indigo-400 hover:text-white"
-                        >
-                            Projects
-                        </Link>
-                    </div>
-                ),
-                enableSorting: false
-            }
-        ];
-    }, [copiedPortalId]);
+    const { data: metricsData, mutate: mutateMetrics } = useSWR<MetricsResponse>('/api/clients/metrics', fetcher);
 
-    const selectedCount = Object.keys(rowSelection).length;
+    const clients = clientsData?.data ?? [];
+    const showEmptyState = !isLoadingClients && clients.length === 0;
 
-    const bulkActions = (
-        <div className="flex items-center gap-2">
-            <button
-                type="button"
-                disabled={selectedCount === 0}
-                className="rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 transition enabled:hover:border-indigo-400 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-                Bulk actions
-            </button>
-        </div>
+    const handleClientCreated = React.useCallback(
+        (client: ClientRecord) => {
+            setDialogOpen(false);
+            setToast({ id: Date.now(), message: `${client.name} added`, variant: 'success' });
+            void mutateClients();
+            void mutateMetrics();
+        },
+        [mutateClients, mutateMetrics]
     );
 
-    const hasActiveFilters =
-        statusFilter.length > 0 ||
-        tagFilter.length > 0 ||
-        balanceFilter.length > 0 ||
-        portalFilter.length > 0 ||
-        activityFilter.length > 0;
-
-    const resetFilters = () => {
-        setStatusFilter([]);
-        setTagFilter([]);
-        setBalanceFilter([]);
-        setPortalFilter([]);
-        setActivityFilter([]);
-    };
-
-    const selectedProfile: ClientProfile | null = drawerClientId ? profiles[drawerClientId] ?? null : null;
-
-    const activeSortOption = React.useMemo(() => {
-        const option = SORT_OPTIONS.find((entry) => entry.id === sortValue);
-        return option ?? DEFAULT_SORT_OPTION;
-    }, [sortValue]);
-
-    React.useEffect(() => {
-        const option = SORT_OPTIONS.find((entry) => entry.id === sortValue);
-        if (option) {
-            setSorting(option.state);
-        }
-    }, [sortValue]);
-
-    const handleSortingChange = React.useCallback((updater: SortingState | ((old: SortingState) => SortingState)) => {
-        setSorting((previous) => {
-            const next = typeof updater === 'function' ? updater(previous) : updater;
-            if (next.length > 0) {
-                const candidate = SORT_OPTIONS.find(
-                    (option) => option.state.length === next.length && option.state.every((entry, index) => entry.id === next[index]?.id && entry.desc === next[index]?.desc)
-                );
-                if (candidate) {
-                    setSortValue(candidate.id);
-                }
-            }
-            return next;
-        });
+    const handleClientError = React.useCallback((message: string) => {
+        setToast({ id: Date.now(), message, variant: 'error' });
     }, []);
-
-    const queryState: QueryState = React.useMemo(() => {
-        const state: QueryState = {};
-        if (search.trim()) state.q = search.trim();
-        if (statusFilter.length > 0) state.status = statusFilter.join(',');
-        if (tagFilter.length > 0) state.tags = tagFilter.join(',');
-        if (balanceFilter.length > 0) state.balance = balanceFilter.join(',');
-        if (portalFilter.length > 0) state.portal = portalFilter.join(',');
-        if (activityFilter.length > 0) state.activity = activityFilter.join(',');
-        if (sortValue !== DEFAULT_SORT_OPTION.id) state.sort = sortValue;
-        if (pagination.pageIndex > 0) state.page = String(pagination.pageIndex + 1);
-        if (pagination.pageSize !== 10) state.pageSize = String(pagination.pageSize);
-        return state;
-    }, [activityFilter, balanceFilter, pagination.pageIndex, pagination.pageSize, portalFilter, search, sortValue, statusFilter, tagFilter]);
-
-    React.useEffect(() => {
-        if (!router.isReady) {
-            return;
-        }
-
-        const current: Record<string, string> = {};
-        Object.entries(router.query).forEach(([key, value]) => {
-            if (Array.isArray(value)) {
-                current[key] = value.join(',');
-            } else if (typeof value === 'string') {
-                current[key] = value;
-            }
-        });
-
-        const nextEntries = Object.entries(queryState);
-        const isEqual =
-            nextEntries.length === Object.keys(current).length &&
-            nextEntries.every(([key, value]) => current[key] === value);
-
-        if (!isEqual) {
-            void router.replace({ pathname: router.pathname, query: queryState }, undefined, { shallow: true });
-        }
-    }, [queryState, router]);
 
     return (
         <div className="flex flex-col gap-6">
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <KpiCard label="Active clients" value={metrics.activeClients.toString()} helper="Tracked across all portfolios" />
-                <KpiCard label="Outstanding balance" value={formatCurrency(metrics.outstandingBalance)} helper="Across selected filters" />
-                <KpiCard label="Upcoming shoots" value={metrics.upcomingShoots.toString()} helper="Next 60 days" />
-                <KpiCard label="Portal ready" value={metrics.portalReady.toString()} helper="Clients with live portals" />
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <KpiCard
+                    label="Active clients"
+                    value={String(metricsData?.activeCount ?? 0)}
+                    helper="Status set to Active"
+                />
+                <KpiCard
+                    label="Outstanding balance"
+                    value={formatCurrency(metricsData?.outstandingCents ?? 0)}
+                    helper="Across all clients"
+                />
+                <KpiCard
+                    label="Upcoming shoots"
+                    value={String(metricsData?.upcomingCount60d ?? 0)}
+                    helper="Next 60 days"
+                />
+                <KpiCard
+                    label="Portal ready"
+                    value={String(metricsData?.portalReadyCount ?? 0)}
+                    helper="Client portal enabled"
+                />
             </section>
 
-            <DataToolbar
-                searchValue={search}
-                onSearchChange={setSearch}
-                searchPlaceholder="Search clients by name, email, phone, owner…"
-                filters={filters}
-                hasActiveFilters={hasActiveFilters}
-                onResetFilters={resetFilters}
-                sortOptions={SORT_OPTIONS.map(({ id, label }) => ({ id, label }))}
-                sortValue={activeSortOption.id}
-                onSortChange={setSortValue}
-                primaryAction={{ label: 'Add client', href: '/clients/new' }}
-                selectedCount={selectedCount}
-                bulkActions={bulkActions}
-                pageSize={pagination.pageSize}
-                onPageSizeChange={(value) => setPagination((previous) => ({ ...previous, pageSize: value }))}
-            />
-
-            <DataTable<ClientTableRow>
-                columns={columns}
-                data={filteredRows}
-                sorting={sorting}
-                onSortingChange={handleSortingChange}
-                pagination={pagination}
-                onPaginationChange={setPagination}
-                rowSelection={rowSelection}
-                onRowSelectionChange={setRowSelection}
-                getRowId={(row) => row.id}
-                onRowClick={(row) => {
-                    setDrawerClientId(row.id);
-                    setIsDrawerOpen(true);
-                }}
-                emptyMessage={
-                    <div className="space-y-3">
-                        <p>No clients match your filters yet.</p>
-                        <Link href="/clients/new" className="text-indigo-300 hover:text-white">
-                            Add a new client
-                        </Link>
+            <section className="flex flex-col gap-4 rounded-3xl border border-slate-800/70 bg-slate-950/60 p-6 shadow-xl shadow-slate-950/50">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                    <div className="flex flex-1 flex-wrap items-center gap-3">
+                        <div className="relative min-w-[220px] flex-1">
+                            <Input
+                                type="search"
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search clients by name, email, or phone"
+                                aria-label="Search clients"
+                            />
+                        </div>
+                        <div className="flex min-w-[150px] flex-col gap-1 text-xs text-slate-400">
+                            <span>Status</span>
+                            <Select
+                                value={statusFilter}
+                                onChange={(event) => setStatusFilter(event.target.value as ClientStatus | 'All')}
+                                aria-label="Filter by status"
+                            >
+                                <option value="All">All statuses</option>
+                                {STATUS_OPTIONS.map((status) => (
+                                    <option key={status} value={status}>
+                                        {status}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
+                        <div className="flex min-w-[180px] flex-col gap-1 text-xs text-slate-400">
+                            <span>Sort</span>
+                            <Select
+                                value={sort}
+                                onChange={(event) => setSort(event.target.value as SortOptionId)}
+                                aria-label="Sort clients"
+                            >
+                                {SORT_OPTIONS.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
                     </div>
-                }
+                    <Button type="button" className="w-full md:ml-auto md:w-auto" onClick={() => setDialogOpen(true)}>
+                        Add client
+                    </Button>
+                </div>
+
+                {clientsError ? (
+                    <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-200">
+                        {clientsError.message}
+                    </div>
+                ) : null}
+
+                {showEmptyState ? (
+                    <EmptyState onAddClient={() => setDialogOpen(true)} />
+                ) : (
+                    <ClientsTable clients={clients} isLoading={isLoadingClients} />
+                )}
+            </section>
+
+            <AddClientDialog
+                open={isDialogOpen}
+                onOpenChange={setDialogOpen}
+                onCreated={handleClientCreated}
+                onError={handleClientError}
             />
 
-            <ClientDrawer client={selectedProfile} open={isDrawerOpen && Boolean(selectedProfile)} onClose={() => setIsDrawerOpen(false)} />
+            <Toast toast={toast} />
         </div>
     );
 }
 
-function KpiCard({ label, value, helper }: { label: string; value: string; helper: string }) {
+type AddClientDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onCreated: (client: ClientRecord) => void;
+    onError: (message: string) => void;
+};
+
+const defaultFormValues: CreateClientFormValues = {
+    name: '',
+    email: '',
+    phone: '',
+    status: 'Lead',
+    upcoming_shoot: '',
+    tags: ''
+};
+
+function AddClientDialog({ open, onOpenChange, onCreated, onError }: AddClientDialogProps) {
+    const {
+        register,
+        handleSubmit,
+        reset,
+        setError,
+        clearErrors,
+        formState: { errors, isSubmitting }
+    } = useForm<CreateClientFormValues>({
+        defaultValues: defaultFormValues
+    });
+
+    const [serverError, setServerError] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        if (!open) {
+            reset(defaultFormValues);
+            clearErrors();
+            setServerError(null);
+        }
+    }, [clearErrors, open, reset]);
+
+    const onSubmit = handleSubmit(async (values) => {
+        clearErrors();
+        setServerError(null);
+
+        const parsed = createClientFormSchema.safeParse(values);
+        if (!parsed.success) {
+            const fieldErrors: Record<string, string> = {};
+            parsed.error.issues.forEach((issue) => {
+                const field = issue.path[0];
+                if (typeof field === 'string' && !fieldErrors[field]) {
+                    fieldErrors[field] = issue.message;
+                }
+            });
+            Object.entries(fieldErrors).forEach(([field, message]) => {
+                setError(field as keyof CreateClientFormValues, { message });
+            });
+            return;
+        }
+
+        const data = parsed.data;
+        const payload = {
+            name: data.name.trim(),
+            email: data.email && data.email.trim().length > 0 ? data.email.trim() : undefined,
+            phone: data.phone && data.phone.trim().length > 0 ? data.phone.trim() : undefined,
+            status: data.status,
+            upcoming_shoot: data.upcoming_shoot && data.upcoming_shoot.trim().length > 0 ? data.upcoming_shoot : undefined,
+            tags:
+                data.tags && data.tags.trim().length > 0
+                    ? data.tags
+                          .split(',')
+                          .map((tag) => tag.trim())
+                          .filter((tag) => tag.length > 0)
+                    : []
+        };
+
+        try {
+            const response = await fetch('/api/clients', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const body = (await response.json()) as { data?: ClientRecord; error?: string; fieldErrors?: Record<string, string> };
+
+            if (!response.ok || !body?.data) {
+                if (body?.fieldErrors) {
+                    Object.entries(body.fieldErrors).forEach(([field, message]) => {
+                        setError(field as keyof CreateClientFormValues, { message });
+                    });
+                }
+                const message = body?.error ?? 'Failed to create client';
+                setServerError(message);
+                onError(message);
+                return;
+            }
+
+            onCreated(body.data);
+        } catch (error) {
+            const message = 'Unable to save client right now.';
+            setServerError(message);
+            onError(message);
+        }
+    });
+
     return (
-        <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
-            <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-            <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
-            <p className="mt-2 text-xs text-slate-500">{helper}</p>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>Add client</DialogTitle>
+                    <DialogDescription>Capture the essentials so you can schedule shoots and share portals later.</DialogDescription>
+                </DialogHeader>
+                <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+                    <div className="space-y-2">
+                        <Label htmlFor="client-name">Name</Label>
+                        <Input id="client-name" placeholder="Client name" {...register('name')} aria-invalid={Boolean(errors.name)} />
+                        {errors.name ? <FieldError message={errors.name.message} /> : null}
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="client-email">Email</Label>
+                            <Input id="client-email" type="email" placeholder="name@example.com" {...register('email')} aria-invalid={Boolean(errors.email)} />
+                            {errors.email ? <FieldError message={errors.email.message} /> : null}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="client-phone">Phone</Label>
+                            <Input id="client-phone" placeholder="(555) 555-5555" {...register('phone')} aria-invalid={Boolean(errors.phone)} />
+                            {errors.phone ? <FieldError message={errors.phone.message} /> : null}
+                        </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="client-status">Status</Label>
+                            <Select id="client-status" {...register('status')} aria-invalid={Boolean(errors.status)}>
+                                {STATUS_OPTIONS.map((status) => (
+                                    <option key={status} value={status}>
+                                        {status}
+                                    </option>
+                                ))}
+                            </Select>
+                            {errors.status ? <FieldError message={errors.status.message} /> : null}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="client-upcoming">Upcoming shoot</Label>
+                            <Input id="client-upcoming" type="date" {...register('upcoming_shoot')} aria-invalid={Boolean(errors.upcoming_shoot)} />
+                            {errors.upcoming_shoot ? <FieldError message={errors.upcoming_shoot.message} /> : null}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="client-tags">Tags</Label>
+                        <Textarea
+                            id="client-tags"
+                            placeholder="wedding, vip, retainer"
+                            rows={2}
+                            {...register('tags')}
+                            aria-invalid={Boolean(errors.tags)}
+                        />
+                        <p className="text-xs text-slate-400">Separate tags with commas to group clients later.</p>
+                        {errors.tags ? <FieldError message={errors.tags.message} /> : null}
+                    </div>
+                    {serverError ? (
+                        <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{serverError}</div>
+                    ) : null}
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" isLoading={isSubmitting}>
+                            Save client
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+type ClientsTableProps = {
+    clients: ClientRecord[];
+    isLoading: boolean;
+};
+
+function ClientsTable({ clients, isLoading }: ClientsTableProps) {
+    if (isLoading) {
+        return (
+            <div className="flex h-32 items-center justify-center rounded-2xl border border-slate-800/70 bg-slate-950/80 text-sm text-slate-300">
+                Loading clients…
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/80 shadow-inner">
+            <table className="min-w-full divide-y divide-slate-800 text-sm">
+                <thead className="bg-slate-950/80">
+                    <tr>
+                        <TableHeaderCell>Name</TableHeaderCell>
+                        <TableHeaderCell>Status</TableHeaderCell>
+                        <TableHeaderCell>Email</TableHeaderCell>
+                        <TableHeaderCell>Phone</TableHeaderCell>
+                        <TableHeaderCell className="text-right">Outstanding</TableHeaderCell>
+                        <TableHeaderCell>Upcoming shoot</TableHeaderCell>
+                        <TableHeaderCell>Portal ready</TableHeaderCell>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-900/80">
+                    {clients.map((client) => {
+                        const portalReady = client.portal_enabled || Boolean(client.portal_url);
+                        return (
+                            <tr key={client.id} className="bg-slate-950/60 hover:bg-slate-900/60">
+                                <TableCell>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-semibold text-white">{client.name}</span>
+                                        <span className="text-xs text-slate-400">Last updated {formatDate(client.updated_at)}</span>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <StatusBadge status={client.status} />
+                                </TableCell>
+                                <TableCell>{client.email ?? '—'}</TableCell>
+                                <TableCell>{client.phone ?? '—'}</TableCell>
+                                <TableCell className="text-right font-semibold text-white">
+                                    {formatCurrency(client.outstanding_cents)}
+                                </TableCell>
+                                <TableCell>{formatDate(client.upcoming_shoot)}</TableCell>
+                                <TableCell>
+                                    {portalReady ? (
+                                        <Badge variant="success">Ready</Badge>
+                                    ) : (
+                                        <Badge variant="neutral">Pending</Badge>
+                                    )}
+                                </TableCell>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
         </div>
     );
 }
 
+type KpiCardProps = {
+    label: string;
+    value: string;
+    helper: string;
+};
+
+function KpiCard({ label, value, helper }: KpiCardProps) {
+    return (
+        <div className="flex h-28 flex-col justify-center rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 shadow-xl shadow-slate-950/50">
+            <span className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">{label}</span>
+            <span className="mt-3 text-3xl font-semibold leading-none text-white">{value}</span>
+            <span className="mt-2 text-xs text-slate-500">{helper}</span>
+        </div>
+    );
+}
+
+type EmptyStateProps = {
+    onAddClient: () => void;
+};
+
+function EmptyState({ onAddClient }: EmptyStateProps) {
+    return (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-slate-800/70 bg-slate-950/80 px-10 py-16 text-center text-slate-300">
+            <p className="text-lg font-semibold text-white">No clients yet</p>
+            <p className="max-w-md text-sm text-slate-400">
+                When you add your first client they will appear here with shoot dates, portal access, and balance tracking.
+            </p>
+            <Button type="button" onClick={onAddClient}>
+                Add client
+            </Button>
+        </div>
+    );
+}
+
+type ToastProps = {
+    toast: ToastState | null;
+};
+
+function Toast({ toast }: ToastProps) {
+    if (!toast) {
+        return null;
+    }
+
+    return (
+        <div className="pointer-events-none fixed bottom-6 right-6 z-50">
+            <div
+                className={`pointer-events-auto rounded-2xl border px-4 py-3 text-sm shadow-lg ${
+                    toast.variant === 'success'
+                        ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100'
+                        : 'border-rose-400/50 bg-rose-500/15 text-rose-100'
+                }`}
+            >
+                {toast.message}
+            </div>
+        </div>
+    );
+}
+
+type TableCellProps = React.TdHTMLAttributes<HTMLTableCellElement>;
+
+type TableHeaderCellProps = React.ThHTMLAttributes<HTMLTableCellElement>;
+
+function TableCell({ className, ...props }: TableCellProps) {
+    return <td className={`px-6 py-4 text-sm text-slate-200 ${className ?? ''}`} {...props} />;
+}
+
+function TableHeaderCell({ className, ...props }: TableHeaderCellProps) {
+    return (
+        <th
+            className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 ${className ?? ''}`}
+            {...props}
+        />
+    );
+}
+
+type StatusBadgeProps = {
+    status: ClientStatus;
+};
+
+function StatusBadge({ status }: StatusBadgeProps) {
+    const variant = status === 'Active' ? 'success' : status === 'Inactive' ? 'warning' : 'neutral';
+    return <Badge variant={variant}>{status}</Badge>;
+}
+
+type FieldErrorProps = {
+    message?: string;
+};
+
+function FieldError({ message }: FieldErrorProps) {
+    if (!message) {
+        return null;
+    }
+    return <p className="text-xs text-rose-300">{message}</p>;
+}
