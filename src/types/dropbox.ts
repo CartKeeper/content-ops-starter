@@ -22,3 +22,15 @@ export type DropboxAssetRecord = {
     galleryId?: string | null;
     galleryName?: string | null;
 };
+
+export type DropboxFileMetadata = {
+    id: string;
+    name: string;
+    pathDisplay: string | null;
+    pathLower: string | null;
+    clientModified: string | null;
+    serverModified: string | null;
+    size: number | null;
+    isDownloadable: boolean;
+    contentHash: string | null;
+};

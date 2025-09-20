@@ -112,28 +112,33 @@ These API routes return JSON responses for GET, POST, PUT, and DELETE requests, 
 
 ### Galleries automation with Dropbox + Zapier
 
-The galleries dashboard now includes a Dropbox Chooser workflow and Zapier webhook bridge so asset imports are trackable end-to-end.
+The galleries dashboard now includes an authenticated Dropbox workflow and Zapier webhook bridge so asset imports are trackable end-to-end without exposing access tokens to the browser.
 
 - **Environment variables**
-  - `NEXT_PUBLIC_DROPBOX_APP_KEY` – enables the Dropbox Chooser button rendered by `DropboxImportPanel`.
+  - `NEXT_PUBLIC_DROPBOX_APP_KEY` – optional legacy support for rendering the Dropbox Chooser button.
+  - `DROPBOX_APP_SECRET` – server-side secret used to exchange refresh tokens for Dropbox API access tokens.
+  - `DROPBOX_REFRESH_TOKEN` – long-lived refresh token generated for the Dropbox app; exchanged on the server for short-lived access tokens.
   - `ZAPIER_WEBHOOK_SECRET` – shared secret for validating signatures on `/api/integrations/zapier/webhook`.
   - `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_URL` – required for the new galleries API routes to write to Supabase tables.
 - **Supabase tables** (`supabase/migrations/20250212000000_create_dropbox_zapier_tables.sql`)
   - `dropbox_assets` stores metadata for imported files and links them to galleries.
   - `gallery_publications` records publish events and downstream automation metadata.
   - `zapier_webhook_events` archives webhook deliveries for replay and debugging.
+- **Server utilities**
+  - `src/server/dropbox/client.ts` securely exchanges refresh tokens for access tokens and exposes Dropbox helpers for listing folders and downloading files.
 - **Next.js API routes**
-  - `POST /api/galleries/import` – persists Dropbox Chooser selections and optionally enqueues Zapier events.
+  - `POST /api/dropbox/list-folder` – previews Dropbox folders through the authenticated API so the CRM can select files server-side.
+  - `POST /api/galleries/import` – resolves Dropbox metadata via the API helper, persists imports, and optionally enqueues Zapier events.
   - `GET|POST /api/galleries` – list or create galleries with publish-ready metadata.
   - `POST /api/galleries/[id]/publish` – transitions a gallery to `live`, logs the publication, and notifies Zapier.
   - `POST /api/integrations/zapier/webhook` – receives signed webhooks from Zapier and stores their payload.
   - `GET /api/integrations/zapier/events` – fetches the most recent webhook activity for the UI monitor.
 - **UI additions**
-  - `DropboxImportPanel` (rendered on `/galleries`) launches the Dropbox Chooser and streams files to Supabase.
+  - `DropboxImportPanel` (rendered on `/galleries`) previews Dropbox folders via the server helper and streams selected files to Supabase.
   - `/integrations/zapier` summarizes environment setup guidance and displays recent webhook deliveries.
 - **Smoke test plan**
   1. Set the environment variables above (with dummy values locally) and run `npm run dev`.
-  2. Visit `/galleries`, choose a gallery, and trigger an import. Confirm the success message and that `/api/galleries/import` returns `200`.
+  2. Visit `/galleries`, preview a Dropbox folder, select a few files, and trigger an import. Confirm the success message and that `/api/galleries/import` returns `200`.
   3. Send a signed `POST` request to `/api/integrations/zapier/webhook` with a JSON body and verify the event appears on `/integrations/zapier`.
   4. Call `POST /api/galleries/{id}/publish` and confirm a new record appears in the `gallery_publications` table.
 
