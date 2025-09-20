@@ -113,9 +113,16 @@ function createEventColors(userId: string) {
 }
 
 function mapResponseEvent(record: Record<string, any>): CalendarEventRecord {
+    const ownerUserId =
+        typeof record.owner_user_id === 'string'
+            ? record.owner_user_id
+            : record.owner_user_id != null
+                ? String(record.owner_user_id)
+                : '';
+
     return {
         id: record.id,
-        ownerUserId: record.owner_user_id,
+        ownerUserId,
         title: record.title,
         description: record.description ?? null,
         startAt: record.start_at,
