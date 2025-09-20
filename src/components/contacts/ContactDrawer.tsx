@@ -3,9 +3,22 @@ import * as Dialog from '@radix-ui/react-dialog';
 
 import { formatDate, formatRelative, formatPhone } from '../../lib/formatters';
 import type { ContactRecord } from '../../types/contact';
-import type { ContactTableRow } from '../../lib/api/contacts';
 
-type ContactProfile = ContactTableRow & { record: ContactRecord };
+type ContactStage = 'new' | 'warm' | 'hot';
+
+type ContactProfile = {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    stage: ContactStage;
+    status: ContactRecord['status'];
+    tags: string[];
+    business: string | null;
+    owner: string | null;
+    lastInteractionAt: string | null;
+    record: ContactRecord;
+};
 
 type ContactDrawerProps = {
     contact: ContactProfile | null;
@@ -198,7 +211,7 @@ function ContactActivityTab({ contact }: { contact: ContactProfile }) {
     );
 }
 
-function getStageBadge(stage: ContactTableRow['stage']): string {
+function getStageBadge(stage: ContactStage): string {
     switch (stage) {
         case 'hot':
             return 'border-rose-400/50 bg-rose-500/10 text-rose-200';

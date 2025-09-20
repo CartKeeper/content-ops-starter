@@ -1,43 +1,90 @@
 import * as React from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
+import useSWR from 'swr';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '../../components/ui/dialog';
 import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
 
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
-import DataToolbar, { type ToolbarFilter, type SortOption } from '../../components/data/DataToolbar';
+import DataToolbar, { type SortOption, type ToolbarFilter } from '../../components/data/DataToolbar';
 import DataTable from '../../components/data/DataTable';
-import ContactDrawer, { type ContactProfile } from '../../components/contacts/ContactDrawer';
-import {
-    buildContactDashboardData,
-    convertContactToClient,
-    fetchContacts,
-    mapContactToRow,
-    type ContactTableRow
-} from '../../lib/api/contacts';
-import type { ContactRecord } from '../../types/contact';
 import { formatDate } from '../../lib/formatters';
+import type { ContactRecord } from '../../types/contact';
+import { getContactName } from '../../types/contact';
+import { deriveStage, type ContactStage } from '../../lib/contacts';
 
-type QueryState = {
-    q?: string;
-    stage?: string;
-    tags?: string;
-    owner?: string;
-    status?: string;
-    sort?: string;
-    page?: string;
-    pageSize?: string;
+type OwnerOption = { id: string; name: string | null };
+
+type ContactsApiResponse = {
+    data: ContactRecord[];
+    meta: {
+        page: number;
+        pageSize: number;
+        total: number;
+        availableFilters: {
+            owners: OwnerOption[];
+            statuses: Array<NonNullable<ContactRecord['status']>>;
+        };
+    };
 };
+
+type MetricsResponse = {
+    total: number;
+    withEmail: number;
+    withPhone: number;
+    newLast30?: number;
+};
+
+type ContactTableRow = {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    stage: ContactStage;
+    status: ContactRecord['status'];
+    owner: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+};
+
+type ToastMessage = { id: string; title: string; tone: 'success' | 'error'; description?: string };
 
 const CONTACT_SORT_OPTIONS: Array<SortOption & { state: SortingState }> = [
     { id: 'name-asc', label: 'Name (A-Z)', state: [{ id: 'name', desc: false }] },
-    { id: 'interaction-desc', label: 'Last interaction (newest)', state: [{ id: 'lastInteractionAt', desc: true }] },
-    { id: 'interaction-asc', label: 'Last interaction (oldest)', state: [{ id: 'lastInteractionAt', desc: false }] }
+    { id: 'name-desc', label: 'Name (Z-A)', state: [{ id: 'name', desc: true }] },
+    { id: 'created-desc', label: 'Newest first', state: [{ id: 'createdAt', desc: true }] },
+    { id: 'created-asc', label: 'Oldest first', state: [{ id: 'createdAt', desc: false }] },
+    { id: 'updated-desc', label: 'Recently updated', state: [{ id: 'updatedAt', desc: true }] },
+    { id: 'updated-asc', label: 'Least recently updated', state: [{ id: 'updatedAt', desc: false }] },
 ];
 
 const DEFAULT_CONTACT_SORT = CONTACT_SORT_OPTIONS[0];
 
-type NotificationBanner = { id: string; message: string; tone: 'success' | 'error' };
+const STAGE_FILTER_OPTIONS: ToolbarFilter['options'] = [
+    { value: 'new', label: 'New' },
+    { value: 'warm', label: 'Warm' },
+    { value: 'hot', label: 'Hot' },
+];
+
+const fetcher = async <T,>(url: string): Promise<T> => {
+    const response = await fetch(url);
+    if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error ?? 'Request failed');
+    }
+    return (await response.json()) as T;
+};
 
 export default function ContactsPage() {
     return (
@@ -53,458 +100,353 @@ export default function ContactsPage() {
 }
 
 function ContactsWorkspace() {
-    const router = useRouter();
-    const parseList = React.useCallback((value: string | string[] | undefined) => {
-        if (Array.isArray(value)) {
-            return value.flatMap((entry) => entry.split(',')).filter(Boolean);
-        }
-        if (typeof value === 'string') {
-            return value.split(',').map((entry) => entry.trim()).filter(Boolean);
-        }
-        return [];
-    }, []);
-
-    const initialSearch = typeof router.query.q === 'string' ? router.query.q : '';
-    const initialStage = parseList(router.query.stage);
-    const initialTags = parseList(router.query.tags);
-    const initialOwner = parseList(router.query.owner);
-    const initialStatus = parseList(router.query.status);
-    const initialSortId = typeof router.query.sort === 'string' ? router.query.sort : DEFAULT_CONTACT_SORT.id;
-    const initialSortOption = CONTACT_SORT_OPTIONS.find((option) => option.id === initialSortId) ?? DEFAULT_CONTACT_SORT;
-    const initialPageIndex = (() => {
-        const value = typeof router.query.page === 'string' ? Number.parseInt(router.query.page, 10) : 1;
-        return Number.isFinite(value) && value > 0 ? value - 1 : 0;
-    })();
-    const initialPageSize = (() => {
-        const value = typeof router.query.pageSize === 'string' ? Number.parseInt(router.query.pageSize, 10) : 10;
-        return Number.isFinite(value) && value > 0 ? value : 10;
-    })();
-
-    const [records, setRecords] = React.useState<ContactRecord[]>([]);
-    const [rows, setRows] = React.useState<ContactTableRow[]>([]);
-    const [isLoading, setIsLoading] = React.useState<boolean>(false);
-    const [error, setError] = React.useState<string | null>(null);
-    const [notifications, setNotifications] = React.useState<NotificationBanner[]>([]);
-    const [search, setSearch] = React.useState<string>(initialSearch);
-    const [stageFilter, setStageFilter] = React.useState<string[]>(initialStage);
-    const [tagFilter, setTagFilter] = React.useState<string[]>(initialTags);
-    const [ownerFilter, setOwnerFilter] = React.useState<string[]>(initialOwner);
-    const [statusFilter, setStatusFilter] = React.useState<string[]>(initialStatus);
-    const [sortValue, setSortValue] = React.useState<string>(initialSortOption.id);
-    const [sorting, setSorting] = React.useState<SortingState>(initialSortOption.state);
-    const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: initialPageIndex, pageSize: initialPageSize });
+    const [search, setSearch] = React.useState('');
+    const [stageFilter, setStageFilter] = React.useState<string[]>([]);
+    const [statusFilter, setStatusFilter] = React.useState<string[]>([]);
+    const [ownerFilter, setOwnerFilter] = React.useState<string[]>([]);
+    const [sortValue, setSortValue] = React.useState<string>(DEFAULT_CONTACT_SORT.id);
+    const [sorting, setSorting] = React.useState<SortingState>(DEFAULT_CONTACT_SORT.state);
+    const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
     const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
-    const [drawerContactId, setDrawerContactId] = React.useState<string | null>(null);
-    const [isDrawerOpen, setIsDrawerOpen] = React.useState<boolean>(false);
-    const [conversionTarget, setConversionTarget] = React.useState<string | null>(null);
+    const [notifications, setNotifications] = React.useState<ToastMessage[]>([]);
+    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
-    const metrics = React.useMemo(() => buildContactDashboardData(records), [records]);
+    const queryKey = React.useMemo(() => {
+        const params = new URLSearchParams();
+        if (search.trim()) params.set('search', search.trim());
+        if (stageFilter.length > 0) params.set('stage', stageFilter.join(','));
+        if (statusFilter.length > 0) params.set('status', statusFilter.join(','));
+        if (ownerFilter.length > 0) params.set('owner', ownerFilter.join(','));
+        params.set('sort', sortValue);
+        params.set('page', String(pagination.pageIndex + 1));
+        params.set('pageSize', String(pagination.pageSize));
+        const serialized = params.toString();
+        return serialized ? `/api/contacts?${serialized}` : '/api/contacts';
+    }, [ownerFilter, pagination.pageIndex, pagination.pageSize, search, sortValue, stageFilter, statusFilter]);
 
-    const contactProfiles = React.useMemo(() => {
-        const map = new Map<string, ContactProfile>();
-        rows.forEach((row) => {
-            const record = records.find((entry) => entry.id === row.id);
-            if (record) {
-                map.set(row.id, { ...row, record });
-            }
+    const {
+        data: contactsResponse,
+        error: contactsError,
+        isValidating: isContactsLoading,
+        mutate: mutateContacts,
+    } = useSWR<ContactsApiResponse>(queryKey, fetcher, {
+        keepPreviousData: true,
+        revalidateOnFocus: false,
+    });
+
+    const { data: metricsResponse, mutate: mutateMetrics } = useSWR<MetricsResponse>('/api/contacts/metrics', fetcher, {
+        revalidateOnFocus: false,
+    });
+
+    React.useEffect(() => {
+        const match = CONTACT_SORT_OPTIONS.find((option) => option.id === sortValue);
+        setSorting(match?.state ?? DEFAULT_CONTACT_SORT.state);
+    }, [sortValue]);
+
+    const ownerLabelMap = React.useMemo(() => {
+        const map = new Map<string, string | null>();
+        const owners = contactsResponse?.meta.availableFilters.owners ?? [];
+        owners.forEach((owner) => {
+            map.set(owner.id, owner.name ?? owner.id);
         });
         return map;
-    }, [records, rows]);
+    }, [contactsResponse?.meta.availableFilters.owners]);
 
-    const selectedProfile = drawerContactId ? contactProfiles.get(drawerContactId) ?? null : null;
-
-    React.useEffect(() => {
-        let active = true;
-        async function loadContacts() {
-            setIsLoading(true);
-            setError(null);
-            try {
-                const data = await fetchContacts();
-                if (!active) return;
-                setRecords(data);
-                setRows(data.map(mapContactToRow));
-            } catch (err) {
-                if (!active) return;
-                setError(err instanceof Error ? err.message : 'Unable to load contacts');
-            } finally {
-                if (active) {
-                    setIsLoading(false);
-                }
-            }
+    const tableRows = React.useMemo<ContactTableRow[]>(() => {
+        if (!contactsResponse) {
+            return [];
         }
-        void loadContacts();
-        return () => {
-            active = false;
-        };
-    }, []);
 
-    React.useEffect(() => {
-        setRows(records.map(mapContactToRow));
-    }, [records]);
+        return contactsResponse.data.map((record) => {
+            const ownerId = record.owner_user_id ?? null;
+            return {
+                id: record.id,
+                name: getContactName(record),
+                email: record.email,
+                phone: record.phone,
+                stage: deriveStage(record.status),
+                status: record.status ?? 'lead',
+                owner: ownerId ? ownerLabelMap.get(ownerId) ?? ownerId : null,
+                createdAt: record.created_at ?? null,
+                updatedAt: record.updated_at ?? null,
+            } satisfies ContactTableRow;
+        });
+    }, [contactsResponse, ownerLabelMap]);
 
-    const tagOptions = React.useMemo(() => {
-        const tags = new Set<string>();
-        rows.forEach((row) => row.tags.forEach((tag) => tags.add(tag)));
-        return Array.from(tags).sort();
-    }, [rows]);
+    const pageCount = React.useMemo(() => {
+        if (!contactsResponse) {
+            return 1;
+        }
+        const total = contactsResponse.meta.total;
+        const size = contactsResponse.meta.pageSize || 1;
+        return Math.max(1, Math.ceil(total / size));
+    }, [contactsResponse]);
 
     const ownerOptions = React.useMemo(() => {
-        const owners = new Set<string>();
-        rows.forEach((row) => {
-            if (row.owner) {
-                owners.add(row.owner);
-            }
-        });
-        return Array.from(owners).sort();
-    }, [rows]);
+        const options = contactsResponse?.meta.availableFilters.owners ?? [];
+        const entries = options.map((owner) => ({ value: owner.id, label: owner.name ?? owner.id }));
+        if (entries.length > 0 || contactsResponse) {
+            entries.unshift({ value: 'unassigned', label: 'Unassigned' });
+        }
+        return entries;
+    }, [contactsResponse]);
+
+    const statusOptions = React.useMemo(() => {
+        const statuses = contactsResponse?.meta.availableFilters.statuses ?? [];
+        return statuses.map((status) => ({ value: status, label: status.charAt(0).toUpperCase() + status.slice(1) }));
+    }, [contactsResponse]);
 
     const filters = React.useMemo<ToolbarFilter[]>(() => {
-        const stageOptions = [
-            { value: 'new', label: 'New lead' },
-            { value: 'warm', label: 'Warm lead' },
-            { value: 'hot', label: 'Converted' }
+        const entries: ToolbarFilter[] = [
+            { id: 'stage', label: 'Stage', options: STAGE_FILTER_OPTIONS, value: stageFilter, onChange: setStageFilter },
         ];
-        const statusOptions = [
-            { value: 'lead', label: 'Lead' },
-            { value: 'active', label: 'Engaged' },
-            { value: 'client', label: 'Client' }
-        ];
-        return [
-            { id: 'stage', label: 'Stage', options: stageOptions, value: stageFilter, onChange: setStageFilter },
-            { id: 'tags', label: 'Tags', options: tagOptions.map((tag) => ({ value: tag, label: tag })), value: tagFilter, onChange: setTagFilter },
-            { id: 'owner', label: 'Owner', options: ownerOptions.map((owner) => ({ value: owner, label: owner })), value: ownerFilter, onChange: setOwnerFilter },
-            { id: 'status', label: 'Status', options: statusOptions, value: statusFilter, onChange: setStatusFilter }
-        ];
-    }, [ownerFilter, ownerOptions, setOwnerFilter, setStageFilter, setStatusFilter, setTagFilter, stageFilter, statusFilter, tagFilter, tagOptions]);
 
-    const filteredRows = React.useMemo(() => {
-        const normalizedSearch = search.trim().toLowerCase();
-        return rows.filter((row) => {
-            if (normalizedSearch) {
-                const haystack = [row.name, row.email ?? '', row.phone ?? '', row.business ?? '', row.owner ?? '']
-                    .map((value) => value.toLowerCase())
-                    .some((value) => value.includes(normalizedSearch));
-                if (!haystack) {
-                    return false;
-                }
-            }
+        if (statusOptions.length > 0) {
+            entries.push({ id: 'status', label: 'Status', options: statusOptions, value: statusFilter, onChange: setStatusFilter });
+        }
 
-            if (stageFilter.length > 0 && !stageFilter.includes(row.stage)) {
-                return false;
-            }
+        if (ownerOptions.length > 0) {
+            entries.push({ id: 'owner', label: 'Owner', options: ownerOptions, value: ownerFilter, onChange: setOwnerFilter });
+        }
 
-            if (tagFilter.length > 0 && !row.tags.some((tag) => tagFilter.includes(tag))) {
-                return false;
-            }
+        return entries;
+    }, [ownerFilter, ownerOptions, stageFilter, statusFilter, statusOptions]);
 
-            if (ownerFilter.length > 0 && (!row.owner || !ownerFilter.includes(row.owner))) {
-                return false;
-            }
+    const metrics = React.useMemo(() => {
+        const base = metricsResponse ?? { total: 0, withEmail: 0, withPhone: 0 };
+        if (typeof metricsResponse?.newLast30 === 'number') {
+            return { ...base, newLast30: metricsResponse.newLast30 };
+        }
+        return base;
+    }, [metricsResponse]);
 
-            if (statusFilter.length > 0 && !statusFilter.includes(row.status)) {
-                return false;
-            }
-
-            return true;
-        });
-    }, [ownerFilter, rows, search, stageFilter, statusFilter, tagFilter]);
-
-    React.useEffect(() => {
-        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-        setRowSelection({});
-    }, [filteredRows.length, search, stageFilter, tagFilter, ownerFilter, statusFilter]);
-
-    const columns = React.useMemo<ColumnDef<ContactTableRow>[]>(() => {
-        const stageOrder: Record<ContactTableRow['stage'], number> = { new: 0, warm: 1, hot: 2 };
-        return [
-            {
-                id: 'select',
-                header: ({ table }) => (
-                    <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-400"
-                        checked={table.getIsAllPageRowsSelected()}
-                        onChange={table.getToggleAllPageRowsSelectedHandler()}
-                        aria-label="Select contacts"
-                    />
-                ),
-                cell: ({ row }) => (
-                    <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-400"
-                        checked={row.getIsSelected()}
-                        onChange={row.getToggleSelectedHandler()}
-                        onClick={(event) => event.stopPropagation()}
-                        aria-label={`Select ${row.original.name}`}
-                    />
-                ),
-                enableSorting: false,
-                size: 48
-            },
-            {
-                accessorKey: 'name',
-                header: 'Contact',
-                cell: ({ row }) => (
-                    <div className="flex flex-col">
-                        <span className="font-semibold text-white">{row.original.name}</span>
-                        <span className="text-xs text-slate-400">{row.original.email ?? 'No email'} • {row.original.phone ?? '—'}</span>
-                    </div>
-                )
-            },
-            {
-                accessorKey: 'stage',
-                header: 'Stage',
-                cell: ({ row }) => (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStageBadge(row.original.stage)}`}>
-                        {row.original.stage.toUpperCase()}
+    const columns = React.useMemo<ColumnDef<ContactTableRow>[]>(() => [
+        {
+            accessorKey: 'name',
+            header: 'Contact',
+            cell: ({ row }) => (
+                <div className="flex flex-col">
+                    <span className="font-semibold text-white">{row.original.name}</span>
+                    <span className="text-xs text-slate-400">
+                        {row.original.email ?? 'No email'} • {row.original.phone ?? 'No phone'}
                     </span>
-                ),
-                sortingFn: (a, b) => stageOrder[a.original.stage] - stageOrder[b.original.stage]
-            },
-            {
-                accessorKey: 'lastInteractionAt',
-                header: 'Last interaction',
-                cell: ({ row }) => (
-                    <span className="text-sm text-slate-300">
-                        {row.original.lastInteractionAt ? formatDate(row.original.lastInteractionAt) : '—'}
-                    </span>
-                )
-            },
-            {
-                accessorKey: 'owner',
-                header: 'Owner',
-                cell: ({ row }) => <span className="text-sm text-slate-300">{row.original.owner ?? 'Unassigned'}</span>
-            },
-            {
-                id: 'actions',
-                header: 'Actions',
-                enableSorting: false,
-                cell: ({ row }) => (
-                    <div className="flex items-center gap-2 text-xs">
-                        <button
-                            type="button"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                setDrawerContactId(row.original.id);
-                                setIsDrawerOpen(true);
-                            }}
-                            className="rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-indigo-400 hover:text-white"
-                        >
-                            View
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                setDrawerContactId(row.original.id);
-                                setIsDrawerOpen(true);
-                            }}
-                            className="rounded-full border border-emerald-500/50 px-3 py-1 text-xs font-medium text-emerald-200 transition hover:border-emerald-400 hover:text-white"
-                        >
-                            Convert
-                        </button>
-                    </div>
-                )
-            }
-        ];
-    }, []);
-
-    const selectedCount = Object.keys(rowSelection).length;
-
-    const hasActiveFilters =
-        stageFilter.length > 0 || tagFilter.length > 0 || ownerFilter.length > 0 || statusFilter.length > 0;
-
-    const resetFilters = () => {
-        setStageFilter([]);
-        setTagFilter([]);
-        setOwnerFilter([]);
-        setStatusFilter([]);
-    };
-
-    const addNotification = React.useCallback((message: string, tone: NotificationBanner['tone']) => {
-        setNotifications((previous) => [...previous, { id: `${Date.now()}`, message, tone }]);
-    }, []);
+                </div>
+            ),
+            enableSorting: true,
+        },
+        {
+            accessorKey: 'stage',
+            header: 'Stage',
+            cell: ({ row }) => (
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getStageBadge(row.original.stage)}`}>
+                    {row.original.stage.toUpperCase()}
+                </span>
+            ),
+            enableSorting: false,
+        },
+        {
+            accessorKey: 'owner',
+            header: 'Owner',
+            cell: ({ row }) => <span className="text-sm text-slate-300">{row.original.owner ?? 'Unassigned'}</span>,
+            enableSorting: false,
+        },
+        {
+            accessorKey: 'createdAt',
+            header: 'Created',
+            cell: ({ row }) => <span className="text-sm text-slate-300">{row.original.createdAt ? formatDate(row.original.createdAt) : '—'}</span>,
+            enableSorting: true,
+        },
+        {
+            accessorKey: 'updatedAt',
+            header: 'Updated',
+            cell: ({ row }) => <span className="text-sm text-slate-300">{row.original.updatedAt ? formatDate(row.original.updatedAt) : '—'}</span>,
+            enableSorting: true,
+        },
+    ], []);
 
     React.useEffect(() => {
         if (notifications.length === 0) {
             return;
         }
+
         const timer = window.setTimeout(() => {
             setNotifications((previous) => previous.slice(1));
         }, 4000);
+
         return () => window.clearTimeout(timer);
     }, [notifications]);
 
-    const queryState: QueryState = React.useMemo(() => {
-        const state: QueryState = {};
-        if (search.trim()) state.q = search.trim();
-        if (stageFilter.length > 0) state.stage = stageFilter.join(',');
-        if (tagFilter.length > 0) state.tags = tagFilter.join(',');
-        if (ownerFilter.length > 0) state.owner = ownerFilter.join(',');
-        if (statusFilter.length > 0) state.status = statusFilter.join(',');
-        if (sortValue !== DEFAULT_CONTACT_SORT.id) state.sort = sortValue;
-        if (pagination.pageIndex > 0) state.page = String(pagination.pageIndex + 1);
-        if (pagination.pageSize !== 10) state.pageSize = String(pagination.pageSize);
-        return state;
-    }, [ownerFilter, pagination.pageIndex, pagination.pageSize, search, sortValue, stageFilter, statusFilter, tagFilter]);
+    const hasActiveFilters = Boolean(search.trim()) || stageFilter.length > 0 || statusFilter.length > 0 || ownerFilter.length > 0;
 
-    React.useEffect(() => {
-        if (!router.isReady) {
-            return;
-        }
-        const current: Record<string, string> = {};
-        Object.entries(router.query).forEach(([key, value]) => {
-            if (Array.isArray(value)) {
-                current[key] = value.join(',');
-            } else if (typeof value === 'string') {
-                current[key] = value;
-            }
-        });
-        const nextEntries = Object.entries(queryState);
-        const isEqual =
-            nextEntries.length === Object.keys(current).length &&
-            nextEntries.every(([key, value]) => current[key] === value);
-        if (!isEqual) {
-            void router.replace({ pathname: router.pathname, query: queryState }, undefined, { shallow: true });
-        }
-    }, [queryState, router]);
-
-    React.useEffect(() => {
-        const option = CONTACT_SORT_OPTIONS.find((entry) => entry.id === sortValue);
-        if (option) {
-            setSorting(option.state);
-        }
-    }, [sortValue]);
-
-    const handleSortingChange = React.useCallback((updater: SortingState | ((old: SortingState) => SortingState)) => {
-        setSorting((previous) => {
-            const next = typeof updater === 'function' ? updater(previous) : updater;
-            if (next.length > 0) {
-                const candidate = CONTACT_SORT_OPTIONS.find(
-                    (option) => option.state.length === next.length && option.state.every((entry, index) => entry.id === next[index]?.id && entry.desc === next[index]?.desc)
-                );
-                if (candidate) {
-                    setSortValue(candidate.id);
-                }
-            }
-            return next;
-        });
+    const addNotification = React.useCallback((title: string, tone: ToastMessage['tone'], description?: string) => {
+        setNotifications((previous) => [
+            ...previous,
+            { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, title, tone, description },
+        ]);
     }, []);
 
-    const handleConvertContact = React.useCallback(
-        async (profile: ContactProfile) => {
-            setConversionTarget(profile.id);
-            try {
-                await convertContactToClient(profile.id);
-                addNotification(`${profile.name} converted to a client.`, 'success');
-                setRecords((previous) =>
-                    previous.map((record) =>
-                        record.id === profile.id
-                            ? {
-                                  ...record,
-                                  status: 'client',
-                                  updated_at: new Date().toISOString()
-                              }
-                            : record
-                    )
-                );
-            } catch (err) {
-                addNotification(err instanceof Error ? err.message : 'Unable to convert contact', 'error');
-            } finally {
-                setConversionTarget(null);
-            }
+    const handleSortingChange = React.useCallback(
+        (updater: SortingState | ((old: SortingState) => SortingState)) => {
+            setSorting((previous) => {
+                const nextState = typeof updater === 'function' ? updater(previous) : updater;
+                const match = CONTACT_SORT_OPTIONS.find((option) => option.state.length === nextState.length && option.state.every((entry, index) => entry.id === nextState[index]?.id && entry.desc === nextState[index]?.desc));
+                setSortValue(match?.id ?? DEFAULT_CONTACT_SORT.id);
+                return nextState;
+            });
+        },
+        []
+    );
+
+    const emptyMessage = React.useMemo(() => {
+        const totalKnown = contactsResponse?.meta.total ?? metrics.total;
+        const workspaceEmpty = totalKnown === 0;
+        if (workspaceEmpty) {
+            return (
+                <div className="space-y-4">
+                    <p className="text-base font-semibold text-white">No contacts yet</p>
+                    <p className="text-sm text-slate-300">Start building your network.</p>
+                    <button
+                        type="button"
+                        onClick={() => setIsDialogOpen(true)}
+                        className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-600"
+                    >
+                        Add contact
+                    </button>
+                </div>
+            );
+        }
+
+        if (hasActiveFilters) {
+            return <p>No contacts match your filters.</p>;
+        }
+
+        return <p>No contacts found.</p>;
+    }, [contactsResponse?.meta.total, hasActiveFilters, metrics.total]);
+
+    const handleContactCreated = React.useCallback(
+        async (record: ContactRecord) => {
+            addNotification('Contact added', 'success', getContactName(record));
+            setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+            setRowSelection({});
+            await Promise.all([mutateContacts(), mutateMetrics()]);
+        },
+        [addNotification, mutateContacts, mutateMetrics]
+    );
+
+    const handleContactError = React.useCallback(
+        (message: string) => {
+            addNotification('Unable to add contact', 'error', message);
         },
         [addNotification]
     );
 
+    const kpiCards = React.useMemo(() => {
+        const cards: Array<{ id: string; label: string; value: number }> = [
+            { id: 'total', label: 'Total contacts', value: metrics.total },
+            { id: 'email', label: 'With email', value: metrics.withEmail },
+            { id: 'phone', label: 'With phone', value: metrics.withPhone },
+        ];
+
+        if (typeof metrics.newLast30 === 'number') {
+            cards.push({ id: 'recent', label: 'New in last 30 days', value: metrics.newLast30 });
+        }
+
+        return cards;
+    }, [metrics.newLast30, metrics.total, metrics.withEmail, metrics.withPhone]);
+
+    const kpiGridClass = kpiCards.length >= 4 ? 'lg:grid-cols-4 xl:grid-cols-4' : 'lg:grid-cols-3 xl:grid-cols-3';
+
     return (
         <div className="flex flex-col gap-6">
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <KpiCard label="Total contacts" value={metrics.total.toString()} helper="Across your workspace" />
-                <KpiCard label="New this month" value={metrics.newThisMonth.toString()} helper="Captured in the last 30 days" />
-                <KpiCard label="Converted to client" value={metrics.converted.toString()} helper="Marked as clients" />
-                <KpiCard label="Needs follow-up" value={metrics.needsFollowUp.toString()} helper="No recent touchpoint" />
+            <section className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${kpiGridClass} items-stretch`}>
+                {kpiCards.map((card) => (
+                    <KpiCard key={card.id} label={card.label} value={card.value} />
+                ))}
             </section>
 
-            {error ? (
-                <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</div>
+            {contactsError ? (
+                <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{contactsError.message}</div>
             ) : null}
 
-            {notifications.map((notification) => (
-                <div
-                    key={notification.id}
-                    className={`rounded-2xl border p-3 text-sm ${
-                        notification.tone === 'success'
-                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                            : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                    }`}
-                >
-                    {notification.message}
+            {notifications.length > 0 ? (
+                <div aria-live="polite" className="space-y-3">
+                    {notifications.map((notification) => (
+                        <div
+                            key={notification.id}
+                            className={`rounded-2xl border p-3 text-sm ${
+                                notification.tone === 'success'
+                                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                                    : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+                            }`}
+                        >
+                            <p className="font-semibold">{notification.title}</p>
+                            {notification.description ? (
+                                <p className="mt-1 text-xs text-inherit opacity-80">{notification.description}</p>
+                            ) : null}
+                        </div>
+                    ))}
                 </div>
-            ))}
+            ) : null}
 
             <DataToolbar
                 searchValue={search}
-                onSearchChange={setSearch}
-                searchPlaceholder="Search contacts by name, email, phone, owner…"
+                onSearchChange={(value) => {
+                    setSearch(value);
+                    setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+                }}
+                searchPlaceholder="Search contacts by name, email, or phone"
                 filters={filters}
                 hasActiveFilters={hasActiveFilters}
-                onResetFilters={resetFilters}
+                onResetFilters={() => {
+                    setStageFilter([]);
+                    setStatusFilter([]);
+                    setOwnerFilter([]);
+                }}
                 sortOptions={CONTACT_SORT_OPTIONS.map(({ id, label }) => ({ id, label }))}
                 sortValue={sortValue}
                 onSortChange={setSortValue}
-                primaryAction={{ label: 'Add contact', href: '/contacts/new' }}
-                selectedCount={selectedCount}
-                bulkActions={
-                    <button
-                        type="button"
-                        disabled={selectedCount === 0}
-                        className="rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 transition enabled:hover:border-indigo-400 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        Bulk actions
-                    </button>
-                }
+                primaryAction={{ label: 'Add contact', onClick: () => setIsDialogOpen(true) }}
                 pageSize={pagination.pageSize}
-                onPageSizeChange={(value) => setPagination({ pageIndex: 0, pageSize: value })}
+                onPageSizeChange={(pageSize) => setPagination({ pageIndex: 0, pageSize })}
             />
 
             <DataTable<ContactTableRow>
                 columns={columns}
-                data={filteredRows}
+                data={tableRows}
                 sorting={sorting}
                 onSortingChange={handleSortingChange}
                 pagination={pagination}
                 onPaginationChange={setPagination}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
+                manualPagination
+                manualSorting
+                pageCount={pageCount}
                 getRowId={(row) => row.id}
-                onRowClick={(row) => {
-                    setDrawerContactId(row.id);
-                    setIsDrawerOpen(true);
-                }}
-                isLoading={isLoading}
-                emptyMessage={
-                    <div className="space-y-3">
-                        <p>No contacts match your filters.</p>
-                        <Link href="/contacts/new" className="text-indigo-300 hover:text-white">
-                            Add your next lead
-                        </Link>
-                    </div>
-                }
+                isLoading={isContactsLoading && !contactsResponse}
+                emptyMessage={emptyMessage}
             />
 
-            <ContactDrawer
-                contact={selectedProfile}
-                open={isDrawerOpen && Boolean(selectedProfile)}
-                onClose={() => setIsDrawerOpen(false)}
-                onConvert={handleConvertContact}
-                isConverting={conversionTarget === selectedProfile?.id}
+            <AddContactDialog
+                open={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
+                onSuccess={handleContactCreated}
+                onError={handleContactError}
             />
         </div>
     );
 }
 
-function getStageBadge(stage: ContactTableRow['stage']): string {
+function KpiCard({ label, value }: { label: string; value: number }) {
+    return (
+        <div className="flex min-h-[104px] max-h-[128px] flex-col items-start justify-center gap-2 rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
+            <p className="text-4xl font-semibold leading-none text-white">{value.toLocaleString()}</p>
+            <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+        </div>
+    );
+}
+
+function getStageBadge(stage: ContactStage): string {
     switch (stage) {
         case 'hot':
             return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
@@ -515,13 +457,193 @@ function getStageBadge(stage: ContactTableRow['stage']): string {
     }
 }
 
-function KpiCard({ label, value, helper }: { label: string; value: string; helper: string }) {
+const addContactSchema = z.object({
+    name: z.string().trim().min(1, 'Name is required'),
+    email: z
+        .string()
+        .trim()
+        .optional()
+        .transform((value) => (value === '' ? undefined : value))
+        .refine((value) => !value || z.string().email().safeParse(value).success, 'Enter a valid email'),
+    phone: z
+        .string()
+        .trim()
+        .optional()
+        .transform((value) => (value === '' ? undefined : value)),
+});
+
+type AddContactFormValues = z.infer<typeof addContactSchema>;
+
+type AddContactDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSuccess: (record: ContactRecord) => Promise<void> | void;
+    onError: (message: string) => void;
+};
+
+function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContactDialogProps) {
+    const {
+        register,
+        handleSubmit,
+        reset,
+        formState: { errors },
+    } = useForm<AddContactFormValues>({
+        resolver: zodResolver(addContactSchema),
+        defaultValues: { name: '', email: '', phone: '' },
+    });
+
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
+    const nameInputRef = React.useRef<HTMLInputElement | null>(null);
+
+    const nameField = register('name');
+    const emailField = register('email');
+    const phoneField = register('phone');
+
+    React.useEffect(() => {
+        if (!open) {
+            reset({ name: '', email: '', phone: '' });
+        }
+    }, [open, reset]);
+
+    const onSubmit = handleSubmit(async (values) => {
+        setIsSubmitting(true);
+        try {
+            const response = await fetch('/api/contacts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: values.name,
+                    email: values.email,
+                    phone: values.phone,
+                }),
+            });
+
+            const payload = (await response.json().catch(() => ({}))) as { data?: ContactRecord; error?: string };
+
+            if (!response.ok || !payload.data) {
+                throw new Error(payload.error ?? 'Unable to save contact');
+            }
+
+            await onSuccess(payload.data);
+            onOpenChange(false);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to save contact';
+            onError(message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    });
+
     return (
-        <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 shadow-xl shadow-slate-950/40">
-            <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-            <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
-            <p className="mt-2 text-xs text-slate-500">{helper}</p>
-        </div>
+        <Dialog open={open} onOpenChange={(next) => (!isSubmitting ? onOpenChange(next) : undefined)}>
+            <DialogContent
+                onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    if (typeof window !== 'undefined') {
+                        window.requestAnimationFrame(() => {
+                            nameInputRef.current?.focus();
+                        });
+                    }
+                }}
+            >
+                <DialogHeader className="flex flex-row items-start justify-between gap-4">
+                    <div>
+                        <DialogTitle>Add contact</DialogTitle>
+                        <DialogDescription>Capture a new lead without leaving the table.</DialogDescription>
+                    </div>
+                    <DialogClose asChild disabled={isSubmitting}>
+                        <button
+                            type="button"
+                            className="rounded-full border border-transparent bg-slate-800/80 p-2 text-slate-300 transition hover:border-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label="Close dialog"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+                                <path
+                                    fillRule="evenodd"
+                                    d="M5.22 5.22a.75.75 0 0 1 1.06 0L10 8.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L11.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06L8.94 10L5.22 6.28a.75.75 0 0 1 0-1.06Z"
+                                    clipRule="evenodd"
+                                />
+                            </svg>
+                        </button>
+                    </DialogClose>
+                </DialogHeader>
+
+                <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="contact-name" className="text-sm font-medium text-slate-200">
+                            Name <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                            id="contact-name"
+                            type="text"
+                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                            placeholder="Jamie Rivera"
+                            {...nameField}
+                            ref={(element) => {
+                                nameField.ref(element);
+                                nameInputRef.current = element;
+                            }}
+                            disabled={isSubmitting}
+                        />
+                        {errors.name ? <p className="text-xs text-rose-300">{errors.name.message}</p> : null}
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="contact-email" className="text-sm font-medium text-slate-200">
+                            Email
+                        </label>
+                        <input
+                            id="contact-email"
+                            type="email"
+                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                            placeholder="jamie@example.com"
+                            {...emailField}
+                            disabled={isSubmitting}
+                        />
+                        {errors.email ? <p className="text-xs text-rose-300">{errors.email.message}</p> : null}
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="contact-phone" className="text-sm font-medium text-slate-200">
+                            Phone
+                        </label>
+                        <input
+                            id="contact-phone"
+                            type="tel"
+                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                            placeholder="(555) 010-1234"
+                            {...phoneField}
+                            disabled={isSubmitting}
+                        />
+                        {errors.phone ? <p className="text-xs text-rose-300">{errors.phone.message}</p> : null}
+                    </div>
+
+                    <DialogFooter className="pt-2">
+                        <DialogClose asChild disabled={isSubmitting}>
+                            <button
+                                type="button"
+                                className="rounded-full border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                        </DialogClose>
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {isSubmitting ? (
+                                <span className="inline-flex items-center gap-2">
+                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />
+                                    Saving…
+                                </span>
+                            ) : (
+                                'Save contact'
+                            )}
+                        </button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
-
