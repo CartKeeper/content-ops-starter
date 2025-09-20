@@ -120,19 +120,23 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                 }
 
                 const imported = payload.data?.imported ?? assets.length;
-                const skipped = payload.data?.skipped ?? 0;
+                const skipped = payload.data?.skipped ?? Math.max(assets.length - imported, 0);
                 setResultMessage(
-                    `Imported ${imported} file${imported === 1 ? '' : 's'} from Dropbox${
-                        skipped > 0 ? ` (${skipped} skipped as duplicates).` : '.'
+                    `Mirrored ${imported} file${imported === 1 ? '' : 's'} to Supabase storage${
+                        skipped > 0 ? ` (${skipped} skipped or failed).` : '.'
                     }`
                 );
+
+                if (payload.error) {
+                    setErrorMessage(payload.error);
+                }
 
                 if (onImportComplete) {
                     onImportComplete({ imported, skipped });
                 }
             } catch (error) {
                 console.error('Dropbox import failed', error);
-                setErrorMessage('Unexpected error while importing from Dropbox. Check console for details.');
+                setErrorMessage('Unexpected error while mirroring files to Supabase storage. Check console for details.');
             } finally {
                 setImporting(false);
             }
@@ -178,9 +182,9 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                     Trigger Zapier webhook for new imports
                 </label>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Launch the Dropbox Chooser to select hero images or proofing assets. Files are written to the Supabase
-                    <code className="ml-1 rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">dropbox_assets</code> table with
-                    duplicate detection and optional Zapier notifications.
+                    Launch the Dropbox Chooser to select hero images or proofing assets. Files are mirrored into the Supabase{' '}
+                    <code className="ml-1 rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">dropbox_assets</code>{' '}
+                    storage bucket alongside metadata for duplicate detection and optional Zapier notifications.
                 </p>
             </div>
             <div className="flex flex-col gap-4">
@@ -194,7 +198,7 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                         <li>Shift-click within the chooser to grab an entire gallery drop folder.</li>
                         <li>Use the direct link option when you want clients to download the original file.</li>
-                        <li>Preview URLs expire after a short period—Supabase stores them so the CRM can refresh as needed.</li>
+                        <li>Supabase-hosted binaries keep CRM download links stable even after Dropbox previews expire.</li>
                     </ul>
                 </div>
             </div>

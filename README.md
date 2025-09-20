@@ -116,12 +116,17 @@ The galleries dashboard now includes a Dropbox Chooser workflow and Zapier webho
 
 - **Environment variables**
   - `NEXT_PUBLIC_DROPBOX_APP_KEY` – enables the Dropbox Chooser button rendered by `DropboxImportPanel`.
+  - `DROPBOX_ACCESS_TOKEN` – server-side token used to download Dropbox binaries before mirroring them to Supabase Storage.
   - `ZAPIER_WEBHOOK_SECRET` – shared secret for validating signatures on `/api/integrations/zapier/webhook`.
   - `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_URL` – required for the new galleries API routes to write to Supabase tables.
+  - `NEXT_PUBLIC_SUPABASE_URL` – allows the CRM UI to build public Supabase Storage URLs for mirrored Dropbox assets.
 - **Supabase tables** (`supabase/migrations/20250212000000_create_dropbox_zapier_tables.sql`)
-  - `dropbox_assets` stores metadata for imported files and links them to galleries.
+  - `dropbox_assets` stores metadata and Supabase storage paths for imported files and links them to galleries.
   - `gallery_publications` records publish events and downstream automation metadata.
   - `zapier_webhook_events` archives webhook deliveries for replay and debugging.
+- **Supabase storage** (`supabase/migrations/20250218000000_enable_dropbox_storage.sql`)
+  - `dropbox_assets` bucket mirrors each Dropbox binary so the CRM can serve files without expiring share links.
+  - Storage policies allow public reads for gallery downloads while reserving writes for the service role.
 - **Next.js API routes**
   - `POST /api/galleries/import` – persists Dropbox Chooser selections and optionally enqueues Zapier events.
   - `GET|POST /api/galleries` – list or create galleries with publish-ready metadata.
@@ -129,7 +134,7 @@ The galleries dashboard now includes a Dropbox Chooser workflow and Zapier webho
   - `POST /api/integrations/zapier/webhook` – receives signed webhooks from Zapier and stores their payload.
   - `GET /api/integrations/zapier/events` – fetches the most recent webhook activity for the UI monitor.
 - **UI additions**
-  - `DropboxImportPanel` (rendered on `/galleries`) launches the Dropbox Chooser and streams files to Supabase.
+  - `DropboxImportPanel` (rendered on `/galleries`) launches the Dropbox Chooser and mirrors files into Supabase Storage with matching metadata rows.
   - `/integrations/zapier` summarizes environment setup guidance and displays recent webhook deliveries.
 - **Smoke test plan**
   1. Set the environment variables above (with dummy values locally) and run `npm run dev`.

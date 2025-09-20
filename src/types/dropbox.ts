@@ -21,4 +21,7 @@ export type DropboxAssetRecord = {
     projectName?: string | null;
     galleryId?: string | null;
     galleryName?: string | null;
+    storageBucket?: string | null;
+    storagePath?: string | null;
+    storageUrl?: string | null;
 };

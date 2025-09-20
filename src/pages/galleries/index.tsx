@@ -23,6 +23,11 @@ const FILTER_ALL = '__all__';
 const FILTER_UNASSIGNED = '__unassigned__';
 const FILTER_FOLDER_UNASSIGNED = '__folder-unassigned__';
 
+const SUPABASE_PUBLIC_STORAGE_BASE =
+    typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_URL
+        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL.replace(/\/+$/, '')}/storage/v1/object/public`
+        : null;
+
 const statusToneMap: Record<AssetSyncStatus, StatusTone> = {
     Synced: 'success',
     Syncing: 'info',
@@ -712,12 +717,30 @@ function DropboxAssetLibrary() {
                                                         <span className="ml-1 font-semibold text-slate-700 dark:text-slate-200">{projectName}</span>
                                                     </p>
                                                 </div>
-                                                {asset.previewUrl ? (
+                                                {asset.storagePath ? (
+                                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                                        Storage path:
+                                                        <code className="ml-1 break-all rounded bg-slate-100 px-1 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                                            {asset.storagePath}
+                                                        </code>
+                                                    </p>
+                                                ) : null}
+                                                {asset.storageUrl ? (
+                                                    <a
+                                                        href={asset.storageUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="mt-2 inline-flex text-xs font-semibold text-[#4DE5FF] transition hover:text-white"
+                                                    >
+                                                        Download from Supabase storage ↗
+                                                    </a>
+                                                ) : null}
+                                                {asset.previewUrl && asset.previewUrl !== asset.storageUrl ? (
                                                     <a
                                                         href={asset.previewUrl}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="text-xs font-semibold text-[#4DE5FF] transition hover:text-white"
+                                                        className="mt-1 inline-flex text-xs font-semibold text-[#4DE5FF] transition hover:text-white"
                                                     >
                                                         Open Dropbox preview ↗
                                                     </a>
@@ -929,6 +952,21 @@ function buildUpdatePayload(update: Partial<DropboxAssetRecord>): Record<string,
     return payload;
 }
 
+function buildPublicStorageUrl(bucket?: string | null, objectPath?: string | null): string | null {
+    if (!bucket || !objectPath || !SUPABASE_PUBLIC_STORAGE_BASE) {
+        return null;
+    }
+
+    const encodedBucket = encodeURIComponent(bucket);
+    const encodedPath = objectPath
+        .split('/')
+        .filter((segment) => segment.length > 0)
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
+
+    return `${SUPABASE_PUBLIC_STORAGE_BASE}/${encodedBucket}/${encodedPath}`;
+}
+
 function normalizeAssetRecord(input: unknown): DropboxAssetRecord {
     if (!input || typeof input !== 'object') {
         return {
@@ -1017,6 +1055,10 @@ function normalizeAssetRecord(input: unknown): DropboxAssetRecord {
     const galleryId = parseOptionalString(record.galleryId ?? record.gallery_id);
     const galleryName = parseOptionalString(record.galleryName ?? record.gallery_name);
 
+    const storageBucket = parseOptionalString(record.storageBucket ?? record.storage_bucket);
+    const storagePath = parseOptionalString(record.storagePath ?? record.storage_path);
+    const storageUrl = buildPublicStorageUrl(storageBucket, storagePath) ?? undefined;
+
     return {
         id,
         fileName,
@@ -1037,7 +1079,10 @@ function normalizeAssetRecord(input: unknown): DropboxAssetRecord {
         projectId,
         projectName,
         galleryId,
-        galleryName
+        galleryName,
+        storageBucket,
+        storagePath,
+        storageUrl
     };
 }
 
