@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { getSupabaseClient } from '../../../../../utils/supabase-client';
-import type { ZapierWebhookPayload } from '../../../../../types/zapier';
+import { getSupabaseClient } from '../../../../utils/supabase-client';
+import type { ZapierWebhookPayload } from '../../../../types/zapier';
 
 export const config = {
     api: {
@@ -38,7 +38,17 @@ function verifySignature(secret: string | null, rawBody: string, signatureHeader
     if (signatureBuffer.length !== expectedBuffer.length) {
         return false;
     }
-    return crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+    const signatureView = new Uint8Array(
+        signatureBuffer.buffer,
+        signatureBuffer.byteOffset,
+        signatureBuffer.byteLength
+    );
+    const expectedView = new Uint8Array(
+        expectedBuffer.buffer,
+        expectedBuffer.byteOffset,
+        expectedBuffer.byteLength
+    );
+    return crypto.timingSafeEqual(signatureView, expectedView);
 }
 
 type ZapierWebhookResponse = {

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { getSupabaseClient } from '../../../../../utils/supabase-client';
+import { getSupabaseClient } from '../../../../utils/supabase-client';
 
 const ALLOWED_METHODS = ['GET'] as const;
 
