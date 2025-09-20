@@ -2,6 +2,7 @@ import * as React from 'react';
 
 import type { GalleryRecord } from '../../data/crm';
 import type { DropboxFileMetadata } from '../../types/dropbox';
+import { DropboxChooserButton, type DropboxChooserFile } from './DropboxChooserButton';
 
 type DropboxImportPanelProps = {
     galleries: GalleryRecord[];
@@ -117,6 +118,30 @@ function formatModifiedDate(value: string | null): string {
     }
 }
 
+function buildImportResultMessage(imported: number, skipped: number, requestedCount?: number | null): string {
+    const base = `Imported ${imported} file${imported === 1 ? '' : 's'} from Dropbox`;
+
+    if (typeof requestedCount === 'number') {
+        const unresolved = Math.max(requestedCount - imported - skipped, 0);
+        const details = [
+            skipped > 0 ? `${skipped} duplicate${skipped === 1 ? '' : 's'}` : null,
+            unresolved > 0 ? `${unresolved} unresolved` : null
+        ].filter(Boolean);
+
+        if (details.length > 0) {
+            return `${base} (${details.join(', ')}).`;
+        }
+
+        return `${base}.`;
+    }
+
+    if (skipped > 0) {
+        return `${base} (${skipped} duplicate${skipped === 1 ? '' : 's'}).`;
+    }
+
+    return `${base}.`;
+}
+
 export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImportPanelProps) {
     const galleryOptions = React.useMemo(
         () =>
@@ -220,6 +245,74 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
         }
     }, [folderPath]);
 
+    const executeImport = React.useCallback(
+        async (
+            body: Record<string, unknown>,
+            { requestedCount }: { requestedCount?: number | null } = {}
+        ) => {
+            setImporting(true);
+            setErrorMessage(null);
+            setResultMessage(null);
+
+            try {
+                const response = await fetch('/api/galleries/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                const payload = (await response.json()) as ImportResponse;
+
+                if (!response.ok) {
+                    setErrorMessage(payload.error || 'Failed to import Dropbox assets.');
+                    return;
+                }
+
+                const imported =
+                    payload.data?.imported ?? (typeof requestedCount === 'number' ? requestedCount : 0);
+                const skipped = payload.data?.skipped ?? 0;
+
+                setResultMessage(buildImportResultMessage(imported, skipped, requestedCount));
+
+                if (onImportComplete) {
+                    onImportComplete({ imported, skipped });
+                }
+            } catch (error) {
+                console.error('Dropbox import failed', error);
+                setErrorMessage('Unexpected error while importing from Dropbox. Check console for details.');
+            } finally {
+                setImporting(false);
+            }
+        },
+        [onImportComplete]
+    );
+
+    const handleChooserImport = React.useCallback(
+        async (files: DropboxChooserFile[]) => {
+            if (!selectedGalleryId) {
+                setResultMessage(null);
+                setErrorMessage('Choose a gallery before importing Dropbox assets.');
+                return;
+            }
+
+            if (!Array.isArray(files) || files.length === 0) {
+                return;
+            }
+
+            await executeImport(
+                {
+                    galleryId: selectedGalleryId,
+                    galleryName: selectedGallery?.label,
+                    clientName: selectedGallery?.clientName,
+                    triggerZapier,
+                    selection: files
+                },
+                { requestedCount: undefined }
+            );
+        },
+        [executeImport, selectedGallery, selectedGalleryId, triggerZapier]
+    );
+
     const handleImport = React.useCallback(async () => {
         if (!selectedGalleryId) {
             setErrorMessage('Choose a gallery before importing Dropbox assets.');
@@ -238,10 +331,6 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
             return;
         }
 
-        setImporting(true);
-        setErrorMessage(null);
-        setResultMessage(null);
-
         const fallbackFolder = folderPath || null;
         const assets = selectedAssets.map((asset) => ({
             dropboxFileId: asset.id,
@@ -249,54 +338,26 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
             fileName: asset.name
         }));
 
-        try {
-            const response = await fetch('/api/galleries/import', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    galleryId: selectedGalleryId,
-                    galleryName: selectedGallery?.label,
-                    clientName: selectedGallery?.clientName,
-                    folderPath: fallbackFolder,
-                    triggerZapier,
-                    assets
-                })
-            });
-
-            const payload = (await response.json()) as ImportResponse;
-
-            if (!response.ok) {
-                setErrorMessage(payload.error || 'Failed to import Dropbox assets.');
-                return;
-            }
-
-            const imported = payload.data?.imported ?? assets.length;
-            const skipped = payload.data?.skipped ?? 0;
-            const unresolved = Math.max(selectedAssets.length - imported - skipped, 0);
-
-            setResultMessage(
-                `Imported ${imported} file${imported === 1 ? '' : 's'} from Dropbox${
-                    skipped > 0 || unresolved > 0
-                        ? ` (${[
-                              skipped > 0 ? `${skipped} duplicate${skipped === 1 ? '' : 's'}` : null,
-                              unresolved > 0 ? `${unresolved} unresolved` : null
-                          ]
-                              .filter(Boolean)
-                              .join(', ')}).`
-                        : '.'
-                }`
-            );
-
-            if (onImportComplete) {
-                onImportComplete({ imported, skipped });
-            }
-        } catch (error) {
-            console.error('Dropbox import failed', error);
-            setErrorMessage('Unexpected error while importing from Dropbox. Check console for details.');
-        } finally {
-            setImporting(false);
-        }
-    }, [folderEntries, folderPath, onImportComplete, selectedAssetIds, selectedGallery, selectedGalleryId, triggerZapier]);
+        await executeImport(
+            {
+                galleryId: selectedGalleryId,
+                galleryName: selectedGallery?.label,
+                clientName: selectedGallery?.clientName,
+                folderPath: fallbackFolder,
+                triggerZapier,
+                assets
+            },
+            { requestedCount: selectedAssets.length }
+        );
+    }, [
+        executeImport,
+        folderEntries,
+        folderPath,
+        selectedAssetIds,
+        selectedGallery,
+        selectedGalleryId,
+        triggerZapier
+    ]);
 
     const allSelected = folderEntries.length > 0 && selectedAssetIds.size === folderEntries.length;
     const selectedCount = selectedAssetIds.size;
@@ -349,7 +410,7 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                     </label>
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Preview Dropbox folders through the authenticated API, select the files you need, and import them directly into the
+                    Preview Dropbox folders through the authenticated API, select the files you need, or launch the Dropbox chooser to import files and entire folders directly into the
                     <code className="ml-1 rounded bg-slate-100 px-1 text-xs dark:bg-slate-800">dropbox_assets</code> table. Server-side token exchange keeps access tokens secure while the CRM records duplicate-resistant metadata.
                 </p>
             </div>
@@ -377,6 +438,14 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                         </button>
                     ) : null}
                 </div>
+                <DropboxChooserButton
+                    onSelect={handleChooserImport}
+                    disabled={importing}
+                    folderselect
+                    className={PRIMARY_BUTTON_CLASS}
+                >
+                    Import via Dropbox chooser
+                </DropboxChooserButton>
                 {resultMessage ? <p className="text-sm text-emerald-500">{resultMessage}</p> : null}
                 {errorMessage ? <p className="text-sm text-rose-500">{errorMessage}</p> : null}
                 <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
@@ -428,6 +497,7 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-xs leading-relaxed text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
                     <p className="font-semibold uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Dropbox API tips</p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
+                        <li>Use the Dropbox chooser to import files or entire folders without copying paths manually.</li>
                         <li>Use refresh-token credentials (`DROPBOX_APP_SECRET`, `DROPBOX_REFRESH_TOKEN`) to keep imports private.</li>
                         <li>Preview folders before importing to confirm Dropbox automations delivered the right files.</li>
                         <li>Zapier events include resolved metadata, making downstream notifications and audits accurate.</li>
