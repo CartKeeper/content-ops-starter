@@ -6,8 +6,6 @@ import { authenticateRequest } from '../../../../../server/auth/session';
 import { getSupabaseClient } from '../../../../../utils/supabase-client';
 import { mapEvent, parseDate, startOfDay, toIsoString } from '../helpers';
 
-type EventRouteContext = { params: Promise<{ id: string }> };
-
 function normalizeTrimmed(value: unknown) {
     if (typeof value !== 'string') {
         return undefined;
@@ -17,13 +15,14 @@ function normalizeTrimmed(value: unknown) {
     return trimmed.length > 0 ? trimmed : undefined;
 }
 
-export async function PATCH(request: NextRequest, context: EventRouteContext) {
+export async function PATCH(request: NextRequest, context: unknown) {
     const session = await authenticateRequest(request);
     if (!session) {
         return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 
-    const { id: eventId } = await context.params;
+    const params = (context as { params?: { id?: string } })?.params ?? {};
+    const eventId = params.id;
     if (!eventId) {
         return NextResponse.json({ error: 'Event ID is required.' }, { status: 400 });
     }
@@ -146,13 +145,14 @@ export async function PATCH(request: NextRequest, context: EventRouteContext) {
     }
 }
 
-export async function DELETE(request: NextRequest, context: EventRouteContext) {
+export async function DELETE(request: NextRequest, context: unknown) {
     const session = await authenticateRequest(request);
     if (!session) {
         return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 
-    const { id: eventId } = await context.params;
+    const params = (context as { params?: { id?: string } })?.params ?? {};
+    const eventId = params.id;
     if (!eventId) {
         return NextResponse.json({ error: 'Event ID is required.' }, { status: 400 });
     }

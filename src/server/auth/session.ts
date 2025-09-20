@@ -1,4 +1,4 @@
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
+import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 
 import { verifySession, type SessionPayload } from '../../lib/jwt';
@@ -19,7 +19,7 @@ function readAuthorizationHeader(request: NextRequest): string | null {
 }
 
 async function readSessionToken(request: NextRequest): Promise<string | null> {
-    const cookieStore = (await cookies()) as UnsafeUnwrappedCookies;
+    const cookieStore = await cookies();
     const cookieToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
     if (cookieToken) {
         return cookieToken;
