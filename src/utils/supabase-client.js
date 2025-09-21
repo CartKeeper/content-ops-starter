@@ -76,3 +76,7 @@ export function getSupabaseConfig() {
 
     return { url, key };
 }
+
+export function isSupabaseConfigured() {
+    return Boolean(resolveUrl() && resolveKey());
+}

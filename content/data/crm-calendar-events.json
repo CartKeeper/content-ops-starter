@@ -1,0 +1,65 @@
+{
+    "type": "CrmCalendarEvents",
+    "items": [
+        {
+            "id": "cal-sample-1",
+            "owner_user_id": "avery-logan",
+            "title": "Evergreen Architects – Site progress",
+            "description": "Quarterly walkthrough and progress portraits on location.",
+            "start_at": "2025-03-16T17:00:00.000Z",
+            "end_at": "2025-03-16T20:00:00.000Z",
+            "all_day": false,
+            "visibility": "team",
+            "created_at": "2025-02-20T10:12:00.000Z",
+            "updated_at": "2025-03-05T08:45:00.000Z"
+        },
+        {
+            "id": "cal-sample-2",
+            "owner_user_id": "jordan-lee",
+            "title": "Harrison & June – Welcome dinner",
+            "description": "Coverage of the welcome dinner and family toasts.",
+            "start_at": "2025-05-17T02:00:00.000Z",
+            "end_at": "2025-05-17T06:00:00.000Z",
+            "all_day": false,
+            "visibility": "team",
+            "created_at": "2025-03-02T15:00:00.000Z",
+            "updated_at": "2025-03-18T19:15:00.000Z"
+        },
+        {
+            "id": "cal-sample-3",
+            "owner_user_id": "avery-logan",
+            "title": "Sona Patel – Lifestyle session",
+            "description": "Lifestyle coverage across downtown and studio setups.",
+            "start_at": "2025-05-21T16:00:00.000Z",
+            "end_at": "2025-05-21T20:00:00.000Z",
+            "all_day": false,
+            "visibility": "team",
+            "created_at": "2025-03-10T11:30:00.000Z",
+            "updated_at": "2025-03-10T11:30:00.000Z"
+        },
+        {
+            "id": "cal-sample-4",
+            "owner_user_id": "jordan-lee",
+            "title": "Atlas Fitness – Campaign planning",
+            "description": "Finalize shot list and production schedule with marketing lead.",
+            "start_at": "2025-04-12T18:00:00.000Z",
+            "end_at": "2025-04-12T19:30:00.000Z",
+            "all_day": false,
+            "visibility": "private",
+            "created_at": "2025-02-28T09:05:00.000Z",
+            "updated_at": "2025-02-28T09:05:00.000Z"
+        },
+        {
+            "id": "cal-sample-5",
+            "owner_user_id": "avery-logan",
+            "title": "Studio planning day",
+            "description": "Outline Q3 marketing themes and gallery refresh timeline.",
+            "start_at": "2025-04-22T00:00:00.000Z",
+            "end_at": "2025-04-22T23:59:00.000Z",
+            "all_day": true,
+            "visibility": "team",
+            "created_at": "2025-03-01T08:00:00.000Z",
+            "updated_at": "2025-03-01T08:00:00.000Z"
+        }
+    ]
+}

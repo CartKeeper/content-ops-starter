@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 
 import { calendarEventCreateSchema } from '../../../../lib/calendar-schemas';
 import { authenticateRequest } from '../../../../server/auth/session';
-import { getSupabaseClient } from '../../../../utils/supabase-client';
+import { getSupabaseClient, isSupabaseConfigured } from '../../../../utils/supabase-client';
+import { getFallbackCalendarEvents } from '../../../../server/calendar/fallback';
 import { buildPermissionFilter, mapEvent, parseDate, startOfDay, endOfDay, toIsoString } from './helpers';
 
 export async function GET(request: NextRequest) {
@@ -24,9 +25,15 @@ export async function GET(request: NextRequest) {
               .filter((value) => value.length > 0)
         : [];
 
-    const supabase = getSupabaseClient();
-
     try {
+        const fallbackOptions = { from: fromParam, to: toParam, userIds };
+
+        if (!isSupabaseConfigured()) {
+            const events = await getFallbackCalendarEvents(session, fallbackOptions);
+            return NextResponse.json({ events });
+        }
+
+        const supabase = getSupabaseClient();
         let query = supabase.from('calendar_events').select('*').order('start_at', { ascending: true });
 
         if (toParam) {
@@ -49,14 +56,17 @@ export async function GET(request: NextRequest) {
         const { data, error } = await query;
         if (error) {
             console.error('Failed to load calendar events', error);
-            return NextResponse.json({ error: 'Unable to load events.' }, { status: 500 });
+            const events = await getFallbackCalendarEvents(session, fallbackOptions);
+            return NextResponse.json({ events }, { headers: { 'x-data-source': 'fallback' } });
         }
 
         const events = (data ?? []).map(mapEvent);
         return NextResponse.json({ events });
     } catch (error) {
         console.error('Unexpected error loading calendar events', error);
-        return NextResponse.json({ error: 'Unable to load events.' }, { status: 500 });
+        const fallbackOptions = { from: fromParam, to: toParam, userIds };
+        const events = await getFallbackCalendarEvents(session, fallbackOptions);
+        return NextResponse.json({ events }, { headers: { 'x-data-source': 'fallback' } });
     }
 }
 
@@ -95,6 +105,13 @@ export async function POST(request: NextRequest) {
 
     if (endDate <= startDate) {
         return NextResponse.json({ error: 'End time must be after the start time.' }, { status: 400 });
+    }
+
+    if (!isSupabaseConfigured()) {
+        return NextResponse.json(
+            { error: 'Calendar storage is not configured. Add Supabase credentials to enable event management.' },
+            { status: 503 }
+        );
     }
 
     const supabase = getSupabaseClient();
