@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { calendarEventUpdateSchema } from '../../../../../lib/calendar-schemas';
 import { authenticateRequest } from '../../../../../server/auth/session';
-import { getSupabaseClient } from '../../../../../utils/supabase-client';
+import { getSupabaseClient, isSupabaseConfigured } from '../../../../../utils/supabase-client';
 import { mapEvent, parseDate, startOfDay, toIsoString } from '../helpers';
 
 function normalizeTrimmed(value: unknown) {
@@ -32,6 +32,13 @@ export async function PATCH(request: NextRequest, context: unknown) {
     if (!parsed.success) {
         const message = parsed.error.issues[0]?.message ?? 'Invalid event payload.';
         return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    if (!isSupabaseConfigured()) {
+        return NextResponse.json(
+            { error: 'Calendar storage is not configured. Add Supabase credentials to enable event management.' },
+            { status: 503 }
+        );
     }
 
     const supabase = getSupabaseClient();
@@ -155,6 +162,13 @@ export async function DELETE(request: NextRequest, context: unknown) {
     const eventId = params.id;
     if (!eventId) {
         return NextResponse.json({ error: 'Event ID is required.' }, { status: 400 });
+    }
+
+    if (!isSupabaseConfigured()) {
+        return NextResponse.json(
+            { error: 'Calendar storage is not configured. Add Supabase credentials to enable event management.' },
+            { status: 503 }
+        );
     }
 
     const supabase = getSupabaseClient();

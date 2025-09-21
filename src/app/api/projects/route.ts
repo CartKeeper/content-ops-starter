@@ -10,6 +10,8 @@ import {
     type ProjectTaskInput
 } from '../../../types/project';
 import { createProject, listProjects } from '../../../server/projects';
+import { listFallbackProjects } from '../../../server/projects/fallback';
+import { isSupabaseConfigured, SupabaseAdminUnavailableError } from '../../../lib/supabase-admin';
 
 const createProjectSchema = z.object({
     project: z.object({
@@ -108,16 +110,30 @@ function parseFilters(request: NextRequest): ProjectListFilters {
 export async function GET(request: NextRequest) {
     try {
         const filters = parseFilters(request);
+        if (!isSupabaseConfigured) {
+            const fallback = await listFallbackProjects(filters);
+            return NextResponse.json(fallback);
+        }
+
         const projects = await listProjects(filters);
         return NextResponse.json(projects);
     } catch (error) {
         console.error('Failed to load projects', error);
-        return NextResponse.json({ error: 'Unable to load projects.' }, { status: 500 });
+        const filters = parseFilters(request);
+        const fallback = await listFallbackProjects(filters);
+        return NextResponse.json(fallback, { headers: { 'x-data-source': 'fallback' } });
     }
 }
 
 export async function POST(request: NextRequest) {
     try {
+        if (!isSupabaseConfigured) {
+            return NextResponse.json(
+                { error: 'Project storage is not configured. Add Supabase credentials to enable project creation.' },
+                { status: 503 }
+            );
+        }
+
         const payload = await request.json().catch(() => null);
         const parsed = createProjectSchema.safeParse(payload ?? {});
 
@@ -135,7 +151,12 @@ export async function POST(request: NextRequest) {
         const project = await createProject(sanitized);
         return NextResponse.json({ project }, { status: 201 });
     } catch (error) {
+        const status = error instanceof SupabaseAdminUnavailableError ? 503 : 500;
         console.error('Failed to create project', error);
-        return NextResponse.json({ error: 'Unable to create project.' }, { status: 500 });
+        const message =
+            status === 503
+                ? 'Project storage is not configured. Add Supabase credentials to enable project creation.'
+                : 'Unable to create project.';
+        return NextResponse.json({ error: message }, { status });
     }
 }

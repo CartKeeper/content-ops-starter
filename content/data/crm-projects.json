@@ -1,0 +1,191 @@
+{
+    "type": "CrmProjects",
+    "items": [
+        {
+            "id": "proj-sample-1",
+            "createdAt": "2025-02-01T17:00:00.000Z",
+            "updatedAt": "2025-03-12T09:45:00.000Z",
+            "title": "Evergreen HQ Refresh",
+            "clientId": "client-evergreen",
+            "clientName": "Evergreen Architects",
+            "status": "IN_PROGRESS",
+            "startDate": "2025-03-01",
+            "endDate": "2025-06-01",
+            "description": "Quarterly content retainer covering headshots, culture, and construction progress milestones.",
+            "tags": ["Retainer", "B2B"],
+            "tasks": [
+                {
+                    "id": "proj-sample-1-task-1",
+                    "projectId": "proj-sample-1",
+                    "name": "Kickoff planning workshop",
+                    "date": "2025-03-05",
+                    "location": "Studio HQ",
+                    "status": "COMPLETE",
+                    "orderIndex": 0,
+                    "completedAt": "2025-03-06T15:30:00.000Z"
+                },
+                {
+                    "id": "proj-sample-1-task-2",
+                    "projectId": "proj-sample-1",
+                    "name": "Site progress walkthrough",
+                    "date": "2025-03-16",
+                    "location": "Oakland Waterfront",
+                    "status": "CONFIRMED",
+                    "orderIndex": 1,
+                    "completedAt": null
+                },
+                {
+                    "id": "proj-sample-1-task-3",
+                    "projectId": "proj-sample-1",
+                    "name": "Executive portrait session",
+                    "date": "2025-05-29",
+                    "location": "Financial District HQ",
+                    "status": "PENDING",
+                    "orderIndex": 2,
+                    "completedAt": null
+                }
+            ],
+            "invoices": [
+                {
+                    "id": "proj-sample-1-invoice-1",
+                    "number": "1033",
+                    "amountCents": 165000,
+                    "status": "PAID",
+                    "dueAt": "2025-03-19"
+                },
+                {
+                    "id": "proj-sample-1-invoice-2",
+                    "number": "1036",
+                    "amountCents": 210000,
+                    "status": "SENT",
+                    "dueAt": "2025-05-31"
+                }
+            ],
+            "completionPercent": 42
+        },
+        {
+            "id": "proj-sample-2",
+            "createdAt": "2025-01-12T14:30:00.000Z",
+            "updatedAt": "2025-03-25T08:10:00.000Z",
+            "title": "Harrison & June Wedding",
+            "clientId": "client-harrison-june",
+            "clientName": "Harrison & June",
+            "status": "PLANNING",
+            "startDate": "2025-05-16",
+            "endDate": "2025-05-19",
+            "description": "Three-day coverage including welcome dinner, ceremony, and post-event gallery delivery.",
+            "tags": ["Wedding", "Album"],
+            "tasks": [
+                {
+                    "id": "proj-sample-2-task-1",
+                    "projectId": "proj-sample-2",
+                    "name": "Timeline confirmation",
+                    "date": "2025-04-25",
+                    "location": "Virtual call",
+                    "status": "COMPLETE",
+                    "orderIndex": 0,
+                    "completedAt": "2025-04-25T19:00:00.000Z"
+                },
+                {
+                    "id": "proj-sample-2-task-2",
+                    "projectId": "proj-sample-2",
+                    "name": "Welcome dinner coverage",
+                    "date": "2025-05-17",
+                    "location": "Terranea Resort",
+                    "status": "PENDING",
+                    "orderIndex": 1,
+                    "completedAt": null
+                },
+                {
+                    "id": "proj-sample-2-task-3",
+                    "projectId": "proj-sample-2",
+                    "name": "Wedding day storytelling",
+                    "date": "2025-05-18",
+                    "location": "Terranea Resort",
+                    "status": "PENDING",
+                    "orderIndex": 2,
+                    "completedAt": null
+                }
+            ],
+            "invoices": [
+                {
+                    "id": "proj-sample-2-invoice-1",
+                    "number": "1030",
+                    "amountCents": 520000,
+                    "status": "OVERDUE",
+                    "dueAt": "2025-05-18"
+                },
+                {
+                    "id": "proj-sample-2-invoice-2",
+                    "number": "1034",
+                    "amountCents": 180000,
+                    "status": "DRAFT",
+                    "dueAt": "2025-05-25"
+                }
+            ],
+            "completionPercent": 33
+        },
+        {
+            "id": "proj-sample-3",
+            "createdAt": "2024-12-08T11:15:00.000Z",
+            "updatedAt": "2025-03-04T16:20:00.000Z",
+            "title": "Sona Patel Brand Campaign",
+            "clientId": "client-sona-patel",
+            "clientName": "Sona Patel",
+            "status": "IN_PROGRESS",
+            "startDate": "2025-04-15",
+            "endDate": "2025-06-10",
+            "description": "Seasonal refresh for personal brand across lifestyle, product, and studio sessions.",
+            "tags": ["Brand", "Campaign"],
+            "tasks": [
+                {
+                    "id": "proj-sample-3-task-1",
+                    "projectId": "proj-sample-3",
+                    "name": "Concept moodboard",
+                    "date": "2025-04-20",
+                    "location": "Studio HQ",
+                    "status": "COMPLETE",
+                    "orderIndex": 0,
+                    "completedAt": "2025-04-21T21:15:00.000Z"
+                },
+                {
+                    "id": "proj-sample-3-task-2",
+                    "projectId": "proj-sample-3",
+                    "name": "Lifestyle capture",
+                    "date": "2025-05-21",
+                    "location": "Downtown Studio",
+                    "status": "CONFIRMED",
+                    "orderIndex": 1,
+                    "completedAt": null
+                },
+                {
+                    "id": "proj-sample-3-task-3",
+                    "projectId": "proj-sample-3",
+                    "name": "Product flat-lay refresh",
+                    "date": "2025-06-04",
+                    "location": "Mission District Loft",
+                    "status": "PENDING",
+                    "orderIndex": 2,
+                    "completedAt": null
+                }
+            ],
+            "invoices": [
+                {
+                    "id": "proj-sample-3-invoice-1",
+                    "number": "1029",
+                    "amountCents": 240000,
+                    "status": "PAID",
+                    "dueAt": "2025-04-25"
+                },
+                {
+                    "id": "proj-sample-3-invoice-2",
+                    "number": "1035",
+                    "amountCents": 275000,
+                    "status": "SENT",
+                    "dueAt": "2025-06-09"
+                }
+            ],
+            "completionPercent": 58
+        }
+    ]
+}
