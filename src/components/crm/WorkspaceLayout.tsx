@@ -143,7 +143,7 @@ type NotificationItem = {
 
 const navItems: NavItem[] = [
     { href: '/dashboard', label: 'Home', icon: SparklesIcon },
-    { href: '/calendar', label: 'Calendar', icon: CalendarIcon },
+    { href: '/studio/calendars', label: 'Calendar', icon: CalendarIcon },
     { href: '/contacts', label: 'Contacts', icon: AddressBookIcon },
     { href: '/clients', label: 'Clients', icon: UsersIcon },
     { href: '/galleries', label: 'Galleries', icon: PhotoIcon },
@@ -153,9 +153,9 @@ const navItems: NavItem[] = [
 ];
 
 const quickActions: QuickAction[] = [
-    { href: '/calendar', label: 'New booking', icon: CalendarIcon, variant: 'primary' },
-    { href: '/calendar', label: 'Quick set up', icon: CheckIcon, variant: 'outline' },
-    { href: '/calendar', label: 'Plan a shoot', icon: PhotoIcon, variant: 'primary' },
+    { href: '/studio/calendars', label: 'New booking', icon: CalendarIcon, variant: 'primary' },
+    { href: '/studio/calendars', label: 'Quick set up', icon: CheckIcon, variant: 'outline' },
+    { href: '/studio/calendars', label: 'Plan a shoot', icon: PhotoIcon, variant: 'primary' },
     { href: '/invoices', label: 'Review billing', icon: ReceiptIcon, variant: 'outline' }
 ];
 
