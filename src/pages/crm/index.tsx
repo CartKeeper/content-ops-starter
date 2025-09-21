@@ -1179,7 +1179,7 @@ function CrmDashboardWorkspace({
                                         title="Upcoming Shoots"
                                         description="Stay ready for every session with a quick view of the week ahead."
                                         action={
-                                            <Link href="/calendar" className="btn btn-sm btn-outline-primary">
+                                            <Link href="/studio/calendars" className="btn btn-sm btn-outline-primary">
                                                 Open calendar
                                             </Link>
                                         }
