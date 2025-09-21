@@ -4,23 +4,23 @@ import useSWR from 'swr';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
 
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
     DialogHeader,
-    DialogTitle,
+    DialogTitle
 } from '../../components/ui/dialog';
-import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
-
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
-import { ToolbarFilterChip, type SortOption, type ToolbarFilter } from '../../components/data/DataToolbar';
+import DataToolbar, { type SortOption, type ToolbarFilter } from '../../components/data/DataToolbar';
 import DataTable from '../../components/data/DataTable';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { LayoutShell, PageHeader } from '../../components/dashboard';
 import { formatDate } from '../../lib/formatters';
 import type { ContactRecord } from '../../types/contact';
 import { getContactName } from '../../types/contact';
@@ -61,7 +61,7 @@ const CONTACT_SORT_OPTIONS: Array<SortOption & { state: SortingState }> = [
     { id: 'created-desc', label: 'Newest first', state: [{ id: 'createdAt', desc: true }] },
     { id: 'created-asc', label: 'Oldest first', state: [{ id: 'createdAt', desc: false }] },
     { id: 'updated-desc', label: 'Recently updated', state: [{ id: 'updatedAt', desc: true }] },
-    { id: 'updated-asc', label: 'Least recently updated', state: [{ id: 'updatedAt', desc: false }] },
+    { id: 'updated-asc', label: 'Least recently updated', state: [{ id: 'updatedAt', desc: false }] }
 ];
 
 const DEFAULT_CONTACT_SORT = CONTACT_SORT_OPTIONS[0];
@@ -69,7 +69,7 @@ const DEFAULT_CONTACT_SORT = CONTACT_SORT_OPTIONS[0];
 const STAGE_FILTER_OPTIONS: ToolbarFilter['options'] = [
     { value: 'new', label: 'New' },
     { value: 'warm', label: 'Warm' },
-    { value: 'hot', label: 'Hot' },
+    { value: 'hot', label: 'Hot' }
 ];
 
 const fetcher = async <T,>(url: string): Promise<T> => {
@@ -96,7 +96,6 @@ export default function ContactsPage() {
 
 function ContactsWorkspace() {
     const [search, setSearch] = React.useState('');
-    const [searchInput, setSearchInput] = React.useState('');
     const [stageFilter, setStageFilter] = React.useState<string[]>([]);
     const [statusFilter, setStatusFilter] = React.useState<string[]>([]);
     const [ownerFilter, setOwnerFilter] = React.useState<string[]>([]);
@@ -124,29 +123,11 @@ function ContactsWorkspace() {
         data: contactsResponse,
         error: contactsError,
         isValidating: isContactsLoading,
-        mutate: mutateContacts,
+        mutate: mutateContacts
     } = useSWR<ContactsApiResponse>(queryKey, fetcher, {
         keepPreviousData: true,
-        revalidateOnFocus: false,
+        revalidateOnFocus: false
     });
-
-    React.useEffect(() => {
-        setSearchInput(search);
-    }, [search]);
-
-    React.useEffect(() => {
-        const timeout = window.setTimeout(() => {
-            if (search === searchInput) {
-                return;
-            }
-            setSearch(searchInput);
-            setPagination((previous) =>
-                previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 }
-            );
-        }, 250);
-
-        return () => window.clearTimeout(timeout);
-    }, [search, searchInput]);
 
     React.useEffect(() => {
         const match = CONTACT_SORT_OPTIONS.find((option) => option.id === sortValue);
@@ -178,7 +159,7 @@ function ContactsWorkspace() {
                 status: record.status ?? 'lead',
                 owner: ownerId ? ownerLabelMap.get(ownerId) ?? ownerId : null,
                 createdAt: record.created_at ?? null,
-                updatedAt: record.updated_at ?? null,
+                updatedAt: record.updated_at ?? null
             } satisfies ContactTableRow;
         });
     }, [contactsResponse, ownerLabelMap]);
@@ -206,64 +187,48 @@ function ContactsWorkspace() {
         return statuses.map((status) => ({ value: status, label: status.charAt(0).toUpperCase() + status.slice(1) }));
     }, [contactsResponse]);
 
-    const filters = React.useMemo<ToolbarFilter[]>(() => {
-        const entries: ToolbarFilter[] = [
-            { id: 'stage', label: 'Stage', options: STAGE_FILTER_OPTIONS, value: stageFilter, onChange: setStageFilter },
-        ];
-
-        if (statusOptions.length > 0) {
-            entries.push({ id: 'status', label: 'Status', options: statusOptions, value: statusFilter, onChange: setStatusFilter });
-        }
-
-        if (ownerOptions.length > 0) {
-            entries.push({ id: 'owner', label: 'Owner', options: ownerOptions, value: ownerFilter, onChange: setOwnerFilter });
-        }
-
-        return entries;
-    }, [ownerFilter, ownerOptions, stageFilter, statusFilter, statusOptions]);
-
     const columns = React.useMemo<ColumnDef<ContactTableRow>[]>(() => [
         {
             accessorKey: 'name',
             header: 'Contact',
             cell: ({ row }) => (
-                <div className="flex flex-col">
-                    <span className="font-semibold text-white">{row.original.name}</span>
-                    <span className="text-xs text-slate-400">
+                <div className="d-flex flex-column">
+                    <span className="fw-semibold">{row.original.name}</span>
+                    <span className="text-secondary small">
                         {row.original.email ?? 'No email'} • {row.original.phone ?? 'No phone'}
                     </span>
                 </div>
             ),
-            enableSorting: true,
+            enableSorting: true
         },
         {
             accessorKey: 'stage',
             header: 'Stage',
             cell: ({ row }) => (
-                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getStageBadge(row.original.stage)}`}>
+                <span className={`badge text-uppercase fw-semibold ${getStageBadge(row.original.stage)}`}>
                     {row.original.stage.toUpperCase()}
                 </span>
             ),
-            enableSorting: false,
+            enableSorting: false
         },
         {
             accessorKey: 'owner',
             header: 'Owner',
-            cell: ({ row }) => <span className="text-sm text-slate-300">{row.original.owner ?? 'Unassigned'}</span>,
-            enableSorting: false,
+            cell: ({ row }) => <span className="text-secondary">{row.original.owner ?? 'Unassigned'}</span>,
+            enableSorting: false
         },
         {
             accessorKey: 'createdAt',
             header: 'Created',
-            cell: ({ row }) => <span className="text-sm text-slate-300">{row.original.createdAt ? formatDate(row.original.createdAt) : '—'}</span>,
-            enableSorting: true,
+            cell: ({ row }) => <span className="text-secondary">{row.original.createdAt ? formatDate(row.original.createdAt) : '—'}</span>,
+            enableSorting: true
         },
         {
             accessorKey: 'updatedAt',
             header: 'Updated',
-            cell: ({ row }) => <span className="text-sm text-slate-300">{row.original.updatedAt ? formatDate(row.original.updatedAt) : '—'}</span>,
-            enableSorting: true,
-        },
+            cell: ({ row }) => <span className="text-secondary">{row.original.updatedAt ? formatDate(row.original.updatedAt) : '—'}</span>,
+            enableSorting: true
+        }
     ], []);
 
     React.useEffect(() => {
@@ -278,12 +243,14 @@ function ContactsWorkspace() {
         return () => window.clearTimeout(timer);
     }, [notifications]);
 
-    const hasActiveFilters = Boolean(search.trim()) || stageFilter.length > 0 || statusFilter.length > 0 || ownerFilter.length > 0;
+    const hasFilterChips = stageFilter.length > 0 || statusFilter.length > 0 || ownerFilter.length > 0;
+    const hasSearch = search.trim().length > 0;
+    const hasAnyFilters = hasFilterChips || hasSearch;
 
     const addNotification = React.useCallback((title: string, tone: ToastMessage['tone'], description?: string) => {
         setNotifications((previous) => [
             ...previous,
-            { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, title, tone, description },
+            { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, title, tone, description }
         ]);
     }, []);
 
@@ -291,7 +258,11 @@ function ContactsWorkspace() {
         (updater: SortingState | ((old: SortingState) => SortingState)) => {
             setSorting((previous) => {
                 const nextState = typeof updater === 'function' ? updater(previous) : updater;
-                const match = CONTACT_SORT_OPTIONS.find((option) => option.state.length === nextState.length && option.state.every((entry, index) => entry.id === nextState[index]?.id && entry.desc === nextState[index]?.desc));
+                const match = CONTACT_SORT_OPTIONS.find(
+                    (option) =>
+                        option.state.length === nextState.length &&
+                        option.state.every((entry, index) => entry.id === nextState[index]?.id && entry.desc === nextState[index]?.desc)
+                );
                 setSortValue(match?.id ?? DEFAULT_CONTACT_SORT.id);
                 return nextState;
             });
@@ -304,22 +275,24 @@ function ContactsWorkspace() {
         const workspaceEmpty = totalKnown === 0;
         if (workspaceEmpty) {
             return (
-                <div className="space-y-4">
-                    <p className="text-base font-semibold text-white">No contacts yet</p>
-                    <p className="text-sm text-slate-300">Start building your network.</p>
-                    <Button type="button" onClick={() => setIsDialogOpen(true)}>
-                        Add contact
-                    </Button>
+                <div className="text-center">
+                    <p className="fw-semibold mb-1">No contacts yet</p>
+                    <p className="text-secondary">Start building your network.</p>
+                    <div className="mt-3">
+                        <Button type="button" onClick={() => setIsDialogOpen(true)}>
+                            Add contact
+                        </Button>
+                    </div>
                 </div>
             );
         }
 
-        if (hasActiveFilters) {
-            return <p>No contacts match your filters.</p>;
+        if (hasAnyFilters) {
+            return <p className="mb-0">No contacts match your search or filters.</p>;
         }
 
-        return <p>No contacts found.</p>;
-    }, [contactsResponse?.meta.total, hasActiveFilters]);
+        return <p className="mb-0">No contacts found.</p>;
+    }, [contactsResponse?.meta.total, hasAnyFilters]);
 
     const handleContactCreated = React.useCallback(
         async (record: ContactRecord) => {
@@ -342,168 +315,128 @@ function ContactsWorkspace() {
         setStageFilter([]);
         setStatusFilter([]);
         setOwnerFilter([]);
-    }, [setOwnerFilter, setStageFilter, setStatusFilter]);
+        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+    }, []);
+
+    const handleSearchChange = React.useCallback((value: string) => {
+        setSearch(value);
+        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+    }, []);
+
+    const handleStageFilterChange = React.useCallback((value: string[]) => {
+        setStageFilter(value);
+        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+    }, []);
+
+    const handleStatusFilterChange = React.useCallback((value: string[]) => {
+        setStatusFilter(value);
+        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+    }, []);
+
+    const handleOwnerFilterChange = React.useCallback((value: string[]) => {
+        setOwnerFilter(value);
+        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+    }, []);
+
+    const filters = React.useMemo<ToolbarFilter[]>(() => {
+        const entries: ToolbarFilter[] = [
+            { id: 'stage', label: 'Stage', options: STAGE_FILTER_OPTIONS, value: stageFilter, onChange: handleStageFilterChange }
+        ];
+
+        if (statusOptions.length > 0) {
+            entries.push({ id: 'status', label: 'Status', options: statusOptions, value: statusFilter, onChange: handleStatusFilterChange });
+        }
+
+        if (ownerOptions.length > 0) {
+            entries.push({ id: 'owner', label: 'Owner', options: ownerOptions, value: ownerFilter, onChange: handleOwnerFilterChange });
+        }
+
+        return entries;
+    }, [handleOwnerFilterChange, handleStageFilterChange, handleStatusFilterChange, ownerOptions, stageFilter, statusFilter, statusOptions]);
 
     return (
-        <div className="w-full">
-            <div className="mx-auto w-full max-w-[1400px] px-4 pb-10 pt-6">
-                <header className="mb-4 sm:mb-6">
-                    <h1 className="text-2xl font-semibold text-white md:text-3xl">Contacts</h1>
-                    <p className="mt-1 text-sm text-slate-400">Manage your studio’s contact list.</p>
-                </header>
+        <LayoutShell>
+            <PageHeader title="Contacts" description="Manage your studio’s contact list.">
+                <Button type="button" onClick={() => setIsDialogOpen(true)}>
+                    Add contact
+                </Button>
+            </PageHeader>
 
-                <section className="rounded-2xl border border-slate-800/70 bg-slate-950/60 p-4 shadow-xl shadow-slate-950/40">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="relative min-w-[220px] flex-1">
-                            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M9 3.5a5.5 5.5 0 1 0 3.473 9.8l3.613 3.614a.75.75 0 1 0 1.06-1.061l-3.613-3.613A5.5 5.5 0 0 0 9 3.5Zm-4 5.5a4 4 0 1 1 8 0a4 4 0 0 1-8 0Z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
-                            </span>
-                            <Input
-                                type="search"
-                                value={searchInput}
-                                onChange={(event) => setSearchInput(event.target.value)}
-                                placeholder="Search contacts by name, email, or phone"
-                                aria-label="Search contacts"
-                                className="pl-9"
-                            />
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            {filters.map((filter) => (
-                                <ToolbarFilterChip key={filter.id} filter={filter} />
-                            ))}
-                            {hasActiveFilters ? (
-                                <button
-                                    type="button"
-                                    className="rounded-full border border-transparent bg-slate-800/60 px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-slate-700 hover:bg-slate-800"
-                                    onClick={handleResetFilters}
-                                >
-                                    Clear filters
-                                </button>
+            <DataToolbar
+                searchValue={search}
+                onSearchChange={handleSearchChange}
+                searchPlaceholder="Search contacts"
+                filters={filters}
+                onResetFilters={handleResetFilters}
+                hasActiveFilters={hasFilterChips}
+                sortOptions={CONTACT_SORT_OPTIONS.map(({ id, label }) => ({ id, label }))}
+                sortValue={sortValue}
+                onSortChange={setSortValue}
+                selectedCount={Object.keys(rowSelection).length}
+                pageSize={pagination.pageSize}
+                onPageSizeChange={(value) => setPagination({ pageIndex: 0, pageSize: value })}
+            />
+
+            {contactsError ? (
+                <div className="alert alert-danger mt-3" role="alert">
+                    {contactsError.message}
+                </div>
+            ) : null}
+
+            {notifications.length > 0 ? (
+                <div className="mt-3 d-flex flex-column gap-2" aria-live="polite">
+                    {notifications.map((notification) => (
+                        <div
+                            key={notification.id}
+                            className={`alert mb-0 ${notification.tone === 'success' ? 'alert-success' : 'alert-danger'}`}
+                            role="alert"
+                        >
+                            <div className="fw-semibold">{notification.title}</div>
+                            {notification.description ? (
+                                <div className="text-secondary small mt-1">{notification.description}</div>
                             ) : null}
                         </div>
-                        <Button
-                            type="button"
-                            onClick={() => setIsDialogOpen(true)}
-                            className="w-full md:ml-auto md:w-auto"
-                        >
-                            Add contact
-                        </Button>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-3 md:justify-end">
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
-                            <label htmlFor="contact-sort" className="hidden md:block">
-                                Sort by
-                            </label>
-                            <select
-                                id="contact-sort"
-                                className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                                value={sortValue}
-                                onChange={(event) => setSortValue(event.target.value)}
-                            >
-                                {CONTACT_SORT_OPTIONS.map(({ id, label }) => (
-                                    <option key={id} value={id}>
-                                        {label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
-                            Show
-                            <select
-                                className="rounded-xl border border-slate-700 bg-slate-900/80 px-2 py-1 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                                value={pagination.pageSize}
-                                onChange={(event) =>
-                                    setPagination({ pageIndex: 0, pageSize: Number.parseInt(event.target.value, 10) })
-                                }
-                            >
-                                {[10, 25, 50, 100].map((option) => (
-                                    <option key={option} value={option}>
-                                        {option}
-                                    </option>
-                                ))}
-                            </select>
-                            rows
-                        </div>
-                    </div>
-                </section>
-
-                {contactsError ? (
-                    <div className="mt-4 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">
-                        {contactsError.message}
-                    </div>
-                ) : null}
-
-                {notifications.length > 0 ? (
-                    <div aria-live="polite" className="mt-4 space-y-3">
-                        {notifications.map((notification) => (
-                            <div
-                                key={notification.id}
-                                className={`rounded-2xl border p-3 text-sm ${
-                                    notification.tone === 'success'
-                                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-                                        : 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                                }`}
-                            >
-                                <p className="font-semibold">{notification.title}</p>
-                                {notification.description ? (
-                                    <p className="mt-1 text-xs text-inherit opacity-80">{notification.description}</p>
-                                ) : null}
-                            </div>
-                        ))}
-                    </div>
-                ) : null}
-
-                <div className="mt-4">
-                    <DataTable<ContactTableRow>
-                        columns={columns}
-                        data={tableRows}
-                        sorting={sorting}
-                        onSortingChange={handleSortingChange}
-                        pagination={pagination}
-                        onPaginationChange={setPagination}
-                        rowSelection={rowSelection}
-                        onRowSelectionChange={setRowSelection}
-                        manualPagination
-                        manualSorting
-                        pageCount={pageCount}
-                        getRowId={(row) => row.id}
-                        isLoading={isContactsLoading && !contactsResponse}
-                        emptyMessage={emptyMessage}
-                    />
+                    ))}
                 </div>
+            ) : null}
 
-                <AddContactDialog
-                    open={isDialogOpen}
-                    onOpenChange={setIsDialogOpen}
-                    onSuccess={handleContactCreated}
-                    onError={handleContactError}
+            <div className="mt-3">
+                <DataTable<ContactTableRow>
+                    columns={columns}
+                    data={tableRows}
+                    sorting={sorting}
+                    onSortingChange={handleSortingChange}
+                    pagination={pagination}
+                    onPaginationChange={setPagination}
+                    rowSelection={rowSelection}
+                    onRowSelectionChange={setRowSelection}
+                    manualPagination
+                    manualSorting
+                    pageCount={pageCount}
+                    getRowId={(row) => row.id}
+                    isLoading={isContactsLoading && !contactsResponse}
+                    emptyMessage={emptyMessage}
                 />
             </div>
-        </div>
+
+            <AddContactDialog
+                open={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
+                onSuccess={handleContactCreated}
+                onError={handleContactError}
+            />
+        </LayoutShell>
     );
 }
 
+const STAGE_BADGE_VARIANTS: Record<ContactStage, string> = {
+    hot: 'bg-danger-lt text-danger',
+    warm: 'bg-warning-lt text-warning',
+    new: 'bg-primary-lt text-primary'
+};
+
 function getStageBadge(stage: ContactStage): string {
-    switch (stage) {
-        case 'hot':
-            return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
-        case 'warm':
-            return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
-        default:
-            return 'border-indigo-500/40 bg-indigo-500/10 text-indigo-200';
-    }
+    return STAGE_BADGE_VARIANTS[stage] ?? STAGE_BADGE_VARIANTS.new;
 }
 
 const addContactSchema = z.object({
@@ -518,7 +451,7 @@ const addContactSchema = z.object({
         .string()
         .trim()
         .optional()
-        .transform((value) => (value === '' ? undefined : value)),
+        .transform((value) => (value === '' ? undefined : value))
 });
 
 type AddContactFormValues = z.infer<typeof addContactSchema>;
@@ -535,10 +468,10 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
         register,
         handleSubmit,
         reset,
-        formState: { errors },
+        formState: { errors }
     } = useForm<AddContactFormValues>({
         resolver: zodResolver(addContactSchema),
-        defaultValues: { name: '', email: '', phone: '' },
+        defaultValues: { name: '', email: '', phone: '' }
     });
 
     const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -563,8 +496,8 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                 body: JSON.stringify({
                     name: values.name,
                     email: values.email,
-                    phone: values.phone,
-                }),
+                    phone: values.phone
+                })
             });
 
             const payload = (await response.json().catch(() => ({}))) as { data?: ContactRecord; error?: string };
@@ -589,110 +522,80 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                 onOpenAutoFocus={(event) => {
                     event.preventDefault();
                     if (typeof window !== 'undefined') {
-                        window.requestAnimationFrame(() => {
-                            nameInputRef.current?.focus();
-                        });
+                        window.requestAnimationFrame(() => nameInputRef.current?.focus());
                     }
                 }}
             >
-                <DialogHeader className="flex flex-row items-start justify-between gap-4">
-                    <div>
+                <form onSubmit={onSubmit} noValidate>
+                    <DialogHeader>
                         <DialogTitle>Add contact</DialogTitle>
                         <DialogDescription>Capture a new lead without leaving the table.</DialogDescription>
+                    </DialogHeader>
+                    <div className="modal-body">
+                        <div className="mb-3">
+                            <Label htmlFor="contact-name">Name</Label>
+                            <Input
+                                id="contact-name"
+                                placeholder="Jamie Rivera"
+                                className={errors.name ? 'is-invalid' : undefined}
+                                {...nameField}
+                                ref={(element) => {
+                                    nameField.ref(element);
+                                    nameInputRef.current = element;
+                                }}
+                                disabled={isSubmitting}
+                            />
+                            <FieldError message={errors.name?.message} />
+                        </div>
+                        <div className="mb-3">
+                            <Label htmlFor="contact-email">Email</Label>
+                            <Input
+                                id="contact-email"
+                                type="email"
+                                placeholder="jamie@example.com"
+                                className={errors.email ? 'is-invalid' : undefined}
+                                {...emailField}
+                                disabled={isSubmitting}
+                            />
+                            <FieldError message={errors.email?.message} />
+                        </div>
+                        <div className="mb-3">
+                            <Label htmlFor="contact-phone">Phone</Label>
+                            <Input
+                                id="contact-phone"
+                                type="tel"
+                                placeholder="(555) 010-1234"
+                                className={errors.phone ? 'is-invalid' : undefined}
+                                {...phoneField}
+                                disabled={isSubmitting}
+                            />
+                            <FieldError message={errors.phone?.message} />
+                        </div>
                     </div>
-                    <DialogClose asChild disabled={isSubmitting}>
-                        <button
-                            type="button"
-                            className="rounded-full border border-transparent bg-slate-800/80 p-2 text-slate-300 transition hover:border-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                            aria-label="Close dialog"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
-                                <path
-                                    fillRule="evenodd"
-                                    d="M5.22 5.22a.75.75 0 0 1 1.06 0L10 8.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L11.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06L8.94 10L5.22 6.28a.75.75 0 0 1 0-1.06Z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                        </button>
-                    </DialogClose>
-                </DialogHeader>
-
-                <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
-                    <div className="flex flex-col gap-1">
-                        <label htmlFor="contact-name" className="text-sm font-medium text-slate-200">
-                            Name <span className="text-rose-400">*</span>
-                        </label>
-                        <input
-                            id="contact-name"
-                            type="text"
-                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                            placeholder="Jamie Rivera"
-                            {...nameField}
-                            ref={(element) => {
-                                nameField.ref(element);
-                                nameInputRef.current = element;
-                            }}
-                            disabled={isSubmitting}
-                        />
-                        {errors.name ? <p className="text-xs text-rose-300">{errors.name.message}</p> : null}
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                        <label htmlFor="contact-email" className="text-sm font-medium text-slate-200">
-                            Email
-                        </label>
-                        <input
-                            id="contact-email"
-                            type="email"
-                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                            placeholder="jamie@example.com"
-                            {...emailField}
-                            disabled={isSubmitting}
-                        />
-                        {errors.email ? <p className="text-xs text-rose-300">{errors.email.message}</p> : null}
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                        <label htmlFor="contact-phone" className="text-sm font-medium text-slate-200">
-                            Phone
-                        </label>
-                        <input
-                            id="contact-phone"
-                            type="tel"
-                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                            placeholder="(555) 010-1234"
-                            {...phoneField}
-                            disabled={isSubmitting}
-                        />
-                        {errors.phone ? <p className="text-xs text-rose-300">{errors.phone.message}</p> : null}
-                    </div>
-
-                    <DialogFooter className="pt-2">
-                        <DialogClose asChild disabled={isSubmitting}>
-                            <button
-                                type="button"
-                                className="rounded-full border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                        </DialogClose>
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {isSubmitting ? (
-                                <span className="inline-flex items-center gap-2">
-                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />
-                                    Saving…
-                                </span>
-                            ) : (
-                                'Save contact'
-                            )}
-                        </button>
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" isLoading={isSubmitting} disabled={isSubmitting}>
+                            Save contact
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+type FieldErrorProps = { message?: string };
+
+function FieldError({ message }: FieldErrorProps) {
+    if (!message) {
+        return null;
+    }
+
+    return (
+        <div className="invalid-feedback d-block" role="alert">
+            {message}
+        </div>
     );
 }

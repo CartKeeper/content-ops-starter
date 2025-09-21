@@ -1,5 +1,6 @@
 import * as React from 'react';
 import Link from 'next/link';
+import classNames from 'classnames';
 
 type ToolbarFilterOption = {
     value: string;
@@ -88,60 +89,58 @@ export function DataToolbar({
     }, [localSearch, onSearchChange, searchValue]);
 
     return (
-        <div className="flex flex-col gap-4 rounded-2xl bg-slate-900/60 p-4 backdrop-blur">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-1 items-center gap-3">
-                    <div className="relative flex-1">
-                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                                className="h-4 w-4"
-                                aria-hidden="true"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M9 3.5a5.5 5.5 0 1 0 3.473 9.8l3.613 3.614a.75.75 0 1 0 1.06-1.061l-3.613-3.613A5.5 5.5 0 0 0 9 3.5Zm-4 5.5a4 4 0 1 1 8 0a4 4 0 0 1-8 0Z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                        </span>
-                        <input
-                            type="search"
-                            className="w-full rounded-xl border border-slate-700 bg-slate-900/80 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                            placeholder={searchPlaceholder}
-                            value={localSearch}
-                            onChange={(event) => setLocalSearch(event.target.value)}
-                            aria-label="Search"
-                        />
+        <div className="card card-stacked">
+            <div className="card-body d-flex flex-column gap-3">
+                <div className="row g-2 align-items-center">
+                    <div className="col-md">
+                        <div className="input-icon">
+                            <span className="input-icon-addon">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    className="icon"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M9 3.5a5.5 5.5 0 1 0 3.473 9.8l3.613 3.614a.75.75 0 1 0 1.06-1.061l-3.613-3.613A5.5 5.5 0 0 0 9 3.5Zm-4 5.5a4 4 0 1 1 8 0a4 4 0 0 1-8 0Z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                            </span>
+                            <input
+                                type="search"
+                                className="form-control"
+                                placeholder={searchPlaceholder}
+                                value={localSearch}
+                                onChange={(event) => setLocalSearch(event.target.value)}
+                                aria-label="Search"
+                            />
+                        </div>
                     </div>
                     {viewOptions && viewOptions.length > 0 ? (
-                        <nav aria-label="Views" className="hidden overflow-hidden rounded-full bg-slate-800/80 p-1 text-xs font-medium text-slate-400 shadow-inner md:flex">
-                            {viewOptions.map((option) => (
-                                <Link
-                                    key={option.id}
-                                    href={option.href}
-                                    className={`flex-1 rounded-full px-4 py-1.5 text-center transition ${
-                                        option.active
-                                            ? 'bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white shadow'
-                                            : 'hover:text-slate-100'
-                                    }`}
-                                >
-                                    {option.label}
-                                </Link>
-                            ))}
-                        </nav>
+                        <div className="col-auto">
+                            <div className="btn-group btn-group-sm" role="group" aria-label="View options">
+                                {viewOptions.map((option) => (
+                                    <Link
+                                        key={option.id}
+                                        href={option.href}
+                                        className={classNames('btn', option.active ? 'btn-primary' : 'btn-outline-secondary')}
+                                    >
+                                        {option.label}
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
                     ) : null}
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <label htmlFor="sort" className="hidden md:block">
+                    <div className="col-auto d-flex align-items-center gap-2">
+                        <label htmlFor="sort" className="text-secondary small mb-0">
                             Sort by
                         </label>
                         <select
                             id="sort"
-                            className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
+                            className="form-select form-select-sm"
                             value={sortValue}
                             onChange={(event) => onSortChange(event.target.value)}
                         >
@@ -153,66 +152,65 @@ export function DataToolbar({
                         </select>
                     </div>
                     {primaryAction ? (
-                        primaryAction.href ? (
-                            <Link
-                                href={primaryAction.href}
-                                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                            >
-                                {primaryAction.icon}
-                                {primaryAction.label}
-                            </Link>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={primaryAction.onClick}
-                                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:from-indigo-400 hover:via-purple-500 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                            >
-                                {primaryAction.icon}
-                                {primaryAction.label}
-                            </button>
-                        )
-                    ) : null}
-                </div>
-            </div>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                    {filters.map((filter) => (
-                        <ToolbarFilterChip key={filter.id} filter={filter} />
-                    ))}
-                    {hasActiveFilters && onResetFilters ? (
-                        <button
-                            type="button"
-                            className="rounded-full border border-transparent bg-slate-800/60 px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-slate-700 hover:bg-slate-800"
-                            onClick={onResetFilters}
-                        >
-                            Clear filters
-                        </button>
-                    ) : null}
-                </div>
-                <div className="flex flex-wrap items-center gap-3 md:justify-end">
-                    {typeof pageSize === 'number' && onPageSizeChange ? (
-                        <label className="flex items-center gap-2 text-xs text-slate-400">
-                            Show
-                            <select
-                                className="rounded-xl border border-slate-700 bg-slate-900/80 px-2 py-1 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
-                                value={pageSize}
-                                onChange={(event) => onPageSizeChange(Number.parseInt(event.target.value, 10))}
-                            >
-                                {pageSizeOptions.map((option) => (
-                                    <option key={option} value={option}>
-                                        {option}
-                                    </option>
-                                ))}
-                            </select>
-                            rows
-                        </label>
-                    ) : null}
-                    {selectedCount > 0 ? (
-                        <div className="rounded-full border border-indigo-400/40 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-200">
-                            {selectedCount} selected
+                        <div className="col-auto">
+                            {primaryAction.href ? (
+                                <Link href={primaryAction.href} className="btn btn-primary d-inline-flex align-items-center gap-2">
+                                    {primaryAction.icon}
+                                    {primaryAction.label}
+                                </Link>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={primaryAction.onClick}
+                                    className="btn btn-primary d-inline-flex align-items-center gap-2"
+                                >
+                                    {primaryAction.icon}
+                                    {primaryAction.label}
+                                </button>
+                            )}
                         </div>
                     ) : null}
-                    {bulkActions}
+                </div>
+
+                {filters.length > 0 || (hasActiveFilters && onResetFilters) ? (
+                    <div className="d-flex flex-wrap align-items-center gap-2">
+                        {filters.map((filter) => (
+                            <ToolbarFilterChip key={filter.id} filter={filter} />
+                        ))}
+                        {hasActiveFilters && onResetFilters ? (
+                            <button type="button" className="btn btn-link btn-sm text-secondary" onClick={onResetFilters}>
+                                Clear filters
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
+
+                <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div className="d-flex flex-wrap align-items-center gap-3">
+                        {typeof pageSize === 'number' && onPageSizeChange ? (
+                            <label className="d-flex align-items-center gap-2 text-secondary small mb-0">
+                                Show
+                                <select
+                                    className="form-select form-select-sm"
+                                    value={pageSize}
+                                    onChange={(event) => onPageSizeChange(Number.parseInt(event.target.value, 10))}
+                                >
+                                    {pageSizeOptions.map((option) => (
+                                        <option key={option} value={option}>
+                                            {option}
+                                        </option>
+                                    ))}
+                                </select>
+                                rows
+                            </label>
+                        ) : null}
+                        {selectedCount > 0 ? (
+                            <span className="badge bg-primary-lt text-primary text-uppercase fw-semibold">
+                                {selectedCount} selected
+                            </span>
+                        ) : null}
+                    </div>
+                    <div className="d-flex flex-wrap align-items-center gap-2">{bulkActions}</div>
                 </div>
             </div>
         </div>
@@ -255,75 +253,66 @@ export function ToolbarFilterChip({ filter }: { filter: ToolbarFilter }) {
     const activeCount = filter.value.length;
 
     return (
-        <div className="relative" ref={containerRef}>
+        <div className={classNames('dropdown', { show: open })} ref={containerRef}>
             <button
                 type="button"
-                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition ${
-                    activeCount
-                        ? 'border-indigo-400/60 bg-indigo-500/10 text-indigo-200'
-                        : 'border-slate-700 bg-slate-800/60 text-slate-200 hover:border-slate-600'
-                }`}
+                className={classNames('btn btn-sm d-inline-flex align-items-center gap-2', activeCount ? 'btn-primary' : 'btn-outline-secondary')}
                 onClick={() => setOpen((previous) => !previous)}
                 aria-haspopup="menu"
                 aria-expanded={open}
             >
                 {filter.label}
-                {activeCount ? <span className="rounded-full bg-indigo-500/40 px-1.5 py-0.5 text-[10px] text-white">{activeCount}</span> : null}
+                {activeCount ? <span className="badge bg-white text-primary">{activeCount}</span> : null}
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 20 20"
                     fill="currentColor"
-                    className="h-3 w-3"
+                    className="icon"
+                    aria-hidden="true"
                 >
                     <path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.25a.75.75 0 0 1-1.06 0L5.21 8.27a.75.75 0 0 1 .02-1.06Z" />
                 </svg>
             </button>
-            {open ? (
-                <div
-                    role="menu"
-                    className="absolute right-0 z-20 mt-2 w-60 rounded-2xl border border-slate-700 bg-slate-900/95 p-4 text-sm text-slate-100 shadow-2xl"
-                >
-                    <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
-                        <span>{filter.label}</span>
-                        <button
-                            type="button"
-                            className="text-[11px] font-medium text-indigo-300 hover:text-indigo-200"
-                            onClick={() => filter.onChange([])}
-                        >
-                            Clear
-                        </button>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                        {filter.options.map((option) => {
-                            const checked = filter.value.includes(option.value);
-                            return (
-                                <label key={option.value} className="flex items-start gap-2 rounded-xl px-2 py-2 hover:bg-slate-800/70">
-                                    <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        onChange={() => {
-                                            const next = new Set(filter.value);
-                                            if (checked) {
-                                                next.delete(option.value);
-                                            } else {
-                                                next.add(option.value);
-                                            }
-                                            filter.onChange(Array.from(next));
-                                        }}
-                                        className="mt-1 h-3.5 w-3.5 rounded border border-slate-600 bg-slate-900 text-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                                    />
-                                    <span className="flex-1 text-sm text-slate-100">
-                                        <span className="block font-medium">{option.label}</span>
-                                        {option.description ? (
-                                            <span className="mt-0.5 block text-xs text-slate-400">{option.description}</span>
-                                        ) : null}
-                                    </span>
-                                </label>
-                            );
-                        })}
-                    </div>
+            <div
+                role="menu"
+                className={classNames('dropdown-menu dropdown-menu-card dropdown-menu-end p-3', { show: open })}
+            >
+                <div className="d-flex align-items-center justify-content-between text-uppercase text-secondary small mb-2">
+                    <span>{filter.label}</span>
+                    <button type="button" className="btn btn-link btn-sm p-0" onClick={() => filter.onChange([])}>
+                        Clear
+                    </button>
                 </div>
-            ) : null}
+                <div className="d-flex flex-column gap-2">
+                    {filter.options.map((option) => {
+                        const checked = filter.value.includes(option.value);
+                        return (
+                            <label key={option.value} className="form-check d-flex align-items-start gap-2">
+                                <input
+                                    type="checkbox"
+                                    className="form-check-input mt-1"
+                                    checked={checked}
+                                    onChange={() => {
+                                        const next = new Set(filter.value);
+                                        if (checked) {
+                                            next.delete(option.value);
+                                        } else {
+                                            next.add(option.value);
+                                        }
+                                        filter.onChange(Array.from(next));
+                                    }}
+                                />
+                                <span className="form-check-label">
+                                    <span className="fw-semibold d-block">{option.label}</span>
+                                    {option.description ? (
+                                        <span className="text-secondary small d-block">{option.description}</span>
+                                    ) : null}
+                                </span>
+                            </label>
+                        );
+                    })}
+                </div>
+            </div>
         </div>
     );
 }

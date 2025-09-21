@@ -11,7 +11,7 @@ const DialogOverlay = React.forwardRef<React.ElementRef<typeof DialogPrimitive.O
     ({ className, ...props }, ref) => (
         <DialogPrimitive.Overlay
             ref={ref}
-            className={cn('fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm', className)}
+            className={cn('modal-backdrop fade show', className)}
             {...props}
         />
     )
@@ -24,13 +24,12 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
             <DialogOverlay />
             <DialogPrimitive.Content
                 ref={ref}
-                className={cn(
-                    'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-6 rounded-3xl border border-slate-800 bg-slate-950/95 p-6 text-slate-100 shadow-2xl focus:outline-none',
-                    className
-                )}
+                className="modal modal-blur fade show d-block"
                 {...props}
             >
-                {children}
+                <div className="modal-dialog modal-dialog-centered modal-lg" role="document">
+                    <div className={cn('modal-content shadow-sm', className)}>{children}</div>
+                </div>
             </DialogPrimitive.Content>
         </DialogPortal>
     )
@@ -38,16 +37,12 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex flex-col gap-1.5 text-left', className)} {...props} />
+    <div ref={ref} className={cn('modal-header', className)} {...props} />
 ));
 DialogHeader.displayName = 'DialogHeader';
 
 const DialogFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-    <div
-        ref={ref}
-        className={cn('flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4', className)}
-        {...props}
-    />
+    <div ref={ref} className={cn('modal-footer', className)} {...props} />
 ));
 DialogFooter.displayName = 'DialogFooter';
 
@@ -55,7 +50,7 @@ const DialogTitle = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Tit
     ({ className, ...props }, ref) => (
         <DialogPrimitive.Title
             ref={ref}
-            className={cn('text-xl font-semibold leading-tight text-white', className)}
+            className={cn('modal-title', className)}
             {...props}
         />
     )
@@ -66,7 +61,7 @@ const DialogDescription = React.forwardRef<React.ElementRef<typeof DialogPrimiti
     ({ className, ...props }, ref) => (
         <DialogPrimitive.Description
             ref={ref}
-            className={cn('text-sm text-slate-400', className)}
+            className={cn('text-secondary', className)}
             {...props}
         />
     )

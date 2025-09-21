@@ -13,7 +13,7 @@ const DrawerOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <DialogPrimitive.Overlay
         ref={ref}
-        className={cn('fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm', className)}
+        className={cn('offcanvas-backdrop fade show', className)}
         {...props}
     />
 ));
@@ -27,25 +27,22 @@ const DrawerContent = React.forwardRef<
         <DrawerOverlay />
         <DialogPrimitive.Content
             ref={ref}
-            className={cn(
-                'fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col gap-6 overflow-y-auto border-l border-slate-800 bg-slate-950/95 p-6 text-slate-100 shadow-2xl focus:outline-none',
-                className
-            )}
+            className={cn('offcanvas offcanvas-end show', className)}
             {...props}
         >
-            {children}
+            <div className="offcanvas-body d-flex flex-column gap-4">{children}</div>
         </DialogPrimitive.Content>
     </DrawerPortal>
 ));
 DrawerContent.displayName = DialogPrimitive.Content.displayName;
 
 const DrawerHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex flex-col gap-1.5 text-left', className)} {...props} />
+    <div ref={ref} className={cn('offcanvas-header', className)} {...props} />
 ));
 DrawerHeader.displayName = 'DrawerHeader';
 
 const DrawerFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('mt-auto flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-4', className)} {...props} />
+    <div ref={ref} className={cn('offcanvas-footer border-top pt-3 d-flex gap-2 justify-content-end', className)} {...props} />
 ));
 DrawerFooter.displayName = 'DrawerFooter';
 
@@ -53,7 +50,7 @@ const DrawerTitle = React.forwardRef<
     React.ElementRef<typeof DialogPrimitive.Title>,
     React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
-    <DialogPrimitive.Title ref={ref} className={cn('text-xl font-semibold leading-tight text-white', className)} {...props} />
+    <DialogPrimitive.Title ref={ref} className={cn('offcanvas-title h4 mb-0', className)} {...props} />
 ));
 DrawerTitle.displayName = DialogPrimitive.Title.displayName;
 
@@ -61,7 +58,7 @@ const DrawerDescription = React.forwardRef<
     React.ElementRef<typeof DialogPrimitive.Description>,
     React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
-    <DialogPrimitive.Description ref={ref} className={cn('text-sm text-slate-400', className)} {...props} />
+    <DialogPrimitive.Description ref={ref} className={cn('text-secondary', className)} {...props} />
 ));
 DrawerDescription.displayName = DialogPrimitive.Description.displayName;
 

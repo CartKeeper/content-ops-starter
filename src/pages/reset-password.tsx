@@ -3,6 +3,9 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 
 import { useNetlifyIdentity } from '../components/auth';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 
 export default function ResetPasswordPage() {
     const identity = useNetlifyIdentity();
@@ -78,64 +81,45 @@ export default function ResetPasswordPage() {
             <Head>
                 <title>Reset password • Studio CRM</title>
             </Head>
-            <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-16 text-slate-100">
-                <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/80 p-10 shadow-2xl backdrop-blur">
-                    <div className="mb-8 text-center">
-                        <p className="text-xs font-semibold uppercase tracking-[0.48em] text-[#4DE5FF]">Secure access</p>
-                        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">Set a new password</h1>
-                        <p className="mt-2 text-sm text-slate-300">
-                            Choose a strong password to keep your workspace secure.
-                        </p>
+            <div className="page page-center">
+                <div className="container-tight py-4">
+                    <div className="card card-md">
+                        <div className="card-body">
+                            <h1 className="card-title">Set a new password</h1>
+                            <p className="text-secondary mb-4">Choose a strong password to keep your workspace secure.</p>
+                            <form onSubmit={handleSubmit} className="space-y-3">
+                                <div className="mb-3">
+                                    <Label htmlFor="password">New password</Label>
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        autoComplete="new-password"
+                                        required
+                                        value={password}
+                                        onChange={(event) => setPassword(event.target.value)}
+                                        placeholder="Minimum 8 characters"
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <Label htmlFor="confirmPassword">Confirm password</Label>
+                                    <Input
+                                        id="confirmPassword"
+                                        type="password"
+                                        autoComplete="new-password"
+                                        required
+                                        value={confirmPassword}
+                                        onChange={(event) => setConfirmPassword(event.target.value)}
+                                        placeholder="Re-enter your password"
+                                    />
+                                </div>
+                                {error ? <div className="alert alert-danger">{error}</div> : null}
+                                {message ? <div className="alert alert-success">{message}</div> : null}
+                                <Button type="submit" className="w-100" isLoading={submitting}>
+                                    {submitting ? 'Updating password…' : 'Update password'}
+                                </Button>
+                            </form>
+                        </div>
                     </div>
-                    <form className="space-y-6" onSubmit={handleSubmit}>
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-slate-200">
-                                New password
-                            </label>
-                            <input
-                                id="password"
-                                type="password"
-                                autoComplete="new-password"
-                                required
-                                value={password}
-                                onChange={(event) => setPassword(event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                placeholder="Minimum 8 characters"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-200">
-                                Confirm password
-                            </label>
-                            <input
-                                id="confirmPassword"
-                                type="password"
-                                autoComplete="new-password"
-                                required
-                                value={confirmPassword}
-                                onChange={(event) => setConfirmPassword(event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                placeholder="Re-enter your password"
-                            />
-                        </div>
-                        {error ? (
-                            <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                                {error}
-                            </p>
-                        ) : null}
-                        {message ? (
-                            <p className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                                {message}
-                            </p>
-                        ) : null}
-                        <button
-                            type="submit"
-                            className="flex w-full items-center justify-center rounded-xl bg-[#4DE5FF] px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-[#86f0ff]"
-                            disabled={submitting}
-                        >
-                            {submitting ? 'Updating password…' : 'Update password'}
-                        </button>
-                    </form>
                 </div>
             </div>
         </>
