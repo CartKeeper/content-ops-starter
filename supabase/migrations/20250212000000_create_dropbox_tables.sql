@@ -54,21 +54,6 @@ create table if not exists public.gallery_publications (
 
 create index if not exists gallery_publications_gallery_idx on public.gallery_publications (gallery_id);
 
-create table if not exists public.zapier_webhook_events (
-    id uuid primary key default uuid_generate_v4(),
-    zap_id text,
-    event_type text,
-    status text not null default 'received' check (status in ('received', 'processed', 'failed')),
-    payload jsonb,
-    headers jsonb,
-    received_at timestamptz not null default timezone('utc', now()),
-    processed_at timestamptz,
-    error_message text
-);
-
-create index if not exists zapier_webhook_events_event_idx on public.zapier_webhook_events (event_type);
-create index if not exists zapier_webhook_events_received_idx on public.zapier_webhook_events (received_at desc);
-
 alter table public.galleries
     add column if not exists deliver_by timestamptz,
     add column if not exists expires_at timestamptz,
