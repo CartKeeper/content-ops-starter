@@ -514,7 +514,7 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
                             <PermissionToggle
                                 id="create-can-manage-integrations"
                                 label="Manage integrations"
-                                description="Connect and disconnect integrations like Dropbox or Zapier."
+                                description="Connect and disconnect integrations like Dropbox."
                                 checked={creation.permissions.canManageIntegrations}
                                 onChange={handleCreationPermissionToggle('canManageIntegrations')}
                                 disabled={creation.role === 'restricted'}
@@ -673,7 +673,7 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
                                 <PermissionToggle
                                     id="edit-can-manage-integrations"
                                     label="Manage integrations"
-                                    description="Connect and disconnect integrations like Dropbox or Zapier."
+                                    description="Connect and disconnect integrations like Dropbox."
                                     checked={editForm.permissions.canManageIntegrations}
                                     onChange={handleEditPermissionToggle('canManageIntegrations')}
                                     disabled={editForm.role === 'restricted'}

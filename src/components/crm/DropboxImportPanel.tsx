@@ -159,7 +159,6 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
     const [resultMessage, setResultMessage] = React.useState<string | null>(null);
     const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
     const [folderPath, setFolderPath] = React.useState('');
-    const [triggerZapier, setTriggerZapier] = React.useState(true);
     const [folderEntries, setFolderEntries] = React.useState<DropboxFileMetadata[]>([]);
     const [selectedAssetIds, setSelectedAssetIds] = React.useState<Set<string>>(() => new Set());
 
@@ -304,13 +303,12 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                     galleryId: selectedGalleryId,
                     galleryName: selectedGallery?.label,
                     clientName: selectedGallery?.clientName,
-                    triggerZapier,
                     selection: files
                 },
                 { requestedCount: undefined }
             );
         },
-        [executeImport, selectedGallery, selectedGalleryId, triggerZapier]
+        [executeImport, selectedGallery, selectedGalleryId]
     );
 
     const handleImport = React.useCallback(async () => {
@@ -344,7 +342,6 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                 galleryName: selectedGallery?.label,
                 clientName: selectedGallery?.clientName,
                 folderPath: fallbackFolder,
-                triggerZapier,
                 assets
             },
             { requestedCount: selectedAssets.length }
@@ -355,8 +352,7 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
         folderPath,
         selectedAssetIds,
         selectedGallery,
-        selectedGalleryId,
-        triggerZapier
+        selectedGalleryId
     ]);
 
     const allSelected = folderEntries.length > 0 && selectedAssetIds.size === folderEntries.length;
@@ -399,15 +395,6 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                     >
                         {loadingFolder ? 'Loading…' : 'Preview folder'}
                     </button>
-                    <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                        <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-slate-300 text-[#4DE5FF] focus:ring-[#4DE5FF] dark:border-slate-600"
-                            checked={triggerZapier}
-                            onChange={(event) => setTriggerZapier(event.target.checked)}
-                        />
-                        Trigger Zapier webhook for new imports
-                    </label>
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                     Preview Dropbox folders through the authenticated API, select the files you need, or launch the Dropbox chooser to import files and entire folders directly into the
@@ -500,7 +487,6 @@ export function DropboxImportPanel({ galleries, onImportComplete }: DropboxImpor
                         <li>Use the Dropbox chooser to import files or entire folders without copying paths manually.</li>
                         <li>Use refresh-token credentials (`DROPBOX_APP_SECRET`, `DROPBOX_REFRESH_TOKEN`) to keep imports private.</li>
                         <li>Preview folders before importing to confirm Dropbox automations delivered the right files.</li>
-                        <li>Zapier events include resolved metadata, making downstream notifications and audits accurate.</li>
                     </ul>
                 </div>
             </div>
