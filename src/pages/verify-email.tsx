@@ -2,6 +2,8 @@ import * as React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
+import { Button } from '../components/ui/button';
+
 export default function VerifyEmailPage() {
     const router = useRouter();
     const { token } = router.query;
@@ -45,22 +47,23 @@ export default function VerifyEmailPage() {
             <Head>
                 <title>Email verification • Studio CRM</title>
             </Head>
-            <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-16 text-slate-100">
-                <div className="w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-900/80 p-10 text-center shadow-2xl backdrop-blur">
-                    <p className="text-xs font-semibold uppercase tracking-[0.48em] text-[#4DE5FF]">Email Verification</p>
-                    <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">
-                        {status === 'success' ? 'You are verified' : status === 'error' ? 'Verification issue' : 'Checking your link'}
-                    </h1>
-                    <p className="mt-4 text-sm text-slate-300">{message}</p>
-                    {status === 'success' ? (
-                        <button
-                            type="button"
-                            onClick={() => router.push('/login')}
-                            className="mt-8 inline-flex items-center justify-center rounded-xl bg-[#4DE5FF] px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-[#86f0ff]"
-                        >
-                            Go to sign in
-                        </button>
-                    ) : null}
+            <div className="page page-center">
+                <div className="container-tight py-4">
+                    <div className="card card-md text-center">
+                        <div className="card-body">
+                            <h1 className="card-title">
+                                {status === 'success' ? 'You are verified' : status === 'error' ? 'Verification issue' : 'Checking your link'}
+                            </h1>
+                            <p className="text-secondary">{message}</p>
+                            {status === 'success' ? (
+                                <div className="mt-4">
+                                    <Button type="button" onClick={() => router.push('/login')}>
+                                        Go to sign in
+                                    </Button>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
                 </div>
             </div>
         </>

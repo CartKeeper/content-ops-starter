@@ -11,6 +11,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle
 } from '../../components/ui/dialog';
@@ -204,34 +205,42 @@ function ClientsWorkspace() {
     }, []);
 
     return (
-        <div className="flex flex-col gap-6">
-            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard
-                    label="Active clients"
-                    value={String(metricsData?.activeCount ?? 0)}
-                    helper="Status set to Active"
-                />
-                <KpiCard
-                    label="Outstanding balance"
-                    value={formatCurrency(metricsData?.outstandingCents ?? 0)}
-                    helper="Across all clients"
-                />
-                <KpiCard
-                    label="Upcoming shoots"
-                    value={String(metricsData?.upcomingCount60d ?? 0)}
-                    helper="Next 60 days"
-                />
-                <KpiCard
-                    label="Portal ready"
-                    value={String(metricsData?.portalReadyCount ?? 0)}
-                    helper="Client portal enabled"
-                />
-            </section>
+        <div className="d-flex flex-column gap-4 pb-5">
+            <div className="row row-cards">
+                <div className="col-sm-6 col-lg-3">
+                    <KpiCard
+                        label="Active clients"
+                        value={String(metricsData?.activeCount ?? 0)}
+                        helper="Status set to Active"
+                    />
+                </div>
+                <div className="col-sm-6 col-lg-3">
+                    <KpiCard
+                        label="Outstanding balance"
+                        value={formatCurrency(metricsData?.outstandingCents ?? 0)}
+                        helper="Across all clients"
+                    />
+                </div>
+                <div className="col-sm-6 col-lg-3">
+                    <KpiCard
+                        label="Upcoming shoots"
+                        value={String(metricsData?.upcomingCount60d ?? 0)}
+                        helper="Next 60 days"
+                    />
+                </div>
+                <div className="col-sm-6 col-lg-3">
+                    <KpiCard
+                        label="Portal ready"
+                        value={String(metricsData?.portalReadyCount ?? 0)}
+                        helper="Client portal enabled"
+                    />
+                </div>
+            </div>
 
-            <section className="flex flex-col gap-4 rounded-3xl border border-slate-800/70 bg-slate-950/60 p-6 shadow-xl shadow-slate-950/50">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                    <div className="flex flex-1 flex-wrap items-center gap-3">
-                        <div className="relative min-w-[220px] flex-1">
+            <div className="card card-stacked">
+                <div className="card-body d-flex flex-column gap-3">
+                    <div className="row g-3 align-items-end">
+                        <div className="col-md">
                             <Input
                                 type="search"
                                 value={search}
@@ -240,8 +249,8 @@ function ClientsWorkspace() {
                                 aria-label="Search clients"
                             />
                         </div>
-                        <div className="flex min-w-[150px] flex-col gap-1 text-xs text-slate-400">
-                            <span>Status</span>
+                        <div className="col-sm-6 col-md-3">
+                            <Label>Status</Label>
                             <Select
                                 value={statusFilter}
                                 onChange={(event) => setStatusFilter(event.target.value as ClientStatus | 'All')}
@@ -255,8 +264,8 @@ function ClientsWorkspace() {
                                 ))}
                             </Select>
                         </div>
-                        <div className="flex min-w-[180px] flex-col gap-1 text-xs text-slate-400">
-                            <span>Sort</span>
+                        <div className="col-sm-6 col-md-3">
+                            <Label>Sort</Label>
                             <Select
                                 value={sort}
                                 onChange={(event) => setSort(event.target.value as SortOptionId)}
@@ -269,24 +278,26 @@ function ClientsWorkspace() {
                                 ))}
                             </Select>
                         </div>
+                        <div className="col-12 col-md-auto ms-auto">
+                            <Button type="button" onClick={() => setDialogOpen(true)}>
+                                Add client
+                            </Button>
+                        </div>
                     </div>
-                    <Button type="button" className="w-full md:ml-auto md:w-auto" onClick={() => setDialogOpen(true)}>
-                        Add client
-                    </Button>
+
+                    {clientsError ? (
+                        <div className="alert alert-danger" role="status">
+                            {clientsError.message}
+                        </div>
+                    ) : null}
+
+                    {showEmptyState ? (
+                        <EmptyState onAddClient={() => setDialogOpen(true)} />
+                    ) : (
+                        <ClientsTable clients={clients} isLoading={isLoadingClients} />
+                    )}
                 </div>
-
-                {clientsError ? (
-                    <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-200">
-                        {clientsError.message}
-                    </div>
-                ) : null}
-
-                {showEmptyState ? (
-                    <EmptyState onAddClient={() => setDialogOpen(true)} />
-                ) : (
-                    <ClientsTable clients={clients} isLoading={isLoadingClients} />
-                )}
-            </section>
+            </div>
 
             <AddClientDialog
                 open={isDialogOpen}
@@ -404,70 +415,101 @@ function AddClientDialog({ open, onOpenChange, onCreated, onError }: AddClientDi
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-xl">
-                <DialogHeader>
-                    <DialogTitle>Add client</DialogTitle>
-                    <DialogDescription>Capture the essentials so you can schedule shoots and share portals later.</DialogDescription>
-                </DialogHeader>
-                <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-                    <div className="space-y-2">
-                        <Label htmlFor="client-name">Name</Label>
-                        <Input id="client-name" placeholder="Client name" {...register('name')} aria-invalid={Boolean(errors.name)} />
-                        {errors.name ? <FieldError message={errors.name.message} /> : null}
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="client-email">Email</Label>
-                            <Input id="client-email" type="email" placeholder="name@example.com" {...register('email')} aria-invalid={Boolean(errors.email)} />
-                            {errors.email ? <FieldError message={errors.email.message} /> : null}
+            <DialogContent>
+                <form onSubmit={onSubmit} noValidate>
+                    <DialogHeader>
+                        <DialogTitle>Add client</DialogTitle>
+                        <DialogDescription>
+                            Capture the essentials so you can schedule shoots and share portals later.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="modal-body">
+                        <div className="mb-3">
+                            <Label htmlFor="client-name">Name</Label>
+                            <Input
+                                id="client-name"
+                                placeholder="Client name"
+                                className={errors.name ? 'is-invalid' : undefined}
+                                {...register('name')}
+                            />
+                            <FieldError message={errors.name?.message} />
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="client-phone">Phone</Label>
-                            <Input id="client-phone" placeholder="(555) 555-5555" {...register('phone')} aria-invalid={Boolean(errors.phone)} />
-                            {errors.phone ? <FieldError message={errors.phone.message} /> : null}
+                        <div className="row g-3">
+                            <div className="col-md-6">
+                                <Label htmlFor="client-email">Email</Label>
+                                <Input
+                                    id="client-email"
+                                    type="email"
+                                    placeholder="name@example.com"
+                                    className={errors.email ? 'is-invalid' : undefined}
+                                    {...register('email')}
+                                />
+                                <FieldError message={errors.email?.message} />
+                            </div>
+                            <div className="col-md-6">
+                                <Label htmlFor="client-phone">Phone</Label>
+                                <Input
+                                    id="client-phone"
+                                    placeholder="(555) 555-5555"
+                                    className={errors.phone ? 'is-invalid' : undefined}
+                                    {...register('phone')}
+                                />
+                                <FieldError message={errors.phone?.message} />
+                            </div>
                         </div>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="client-status">Status</Label>
-                            <Select id="client-status" {...register('status')} aria-invalid={Boolean(errors.status)}>
-                                {STATUS_OPTIONS.map((status) => (
-                                    <option key={status} value={status}>
-                                        {status}
-                                    </option>
-                                ))}
-                            </Select>
-                            {errors.status ? <FieldError message={errors.status.message} /> : null}
+                        <div className="row g-3 mt-1">
+                            <div className="col-md-6">
+                                <Label htmlFor="client-status">Status</Label>
+                                <Select
+                                    id="client-status"
+                                    className={errors.status ? 'is-invalid' : undefined}
+                                    {...register('status')}
+                                >
+                                    {STATUS_OPTIONS.map((status) => (
+                                        <option key={status} value={status}>
+                                            {status}
+                                        </option>
+                                    ))}
+                                </Select>
+                                <FieldError message={errors.status?.message} />
+                            </div>
+                            <div className="col-md-6">
+                                <Label htmlFor="client-upcoming">Upcoming shoot</Label>
+                                <Input
+                                    id="client-upcoming"
+                                    type="date"
+                                    className={errors.upcoming_shoot ? 'is-invalid' : undefined}
+                                    {...register('upcoming_shoot')}
+                                />
+                                <FieldError message={errors.upcoming_shoot?.message} />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="client-upcoming">Upcoming shoot</Label>
-                            <Input id="client-upcoming" type="date" {...register('upcoming_shoot')} aria-invalid={Boolean(errors.upcoming_shoot)} />
-                            {errors.upcoming_shoot ? <FieldError message={errors.upcoming_shoot.message} /> : null}
+                        <div className="mb-3 mt-3">
+                            <Label htmlFor="client-tags">Tags</Label>
+                            <Textarea
+                                id="client-tags"
+                                placeholder="wedding, vip, retainer"
+                                rows={2}
+                                className={errors.tags ? 'is-invalid' : undefined}
+                                {...register('tags')}
+                            />
+                            <div className="form-text">Separate tags with commas to group clients later.</div>
+                            <FieldError message={errors.tags?.message} />
                         </div>
+                        {serverError ? (
+                            <div className="alert alert-danger" role="alert">
+                                {serverError}
+                            </div>
+                        ) : null}
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="client-tags">Tags</Label>
-                        <Textarea
-                            id="client-tags"
-                            placeholder="wedding, vip, retainer"
-                            rows={2}
-                            {...register('tags')}
-                            aria-invalid={Boolean(errors.tags)}
-                        />
-                        <p className="text-xs text-slate-400">Separate tags with commas to group clients later.</p>
-                        {errors.tags ? <FieldError message={errors.tags.message} /> : null}
-                    </div>
-                    {serverError ? (
-                        <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{serverError}</div>
-                    ) : null}
-                    <div className="flex justify-end gap-3 pt-2">
+                    <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
                         <Button type="submit" isLoading={isSubmitting}>
                             Save client
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -482,35 +524,36 @@ type ClientsTableProps = {
 function ClientsTable({ clients, isLoading }: ClientsTableProps) {
     if (isLoading) {
         return (
-            <div className="flex h-32 items-center justify-center rounded-2xl border border-slate-800/70 bg-slate-950/80 text-sm text-slate-300">
-                Loading clients…
+            <div className="text-center text-secondary py-5">
+                <div className="spinner-border text-primary mb-2" role="status" aria-hidden />
+                <div>Loading clients…</div>
             </div>
         );
     }
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/80 shadow-inner">
-            <table className="min-w-full divide-y divide-slate-800 text-sm">
-                <thead className="bg-slate-950/80">
+        <div className="table-responsive">
+            <table className="table card-table table-vcenter">
+                <thead>
                     <tr>
                         <TableHeaderCell>Name</TableHeaderCell>
                         <TableHeaderCell>Status</TableHeaderCell>
                         <TableHeaderCell>Email</TableHeaderCell>
                         <TableHeaderCell>Phone</TableHeaderCell>
-                        <TableHeaderCell className="text-right">Outstanding</TableHeaderCell>
+                        <TableHeaderCell className="text-end">Outstanding</TableHeaderCell>
                         <TableHeaderCell>Upcoming shoot</TableHeaderCell>
                         <TableHeaderCell>Portal ready</TableHeaderCell>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-900/80">
+                <tbody>
                     {clients.map((client) => {
                         const portalReady = client.portal_enabled || Boolean(client.portal_url);
                         return (
-                            <tr key={client.id} className="bg-slate-950/60 hover:bg-slate-900/60">
+                            <tr key={client.id}>
                                 <TableCell>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-semibold text-white">{client.name}</span>
-                                        <span className="text-xs text-slate-400">Last updated {formatDate(client.updated_at)}</span>
+                                    <div className="d-flex flex-column">
+                                        <span className="fw-semibold">{client.name}</span>
+                                        <span className="text-secondary small">Last updated {formatDate(client.updated_at)}</span>
                                     </div>
                                 </TableCell>
                                 <TableCell>
@@ -518,7 +561,7 @@ function ClientsTable({ clients, isLoading }: ClientsTableProps) {
                                 </TableCell>
                                 <TableCell>{client.email ?? '—'}</TableCell>
                                 <TableCell>{client.phone ?? '—'}</TableCell>
-                                <TableCell className="text-right font-semibold text-white">
+                                <TableCell className="text-end fw-semibold">
                                     {formatCurrency(client.outstanding_cents)}
                                 </TableCell>
                                 <TableCell>{formatDate(client.upcoming_shoot)}</TableCell>
@@ -546,10 +589,12 @@ type KpiCardProps = {
 
 function KpiCard({ label, value, helper }: KpiCardProps) {
     return (
-        <div className="flex h-28 flex-col justify-center rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 shadow-xl shadow-slate-950/50">
-            <span className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">{label}</span>
-            <span className="mt-3 text-3xl font-semibold leading-none text-white">{value}</span>
-            <span className="mt-2 text-xs text-slate-500">{helper}</span>
+        <div className="card card-stacked h-100">
+            <div className="card-body">
+                <div className="text-uppercase text-secondary small fw-semibold">{label}</div>
+                <div className="h2 mt-2 mb-2">{value}</div>
+                <div className="text-secondary small">{helper}</div>
+            </div>
         </div>
     );
 }
@@ -560,14 +605,18 @@ type EmptyStateProps = {
 
 function EmptyState({ onAddClient }: EmptyStateProps) {
     return (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-slate-800/70 bg-slate-950/80 px-10 py-16 text-center text-slate-300">
-            <p className="text-lg font-semibold text-white">No clients yet</p>
-            <p className="max-w-md text-sm text-slate-400">
-                When you add your first client they will appear here with shoot dates, portal access, and balance tracking.
-            </p>
-            <Button type="button" onClick={onAddClient}>
-                Add client
-            </Button>
+        <div className="card card-stacked">
+            <div className="card-body text-center">
+                <p className="h4">No clients yet</p>
+                <p className="text-secondary">
+                    When you add your first client they will appear here with shoot dates, portal access, and balance tracking.
+                </p>
+                <div className="mt-3">
+                    <Button type="button" onClick={onAddClient}>
+                        Add client
+                    </Button>
+                </div>
+            </div>
         </div>
     );
 }
@@ -582,15 +631,9 @@ function Toast({ toast }: ToastProps) {
     }
 
     return (
-        <div className="pointer-events-none fixed bottom-6 right-6 z-50">
-            <div
-                className={`pointer-events-auto rounded-2xl border px-4 py-3 text-sm shadow-lg ${
-                    toast.variant === 'success'
-                        ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100'
-                        : 'border-rose-400/50 bg-rose-500/15 text-rose-100'
-                }`}
-            >
-                {toast.message}
+        <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 1050 }}>
+            <div className={`toast show text-white ${toast.variant === 'success' ? 'bg-success' : 'bg-danger'}`} role="status">
+                <div className="toast-body">{toast.message}</div>
             </div>
         </div>
     );
@@ -601,15 +644,12 @@ type TableCellProps = React.TdHTMLAttributes<HTMLTableCellElement>;
 type TableHeaderCellProps = React.ThHTMLAttributes<HTMLTableCellElement>;
 
 function TableCell({ className, ...props }: TableCellProps) {
-    return <td className={`px-6 py-4 text-sm text-slate-200 ${className ?? ''}`} {...props} />;
+    return <td className={`align-middle ${className ?? ''}`} {...props} />;
 }
 
 function TableHeaderCell({ className, ...props }: TableHeaderCellProps) {
     return (
-        <th
-            className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 ${className ?? ''}`}
-            {...props}
-        />
+        <th className={`text-uppercase text-secondary small fw-semibold ${className ?? ''}`} {...props} />
     );
 }
 
@@ -630,5 +670,9 @@ function FieldError({ message }: FieldErrorProps) {
     if (!message) {
         return null;
     }
-    return <p className="text-xs text-rose-300">{message}</p>;
+    return (
+        <div className="invalid-feedback d-block" role="alert">
+            {message}
+        </div>
+    );
 }

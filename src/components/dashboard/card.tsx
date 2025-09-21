@@ -9,13 +9,8 @@ type CardProps = {
 
 export function DashboardCard({ children, className }: CardProps) {
     return (
-        <div
-            className={cn(
-                'flex h-full flex-col rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 shadow-xl shadow-slate-950/40',
-                className
-            )}
-        >
-            {children}
+        <div className={cn('card card-stacked h-100', className)}>
+            <div className="card-body">{children}</div>
         </div>
     );
 }

@@ -10,13 +10,17 @@ type ProgressProps = {
 export function Progress({ value, className }: ProgressProps) {
     const clamped = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
     return (
-        <div className={cn('h-2 w-full rounded-full bg-slate-800/80', className)}>
+        <div className={cn('progress', className)}>
             <div
-                className="h-full rounded-full bg-indigo-500 transition-all"
+                className="progress-bar"
+                role="progressbar"
                 style={{ width: `${clamped}%` }}
-                aria-hidden
-            />
-            <span className="sr-only">{clamped}% complete</span>
+                aria-valuenow={clamped}
+                aria-valuemin={0}
+                aria-valuemax={100}
+            >
+                <span className="visually-hidden">{clamped}% complete</span>
+            </div>
         </div>
     );
 }
