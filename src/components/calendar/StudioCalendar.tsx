@@ -541,12 +541,18 @@ function StudioCalendarContent() {
         openCreateDialog({ start, end, allDay: false });
     }, [currentUserId, openCreateDialog]);
 
-    const calendarApiRef = React.useCallback((instance: any) => {
-        if (instance) {
-            const api = instance.getApi();
-            handleCalendarReady(api);
-        }
-    }, [handleCalendarReady]);
+    const calendarApiRef = React.useCallback(
+        (instance: any) => {
+            if (instance) {
+                const api = typeof instance.getApi === 'function' ? instance.getApi() : instance;
+                calendarRef.current = api;
+                handleCalendarReady(api);
+            } else {
+                calendarRef.current = null;
+            }
+        },
+        [handleCalendarReady]
+    );
 
     const changeView = React.useCallback((view: typeof currentView) => {
         const calendar = calendarRef.current;
