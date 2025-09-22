@@ -110,6 +110,8 @@ The CRM API routes under `src/pages/api/` rely on [Supabase](https://supabase.co
 
 These API routes return JSON responses for GET, POST, PUT, and DELETE requests, so they can be consumed directly from front-end forms or integrations.
 
+When preparing CSVs for Supabase imports (for example, bulk-loading contacts or clients), set the `owner_user_id` column to a value from `public.users.id`. Leave the field blank if the record should be unassigned so the import stores a `NULL` owner.
+
 ### Galleries automation with Dropbox
 
 The galleries dashboard now includes an authenticated Dropbox workflow so asset imports are trackable end-to-end without exposing access tokens to the browser.
