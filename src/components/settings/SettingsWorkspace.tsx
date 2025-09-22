@@ -1,11 +1,18 @@
 'use client';
 
 import * as React from 'react';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { FormProvider, useForm } from 'react-hook-form';
 
 import { useNetlifyIdentity } from '../auth';
 import { CrmAuthGuard, WorkspaceLayout } from '../crm';
 import { useIntegrations, type IntegrationStatus } from '../crm/integration-context';
 import { INTEGRATION_CATEGORIES } from '../../data/integrations';
+import { FieldGrid } from '../forms/FieldGrid';
+import { FieldWrapper } from '../forms/FieldWrapper';
+import { FormSectionCard } from '../forms/SectionCard';
+import { Select, TextInput, Textarea } from '../forms/inputs';
 import { UserManagementPanel } from './UserManagementPanel';
 import type { UserProfile } from '../../types/user';
 import { SettingsTabs } from './SettingsTabs';
@@ -43,33 +50,12 @@ const DEFAULT_WELCOME_MESSAGE =
 
 const AVATAR_PLACEHOLDER = '/images/avatar1.svg';
 
-type ProfileFormState = {
-    name: string;
-    email: string;
-    roleTitle: string;
-    phone: string;
-    welcomeMessage: string;
-    avatarUrl: string;
-};
-
 type NoticeState = {
     type: 'success' | 'error' | 'info';
     message: string;
 };
 
 type EmailConnectionStatus = 'connected' | 'disconnected';
-
-type EmailSettingsFormState = {
-    provider: string;
-    fromName: string;
-    fromEmail: string;
-    replyTo: string;
-    smtpHost: string;
-    smtpPort: string;
-    encryption: 'none' | 'ssl' | 'tls';
-    username: string;
-    password: string;
-};
 
 type SettingsWorkspaceProps = {
     activeSection: SettingsSection;
@@ -86,7 +72,57 @@ const SECTION_TITLES: Record<SettingsSection, string> = SETTINGS_TABS.reduce(
     {} as Record<SettingsSection, string>
 );
 
-const EMPTY_PROFILE_FORM: ProfileFormState = {
+function isValidUrl(value: string): boolean {
+    if (value.length === 0) {
+        return true;
+    }
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (error) {
+        return false;
+    }
+}
+
+function optionalString(max: number, message: string) {
+    return z
+        .string()
+        .trim()
+        .max(max, message)
+        .optional()
+        .transform((value) => value ?? '');
+}
+
+function optionalPattern(regex: RegExp, message: string) {
+    return z
+        .string()
+        .trim()
+        .optional()
+        .transform((value) => value ?? '')
+        .refine((value) => value.length === 0 || regex.test(value), message);
+}
+
+const profileSchema = z.object({
+    name: z
+        .string()
+        .trim()
+        .min(1, 'Studio name is required')
+        .max(60, 'Studio name must be 60 characters or fewer'),
+    email: z.string().trim().email('Enter a valid email address'),
+    roleTitle: optionalString(60, 'Role title must be 60 characters or fewer'),
+    phone: optionalPattern(/^[+0-9 ()-]{7,20}$/i, 'Enter a valid phone number'),
+    welcomeMessage: optionalString(500, 'Welcome message must be 500 characters or fewer'),
+    avatarUrl: z
+        .string()
+        .trim()
+        .optional()
+        .transform((value) => value ?? '')
+        .refine((value) => isValidUrl(value), 'Enter a valid image URL')
+});
+
+type ProfileFormValues = z.infer<typeof profileSchema>;
+
+const PROFILE_DEFAULTS: ProfileFormValues = {
     name: '',
     email: '',
     roleTitle: '',
@@ -95,14 +131,32 @@ const EMPTY_PROFILE_FORM: ProfileFormState = {
     avatarUrl: ''
 };
 
-const EMPTY_EMAIL_SETTINGS: EmailSettingsFormState = {
-    provider: 'Custom SMTP',
+const emailSettingsSchema = z.object({
+    provider: z.enum(['custom', 'sendgrid', 'postmark', 'ses']),
+    encryption: z.enum(['none', 'ssl', 'tls']),
+    fromName: z.string().trim().min(1, 'From name is required'),
+    fromEmail: z.string().trim().email('Enter a valid from email'),
+    replyTo: z.string().trim().email('Enter a valid reply-to email'),
+    host: z.string().trim().min(1, 'SMTP host is required'),
+    port: z
+        .coerce.number()
+        .int('Port must be an integer')
+        .min(1, 'Port must be between 1 and 65535')
+        .max(65535, 'Port must be between 1 and 65535'),
+    username: z.string().trim().min(1, 'SMTP username is required'),
+    password: z.string().trim().min(1, 'Password is required')
+});
+
+type EmailSettingsFormValues = z.infer<typeof emailSettingsSchema>;
+
+const EMAIL_SETTINGS_DEFAULTS: EmailSettingsFormValues = {
+    provider: 'custom',
+    encryption: 'tls',
     fromName: 'Aperture Studio',
     fromEmail: 'hello@aperture.studio',
     replyTo: 'team@aperture.studio',
-    smtpHost: 'smtp.aperture.studio',
-    smtpPort: '587',
-    encryption: 'tls',
+    host: 'smtp.aperture.studio',
+    port: 587,
     username: 'hello@aperture.studio',
     password: ''
 };
@@ -111,11 +165,10 @@ function safeTrim(value: string | null | undefined): string {
     if (typeof value !== 'string') {
         return '';
     }
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : '';
+    return value.trim();
 }
 
-function mapProfileToForm(profile: UserProfile): ProfileFormState {
+function mapProfileToForm(profile: UserProfile): ProfileFormValues {
     const welcome = safeTrim(profile.welcomeMessage);
     return {
         name: safeTrim(profile.name),
@@ -140,13 +193,33 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
     const [isAddOpen, setIsAddOpen] = React.useState(false);
     const [selectedIntegrationId, setSelectedIntegrationId] = React.useState<string>('');
     const [activeIntegrationId, setActiveIntegrationId] = React.useState<string | null>(null);
-    const [profileForm, setProfileForm] = React.useState<ProfileFormState>(EMPTY_PROFILE_FORM);
+    const profileFormMethods = useForm<ProfileFormValues>({
+        resolver: zodResolver(profileSchema),
+        defaultValues: PROFILE_DEFAULTS,
+        mode: 'onBlur'
+    });
     const [profile, setProfile] = React.useState<UserProfile | null>(null);
     const [isLoadingProfile, setIsLoadingProfile] = React.useState(false);
     const [isSavingProfile, setIsSavingProfile] = React.useState(false);
     const [isSendingInvite, setIsSendingInvite] = React.useState(false);
     const [notice, setNotice] = React.useState<NoticeState | null>(null);
-    const [emailForm, setEmailForm] = React.useState<EmailSettingsFormState>(EMPTY_EMAIL_SETTINGS);
+    const emailFormMethods = useForm<EmailSettingsFormValues>({
+        resolver: zodResolver(emailSettingsSchema),
+        defaultValues: EMAIL_SETTINGS_DEFAULTS,
+        mode: 'onChange'
+    });
+    const {
+        handleSubmit: submitProfileForm,
+        reset: resetProfileForm,
+        watch: watchProfile,
+        getValues: getProfileValues
+    } = profileFormMethods;
+    const {
+        handleSubmit: submitEmailForm,
+        reset: resetEmailForm,
+        setValue: setEmailValue,
+        formState: emailFormState
+    } = emailFormMethods;
     const [emailStatus, setEmailStatus] = React.useState<EmailConnectionStatus>('disconnected');
     const [isSavingEmail, setIsSavingEmail] = React.useState(false);
     const [isTestingEmail, setIsTestingEmail] = React.useState(false);
@@ -183,7 +256,7 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
             }
 
             setProfile(payload.profile);
-            setProfileForm(mapProfileToForm(payload.profile));
+            resetProfileForm(mapProfileToForm(payload.profile));
             setNotice(null);
 
             return payload.profile;
@@ -198,7 +271,7 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
                 setIsLoadingProfile(false);
             }
         }
-    }, [identity.isAuthenticated, identity.isReady]);
+    }, [identity.isAuthenticated, identity.isReady, resetProfileForm]);
 
     React.useEffect(() => {
         if (!identity.isReady || !identity.isAuthenticated) {
@@ -219,78 +292,70 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
         return () => window.clearTimeout(timer);
     }, [notice]);
 
-    const handleFieldChange = React.useCallback(
-        (key: keyof ProfileFormState) =>
-            (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-                const value = event.target.value;
-                setProfileForm((previous) => ({ ...previous, [key]: value }));
-            },
-        []
-    );
-
+    const avatarUrlValue = watchProfile('avatarUrl');
     const avatarPreview =
-        profileForm.avatarUrl.trim().length > 0 ? profileForm.avatarUrl : AVATAR_PLACEHOLDER;
+        avatarUrlValue && avatarUrlValue.trim().length > 0 ? avatarUrlValue : AVATAR_PLACEHOLDER;
     const isProfileBusy = isLoadingProfile || isSavingProfile;
 
-    const handleProfileSubmit = React.useCallback(
-        async (event: React.FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            if (!identity.isAuthenticated) {
-                setNotice({ type: 'error', message: 'You need to be signed in to update your profile.' });
-                return;
-            }
-
-            if (isMountedRef.current) {
-                setIsSavingProfile(true);
-                setNotice(null);
-            }
-
-            try {
-                const response = await fetch('/api/users/me', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: profileForm.name,
-                        email: profileForm.email,
-                        roleTitle: profileForm.roleTitle,
-                        phone: profileForm.phone,
-                        welcomeMessage: profileForm.welcomeMessage,
-                        avatarUrl: profileForm.avatarUrl
-                    })
-                });
-
-                const payload = (await response.json().catch(() => null)) as
-                    | { profile?: UserProfile; error?: string }
-                    | null;
-
-                if (!response.ok || !payload?.profile) {
-                    const message = payload?.error ?? 'Unable to update profile.';
-                    throw new Error(message);
+    const handleProfileSubmit = React.useMemo(
+        () =>
+            submitProfileForm(async (formValues) => {
+                if (!identity.isAuthenticated) {
+                    setNotice({ type: 'error', message: 'You need to be signed in to update your profile.' });
+                    return;
                 }
 
                 if (isMountedRef.current) {
-                    setProfile(payload.profile);
-                    setProfileForm(mapProfileToForm(payload.profile));
-                    setNotice({ type: 'success', message: 'Profile saved.' });
+                    setIsSavingProfile(true);
+                    setNotice(null);
                 }
 
                 try {
-                    await identity.refresh();
-                } catch (refreshError) {
-                    console.warn('Failed to refresh identity after profile update', refreshError);
+                    const response = await fetch('/api/users/me', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: formValues.name,
+                            email: formValues.email,
+                            roleTitle: formValues.roleTitle,
+                            phone: formValues.phone,
+                            welcomeMessage: formValues.welcomeMessage,
+                            avatarUrl: formValues.avatarUrl
+                        })
+                    });
+
+                    const payload = (await response.json().catch(() => null)) as
+                        | { profile?: UserProfile; error?: string }
+                        | null;
+
+                    if (!response.ok || !payload?.profile) {
+                        const message = payload?.error ?? 'Unable to update profile.';
+                        throw new Error(message);
+                    }
+
+                    if (isMountedRef.current) {
+                        setProfile(payload.profile);
+                        resetProfileForm(mapProfileToForm(payload.profile));
+                        setNotice({ type: 'success', message: 'Profile saved.' });
+                    }
+
+                    try {
+                        await identity.refresh();
+                    } catch (refreshError) {
+                        console.warn('Failed to refresh identity after profile update', refreshError);
+                    }
+                } catch (error) {
+                    if (isMountedRef.current) {
+                        const message = error instanceof Error ? error.message : 'Unable to update profile.';
+                        setNotice({ type: 'error', message });
+                    }
+                } finally {
+                    if (isMountedRef.current) {
+                        setIsSavingProfile(false);
+                    }
                 }
-            } catch (error) {
-                if (isMountedRef.current) {
-                    const message = error instanceof Error ? error.message : 'Unable to update profile.';
-                    setNotice({ type: 'error', message });
-                }
-            } finally {
-                if (isMountedRef.current) {
-                    setIsSavingProfile(false);
-                }
-            }
-        },
-        [identity, profileForm]
+            }),
+        [identity, resetProfileForm, submitProfileForm]
     );
 
     const handleSendInvite = React.useCallback(async () => {
@@ -298,7 +363,7 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
             return;
         }
 
-        const targetEmail = profileForm.email.trim();
+        const targetEmail = getProfileValues('email').trim();
         if (targetEmail.length === 0) {
             setNotice({ type: 'error', message: 'Add an email address before sending a preview invite.' });
             return;
@@ -331,107 +396,100 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
                 setIsSendingInvite(false);
             }
         }
-    }, [isSendingInvite, profile?.id, profileForm.email]);
+    }, [getProfileValues, isSendingInvite, profile?.id]);
 
-    const handleEmailFieldChange = React.useCallback(
-        (key: keyof EmailSettingsFormState) =>
-            (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-                const value = event.target.value;
-                setEmailForm((previous) => ({ ...previous, [key]: value }));
-                if (emailStatus === 'connected') {
-                    setEmailStatus('disconnected');
-                }
-            },
-        [emailStatus]
-    );
-
-    const isEmailFormComplete = React.useMemo(
+    const handleEmailSubmit = React.useMemo(
         () =>
-            emailForm.fromName.trim().length > 0 &&
-            emailForm.fromEmail.trim().length > 0 &&
-            emailForm.replyTo.trim().length > 0 &&
-            emailForm.smtpHost.trim().length > 0 &&
-            emailForm.smtpPort.trim().length > 0 &&
-            emailForm.username.trim().length > 0 &&
-            emailForm.password.trim().length > 0,
-        [emailForm]
+            submitEmailForm(async (formValues) => {
+                if (isSavingEmail) {
+                    return;
+                }
+
+                if (isMountedRef.current) {
+                    setIsSavingEmail(true);
+                    setNotice(null);
+                }
+
+                try {
+                    await new Promise<void>((resolve) => {
+                        globalThis.setTimeout(resolve, 900);
+                    });
+
+                    if (isMountedRef.current) {
+                        resetEmailForm(formValues);
+                        setEmailStatus('connected');
+                        setNotice({ type: 'success', message: 'Outgoing email settings saved.' });
+                    }
+                } catch (error) {
+                    if (isMountedRef.current) {
+                        setNotice({ type: 'error', message: 'Unable to save outgoing email settings.' });
+                    }
+                } finally {
+                    if (isMountedRef.current) {
+                        setIsSavingEmail(false);
+                    }
+                }
+            }),
+        [isSavingEmail, resetEmailForm, submitEmailForm]
     );
 
-    const handleEmailSubmit = React.useCallback(
-        async (event: React.FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            if (isSavingEmail) {
-                return;
-            }
-
-            if (isMountedRef.current) {
-                setIsSavingEmail(true);
-                setNotice(null);
-            }
-
-            try {
-                await new Promise<void>((resolve) => {
-                    globalThis.setTimeout(resolve, 900);
-                });
+    const handleTestEmail = React.useMemo(
+        () =>
+            submitEmailForm(async (formValues) => {
+                if (isTestingEmail) {
+                    return;
+                }
+                if (emailStatus !== 'connected') {
+                    setNotice({
+                        type: 'error',
+                        message: 'Save and connect your outgoing email before sending a test message.'
+                    });
+                    return;
+                }
 
                 if (isMountedRef.current) {
-                    setEmailStatus('connected');
-                    setNotice({ type: 'success', message: 'Outgoing email settings saved.' });
+                    setIsTestingEmail(true);
+                    setNotice(null);
                 }
-            } catch (error) {
-                if (isMountedRef.current) {
-                    setNotice({ type: 'error', message: 'Unable to save outgoing email settings.' });
+
+                try {
+                    await new Promise<void>((resolve) => {
+                        globalThis.setTimeout(resolve, 900);
+                    });
+
+                    if (isMountedRef.current) {
+                        console.info('Test email queued', { provider: formValues.provider, to: formValues.replyTo });
+                        setNotice({ type: 'info', message: 'Test email queued for delivery.' });
+                    }
+                } catch (error) {
+                    if (isMountedRef.current) {
+                        setNotice({ type: 'error', message: 'Unable to send test email.' });
+                    }
+                } finally {
+                    if (isMountedRef.current) {
+                        setIsTestingEmail(false);
+                    }
                 }
-            } finally {
-                if (isMountedRef.current) {
-                    setIsSavingEmail(false);
-                }
-            }
-        },
-        [isSavingEmail]
+            }),
+        [emailStatus, isTestingEmail, submitEmailForm]
     );
-
-    const handleTestEmail = React.useCallback(async () => {
-        if (isTestingEmail) {
-            return;
-        }
-        if (!isEmailFormComplete || emailStatus !== 'connected') {
-            setNotice({
-                type: 'error',
-                message: 'Save and connect your outgoing email before sending a test message.'
-            });
-            return;
-        }
-
-        if (isMountedRef.current) {
-            setIsTestingEmail(true);
-            setNotice(null);
-        }
-
-        try {
-            await new Promise<void>((resolve) => {
-                globalThis.setTimeout(resolve, 900);
-            });
-
-            if (isMountedRef.current) {
-                setNotice({ type: 'info', message: 'Test email queued for delivery.' });
-            }
-        } catch (error) {
-            if (isMountedRef.current) {
-                setNotice({ type: 'error', message: 'Unable to send test email.' });
-            }
-        } finally {
-            if (isMountedRef.current) {
-                setIsTestingEmail(false);
-            }
-        }
-    }, [emailStatus, isEmailFormComplete, isTestingEmail]);
 
     const handleEmailDisconnect = React.useCallback(() => {
         setEmailStatus('disconnected');
-        setEmailForm((previous) => ({ ...previous, password: '' }));
+        setEmailValue('password', '', { shouldDirty: true, shouldTouch: true });
         setNotice({ type: 'info', message: 'Outgoing email connection disabled.' });
-    }, []);
+    }, [setEmailValue]);
+
+    React.useEffect(() => {
+        if (emailStatus !== 'connected') {
+            return;
+        }
+        if (!emailFormState.isDirty) {
+            return;
+        }
+
+        setEmailStatus('disconnected');
+    }, [emailFormState.isDirty, emailStatus]);
 
     const availableOptions = React.useMemo(
         () =>
@@ -507,336 +565,215 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
     let sectionContent: React.ReactNode;
 
     if (activeSection === 'general') {
+        const profileEmailValue = watchProfile('email');
         sectionContent = (
-            <section className="mt-14 rounded-3xl border border-slate-800 bg-slate-950/60 p-10 shadow-[0_30px_80px_-60px_rgba(15,23,42,0.95)]">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.48em] text-[#4DE5FF]">Studio profile</p>
-                        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Workspace identity</h2>
-                        <p className="mt-2 max-w-3xl text-sm text-slate-300">
-                            Update contact details and booking hand-offs for new projects.
-                        </p>
-                    </div>
-                    <span className="inline-flex items-center rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-200">
-                        Live
-                    </span>
-                </div>
-                {isLoadingProfile && !profile ? (
-                    <div className="mt-6 text-sm text-slate-400">Loading profile…</div>
-                ) : null}
-                {notice ? (
-                    <div
-                        className={`mt-6 rounded-2xl border px-5 py-4 text-sm ${NOTICE_STYLES[notice.type]}`}
-                        role="status"
-                    >
-                        {notice.message}
-                    </div>
-                ) : null}
-                <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-                    <form className="space-y-6" onSubmit={handleProfileSubmit}>
-                        <div className="grid gap-6">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-300" htmlFor="studio-name">
-                                    Studio name
-                                </label>
-                                <input
-                                    id="studio-name"
-                                    type="text"
-                                    defaultValue="Aperture Studio"
-                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                />
-                            </div>
-                            <div className="flex flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 sm:flex-row sm:items-center">
-                                <span
-                                    className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900"
-                                    style={{ backgroundImage: `url(${avatarPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                                    aria-hidden
-                                />
-                                <div className="flex-1">
-                                    <label className="block text-xs font-medium text-slate-300" htmlFor="profile-avatar">
-                                        Profile photo URL
-                                    </label>
-                                    <input
-                                        id="profile-avatar"
-                                        type="url"
-                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                        value={profileForm.avatarUrl}
-                                        onChange={handleFieldChange('avatarUrl')}
-                                        placeholder="https://"
+            <div className="space-y-8">
+                <FormProvider {...profileFormMethods}>
+                    <FormSectionCard
+                        onSubmit={handleProfileSubmit}
+                        eyebrow="Studio profile"
+                        title="Workspace identity"
+                        subtitle="Update contact details and booking hand-offs for new projects."
+                        actions={
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+                                <span className="inline-flex items-center rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-200">
+                                    Live
+                                </span>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="submit"
+                                        className="rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                                         disabled={isProfileBusy}
-                                    />
-                                    <p className="mt-1 text-xs text-slate-400">Use a square image for best results.</p>
+                                    >
+                                        {isSavingProfile ? 'Saving…' : 'Save profile'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="rounded-2xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-[#4DE5FF] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                        onClick={handleSendInvite}
+                                        disabled={
+                                            isLoadingProfile ||
+                                            isSendingInvite ||
+                                            profileEmailValue.trim().length === 0
+                                        }
+                                    >
+                                        {isSendingInvite ? 'Sending…' : 'Send preview invite'}
+                                    </button>
                                 </div>
                             </div>
-                        </div>
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-300" htmlFor="profile-name">
-                                    Primary contact
-                                </label>
-                                <input
-                                    id="profile-name"
-                                    type="text"
-                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                    value={profileForm.name}
-                                    onChange={handleFieldChange('name')}
-                                    disabled={isProfileBusy}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-300" htmlFor="profile-role">
-                                    Role
-                                </label>
-                                <input
-                                    id="profile-role"
-                                    type="text"
-                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                    value={profileForm.roleTitle}
-                                    onChange={handleFieldChange('roleTitle')}
-                                    disabled={isProfileBusy}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-300" htmlFor="profile-email">
-                                    Email
-                                </label>
-                                <input
-                                    id="profile-email"
-                                    type="email"
-                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                    value={profileForm.email}
-                                    onChange={handleFieldChange('email')}
-                                    disabled={isProfileBusy}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-300" htmlFor="profile-phone">
-                                    Phone number
-                                </label>
-                                <input
-                                    id="profile-phone"
-                                    type="tel"
-                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                    value={profileForm.phone}
-                                    onChange={handleFieldChange('phone')}
-                                    disabled={isProfileBusy}
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-slate-300" htmlFor="profile-welcome">
-                                Welcome message
-                            </label>
-                            <textarea
-                                id="profile-welcome"
-                                className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                rows={4}
-                                value={profileForm.welcomeMessage}
-                                onChange={handleFieldChange('welcomeMessage')}
-                                disabled={isProfileBusy}
-                            />
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                            <button
-                                type="submit"
-                                className="rounded-xl bg-[#4DE5FF] px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-[#86f0ff] disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={isProfileBusy || profileForm.email.trim().length === 0}
-                            >
-                                {isSavingProfile ? 'Saving…' : 'Save profile'}
-                            </button>
-                            <button
-                                type="button"
-                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-[#4DE5FF] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                onClick={handleSendInvite}
-                                disabled={isLoadingProfile || isSendingInvite || profileForm.email.trim().length === 0}
-                            >
-                                {isSendingInvite ? 'Sending…' : 'Send preview invite'}
-                            </button>
-                        </div>
-                    </form>
-                    <form
-                        className="flex h-full flex-col rounded-2xl border border-slate-800/80 bg-slate-900/40 p-6 shadow-[0_20px_45px_-40px_rgba(15,23,42,0.9)]"
-                        onSubmit={handleEmailSubmit}
+                        }
                     >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#4DE5FF]">Deliverability</p>
-                                <h3 className="mt-2 text-lg font-semibold text-white">Outgoing email</h3>
-                                <p className="mt-2 text-xs text-slate-400">
-                                    Connect your sending domain to deliver onboarding emails directly from the CRM.
-                                </p>
-                            </div>
-                            <span
-                                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                                    emailStatus === 'connected'
-                                        ? 'bg-emerald-500/20 text-emerald-200'
-                                        : 'bg-slate-800 text-slate-300'
-                                }`}
+                        {isLoadingProfile && !profile ? (
+                            <p className="text-sm text-slate-400">Loading profile…</p>
+                        ) : null}
+                        {notice ? (
+                            <div
+                                className={`mt-4 rounded-2xl border px-5 py-4 text-sm ${NOTICE_STYLES[notice.type]}`}
+                                role="status"
                             >
-                                {emailStatus === 'connected' ? 'Connected' : 'Not connected'}
-                            </span>
-                        </div>
-                        <div className="mt-6 grid flex-1 gap-4">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-provider">
-                                        Provider
-                                    </label>
-                                    <select
-                                        id="email-provider"
-                                        value={emailForm.provider}
-                                        onChange={handleEmailFieldChange('provider')}
-                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                {notice.message}
+                            </div>
+                        ) : null}
+                        <FieldGrid className="gap-y-6 pt-4">
+                            <div className="col-span-12 md:col-span-5 lg:col-span-4">
+                                <div className="flex flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 sm:flex-row sm:items-center">
+                                    <span
+                                        className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900"
+                                        style={{
+                                            backgroundImage: `url(${avatarPreview})`,
+                                            backgroundSize: 'cover',
+                                            backgroundPosition: 'center'
+                                        }}
+                                        aria-hidden
+                                    />
+                                    <p className="text-xs text-slate-400">
+                                        Drop in a hosted image or upload to Supabase Storage. Use a square crop for the cleanest preview across invites.
+                                    </p>
+                                </div>
+                            </div>
+                            <FieldWrapper name="avatarUrl" label="Profile photo URL" size="lg" helpText="Use a square image for best results.">
+                                <TextInput name="avatarUrl" type="url" placeholder="https://cdn.aperture.studio/avatar.png" />
+                            </FieldWrapper>
+                            <FieldWrapper name="name" label="Studio name" size="md">
+                                <TextInput name="name" placeholder="Aperture Studio" autoComplete="organization" />
+                            </FieldWrapper>
+                            <FieldWrapper
+                                name="roleTitle"
+                                label="Role"
+                                size="sm"
+                                helpText="Shown on onboarding emails and client portal invites."
+                            >
+                                <TextInput name="roleTitle" placeholder="Producer" autoComplete="organization-title" />
+                            </FieldWrapper>
+                            <FieldWrapper
+                                name="email"
+                                label="Email"
+                                size="lg"
+                                helpText="Booking notifications and client replies are routed here."
+                            >
+                                <TextInput name="email" type="email" placeholder="hello@aperture.studio" autoComplete="email" />
+                            </FieldWrapper>
+                            <FieldWrapper
+                                name="phone"
+                                label="Phone number"
+                                size="sm"
+                                helpText="Format with a country code to help clients dial internationally."
+                            >
+                                <TextInput name="phone" type="tel" placeholder="+1 (555) 123-4567" autoComplete="tel" />
+                            </FieldWrapper>
+                            <FieldWrapper
+                                name="welcomeMessage"
+                                label="Welcome message"
+                                size="xl"
+                                helpText="Shared with clients immediately after their booking is confirmed."
+                            >
+                                <Textarea name="welcomeMessage" rows={5} />
+                            </FieldWrapper>
+                        </FieldGrid>
+                    </FormSectionCard>
+                </FormProvider>
+                <FormProvider {...emailFormMethods}>
+                    <FormSectionCard
+                        onSubmit={handleEmailSubmit}
+                        eyebrow="Deliverability"
+                        title="Outgoing email"
+                        subtitle="Connect your sending domain to deliver onboarding emails directly from the CRM."
+                        actions={
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+                                <span
+                                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                                        emailStatus === 'connected'
+                                            ? 'bg-emerald-500/20 text-emerald-200'
+                                            : 'bg-slate-800/60 text-slate-300'
+                                    }`}
+                                >
+                                    {emailStatus === 'connected' ? 'Connected' : 'Not connected'}
+                                </span>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="submit"
+                                        className="rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                                        disabled={isSavingEmail}
                                     >
-                                        <option value="Custom SMTP">Custom SMTP</option>
-                                        <option value="SendGrid">SendGrid</option>
-                                        <option value="Mailgun">Mailgun</option>
-                                        <option value="Postmark">Postmark</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-encryption">
-                                        Encryption
-                                    </label>
-                                    <select
-                                        id="email-encryption"
-                                        value={emailForm.encryption}
-                                        onChange={handleEmailFieldChange('encryption')}
-                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                        {isSavingEmail ? 'Saving…' : emailStatus === 'connected' ? 'Update connection' : 'Save connection'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="rounded-2xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-[#4DE5FF] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                        onClick={handleTestEmail}
+                                        disabled={isSavingEmail || isTestingEmail || emailStatus !== 'connected'}
                                     >
-                                        <option value="tls">TLS</option>
-                                        <option value="ssl">SSL</option>
-                                        <option value="none">None</option>
-                                    </select>
+                                        {isTestingEmail ? 'Sending…' : 'Send test email'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="rounded-2xl border border-slate-800 px-4 py-2 text-sm font-semibold text-slate-400 transition hover:border-red-500 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                        onClick={handleEmailDisconnect}
+                                        disabled={emailStatus === 'disconnected'}
+                                    >
+                                        Disconnect
+                                    </button>
                                 </div>
                             </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-from-name">
-                                        From name
-                                    </label>
-                                    <input
-                                        id="email-from-name"
-                                        type="text"
-                                        value={emailForm.fromName}
-                                        onChange={handleEmailFieldChange('fromName')}
-                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                        placeholder="Aperture Studio"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-from-address">
-                                        From email
-                                    </label>
-                                    <input
-                                        id="email-from-address"
-                                        type="email"
-                                        value={emailForm.fromEmail}
-                                        onChange={handleEmailFieldChange('fromEmail')}
-                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                        placeholder="hello@aperture.studio"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-reply-to">
-                                        Reply-to address
-                                    </label>
-                                    <input
-                                        id="email-reply-to"
-                                        type="email"
-                                        value={emailForm.replyTo}
-                                        onChange={handleEmailFieldChange('replyTo')}
-                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                        placeholder="team@aperture.studio"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-username">
-                                        SMTP username
-                                    </label>
-                                    <input
-                                        id="email-username"
-                                        type="text"
-                                        value={emailForm.username}
-                                        onChange={handleEmailFieldChange('username')}
-                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                        placeholder="hello@aperture.studio"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-host">
-                                        SMTP host
-                                    </label>
-                                    <input
-                                        id="email-host"
-                                        type="text"
-                                        value={emailForm.smtpHost}
-                                        onChange={handleEmailFieldChange('smtpHost')}
-                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                        placeholder="smtp.aperture.studio"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-port">
-                                        Port
-                                    </label>
-                                    <input
-                                        id="email-port"
-                                        type="text"
-                                        value={emailForm.smtpPort}
-                                        onChange={handleEmailFieldChange('smtpPort')}
-                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                        placeholder="587"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-300" htmlFor="email-password">
-                                    SMTP password
-                                </label>
-                                <input
-                                    id="email-password"
-                                    type="password"
-                                    value={emailForm.password}
-                                    onChange={handleEmailFieldChange('password')}
-                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
-                                    placeholder="••••••••"
-                                    autoComplete="new-password"
+                        }
+                    >
+                        <FieldGrid className="gap-y-6">
+                            <FieldWrapper name="provider" label="Provider" size="sm">
+                                <Select
+                                    name="provider"
+                                    options={[
+                                        { label: 'Custom SMTP', value: 'custom' },
+                                        { label: 'SendGrid', value: 'sendgrid' },
+                                        { label: 'Postmark', value: 'postmark' },
+                                        { label: 'Amazon SES', value: 'ses' }
+                                    ]}
                                 />
-                            </div>
-                        </div>
-                        <div className="mt-6 flex flex-wrap gap-3">
-                            <button
-                                type="submit"
-                                className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={!isEmailFormComplete || isSavingEmail}
+                            </FieldWrapper>
+                            <FieldWrapper
+                                name="encryption"
+                                label="Encryption"
+                                size="sm"
+                                helpText="Choose TLS (587) or SSL (465) based on your provider."
                             >
-                                {isSavingEmail ? 'Saving…' : emailStatus === 'connected' ? 'Update connection' : 'Save connection'}
-                            </button>
-                            <button
-                                type="button"
-                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-[#4DE5FF] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                onClick={handleTestEmail}
-                                disabled={!isEmailFormComplete || isSavingEmail || isTestingEmail}
+                                <Select
+                                    name="encryption"
+                                    options={[
+                                        { label: 'TLS', value: 'tls' },
+                                        { label: 'SSL', value: 'ssl' },
+                                        { label: 'None', value: 'none' }
+                                    ]}
+                                />
+                            </FieldWrapper>
+                            <FieldWrapper name="host" label="SMTP host" size="lg">
+                                <TextInput name="host" placeholder="smtp.yourdomain.com" autoComplete="off" />
+                            </FieldWrapper>
+                            <FieldWrapper name="port" label="Port" size="xs">
+                                <TextInput name="port" type="number" inputMode="numeric" placeholder="587" min={1} max={65535} />
+                            </FieldWrapper>
+                            <FieldWrapper name="username" label="Username" size="md">
+                                <TextInput name="username" placeholder="apikey or mailbox" autoComplete="username" />
+                            </FieldWrapper>
+                            <FieldWrapper
+                                name="password"
+                                label="Password / API key"
+                                size="md"
+                                helpText="Stored securely in Supabase and never shown after saving."
                             >
-                                {isTestingEmail ? 'Sending…' : 'Send test email'}
-                            </button>
-                            <button
-                                type="button"
-                                className="rounded-xl border border-slate-800 px-4 py-2 text-sm font-semibold text-slate-400 transition hover:border-red-500 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
-                                onClick={handleEmailDisconnect}
-                                disabled={emailStatus === 'disconnected'}
-                            >
-                                Disconnect
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </section>
+                                <TextInput name="password" type="password" placeholder="••••••••" autoComplete="new-password" />
+                            </FieldWrapper>
+                            <FieldWrapper name="fromName" label="From name" size="md">
+                                <TextInput name="fromName" placeholder="Aperture Studio" />
+                            </FieldWrapper>
+                            <FieldWrapper name="fromEmail" label="From email" size="lg">
+                                <TextInput name="fromEmail" type="email" placeholder="noreply@yourdomain.com" autoComplete="email" />
+                            </FieldWrapper>
+                            <FieldWrapper name="replyTo" label="Reply-to email" size="lg">
+                                <TextInput name="replyTo" type="email" placeholder="team@yourdomain.com" autoComplete="email" />
+                            </FieldWrapper>
+                        </FieldGrid>
+                    </FormSectionCard>
+                </FormProvider>
+            </div>
         );
     } else if (activeSection === 'notifications') {
         sectionContent = (
