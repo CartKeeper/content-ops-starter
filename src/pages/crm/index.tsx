@@ -233,42 +233,184 @@ function normalizeUserKey(value: string | undefined | null): string | null {
     return trimmed.toLowerCase();
 }
 
-function createStudioUsers(entries: CmsUserEntry[]): StudioUser[] {
-    return entries
-        .map((entry, index) => {
-            const name = entry.name?.trim() || `Team member ${index + 1}`;
-            const rawId = entry.id?.trim();
-            const normalizedId = rawId?.length
-                ? rawId
-                : name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            const email = entry.email?.trim();
-            const role = entry.role?.trim().toLowerCase() || 'member';
+function toUserSlug(value: string | undefined | null): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
 
-            return {
-                id: normalizedId || `user-${index + 1}`,
-                name,
-                email,
-                role
-            } satisfies StudioUser;
-        })
-        .filter((user, index, array) => array.findIndex((candidate) => candidate.id === user.id) === index);
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) {
+        return null;
+    }
+
+    const slug = trimmed.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return slug || null;
+}
+
+function createStudioUsers(
+    entries: CmsUserEntry[],
+    ownerReferences: Array<string | undefined | null> = []
+): StudioUser[] {
+    const users: StudioUser[] = [];
+    const lookup = new Map<string, StudioUser>();
+
+    const registerKeys = (user: StudioUser, keys: Array<string | null | undefined>) => {
+        keys.forEach((key) => {
+            if (!key) {
+                return;
+            }
+            lookup.set(key, user);
+        });
+    };
+
+    const registerUser = (user: StudioUser) => {
+        const keys = new Set<string>();
+
+        keys.add(user.id);
+
+        const normalizedId = normalizeUserKey(user.id);
+        if (normalizedId) {
+            keys.add(normalizedId);
+            const compactId = normalizedId.replace(/[^a-z0-9]/g, '');
+            if (compactId) {
+                keys.add(compactId);
+            }
+        }
+
+        const slugId = toUserSlug(user.id);
+        if (slugId) {
+            keys.add(slugId);
+        }
+
+        const normalizedName = normalizeUserKey(user.name);
+        if (normalizedName) {
+            keys.add(normalizedName);
+            const compactName = normalizedName.replace(/[^a-z0-9]/g, '');
+            if (compactName) {
+                keys.add(compactName);
+            }
+        }
+
+        const slugName = toUserSlug(user.name);
+        if (slugName) {
+            keys.add(slugName);
+        }
+
+        if (user.email) {
+            keys.add(user.email);
+            const normalizedEmail = normalizeUserKey(user.email);
+            if (normalizedEmail) {
+                keys.add(normalizedEmail);
+            }
+        }
+
+        for (const key of keys) {
+            if (lookup.has(key)) {
+                return;
+            }
+        }
+
+        users.push(user);
+        registerKeys(user, Array.from(keys));
+    };
+
+    entries.forEach((entry, index) => {
+        const name = entry.name?.trim() || `Team member ${index + 1}`;
+        const rawId = entry.id?.trim();
+        const normalizedId = rawId?.length
+            ? rawId
+            : toUserSlug(name) ?? name.toLowerCase().replace(/\s+/g, '-');
+        const email = entry.email?.trim();
+        const role = entry.role?.trim().toLowerCase() || 'member';
+
+        registerUser({
+            id: normalizedId || `user-${index + 1}`,
+            name,
+            email,
+            role
+        });
+    });
+
+    ownerReferences.forEach((reference) => {
+        if (!reference) {
+            return;
+        }
+
+        const trimmed = reference.trim();
+        if (!trimmed) {
+            return;
+        }
+
+        const normalizedRef = normalizeUserKey(trimmed);
+        const slugRef = toUserSlug(trimmed);
+        const compactRef = normalizedRef?.replace(/[^a-z0-9]/g, '');
+
+        const hasExistingUser = [trimmed, normalizedRef, slugRef, compactRef].some(
+            (key) => key && lookup.has(key)
+        );
+        if (hasExistingUser) {
+            return;
+        }
+
+        const isEmail = trimmed.includes('@') && !trimmed.includes(' ');
+        const email = isEmail ? trimmed.toLowerCase() : undefined;
+        const labelSource = isEmail ? trimmed.split('@')[0] : trimmed;
+
+        const displayName = labelSource
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .split(' ')
+            .filter(Boolean)
+            .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+            .join(' ');
+
+        const fallbackIndex = users.length + 1;
+        const id = slugRef || normalizedRef || `user-${fallbackIndex}`;
+
+        registerUser({
+            id,
+            name: displayName || `Team member ${fallbackIndex}`,
+            email,
+            role: 'member'
+        });
+    });
+
+    return users;
 }
 
 function buildUserResolutionContext(users: StudioUser[]): UserResolutionContext {
     const lookup = new Map<string, StudioUser>();
     const byId = new Map<string, StudioUser>();
 
+    const registerLookup = (key: string | null | undefined, user: StudioUser) => {
+        if (!key) {
+            return;
+        }
+        lookup.set(key, user);
+    };
+
     users.forEach((user) => {
         const normalizedId = normalizeUserKey(user.id) ?? user.id;
-        lookup.set(normalizedId, user);
+        const slugId = toUserSlug(user.id);
+        const normalizedName = normalizeUserKey(user.name);
+        const slugName = toUserSlug(user.name);
+
+        registerLookup(user.id, user);
+        registerLookup(normalizedId, user);
+        registerLookup(slugId, user);
+        registerLookup(normalizedName, user);
+        registerLookup(slugName, user);
+
+        if (user.email) {
+            registerLookup(user.email, user);
+            registerLookup(normalizeUserKey(user.email), user);
+        }
+
         byId.set(user.id, user);
         byId.set(normalizedId, user);
 
-        if (user.email) {
-            const normalizedEmail = normalizeUserKey(user.email);
-            if (normalizedEmail) {
-                lookup.set(normalizedEmail, user);
-            }
+        if (slugId) {
+            byId.set(slugId, user);
         }
     });
 
@@ -1318,7 +1460,13 @@ export const getStaticProps: GetStaticProps<CrmPageProps> = async () => {
         readCmsSettings('crm-settings.json')
     ]);
 
-    const users = createStudioUsers(userEntries);
+    const ownerReferences = [
+        ...bookingEntries.map((entry) => entry.owner),
+        ...invoiceEntries.map((entry) => entry.owner),
+        ...clientEntries.map((entry) => entry.owner)
+    ];
+
+    const users = createStudioUsers(userEntries, ownerReferences);
     const userContext = buildUserResolutionContext(users);
 
     const bookings = createBookingRecords(bookingEntries, userContext).sort((a, b) =>
