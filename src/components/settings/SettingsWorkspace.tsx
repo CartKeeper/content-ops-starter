@@ -20,12 +20,6 @@ import { SETTINGS_TABS, type SettingsSection } from './settings-sections';
 
 const notificationPreferences = [
     {
-        id: 'booking-alerts',
-        label: 'New booking requests',
-        description: 'Get notified when a lead selects a session date or completes the inquiry form.',
-        defaultChecked: true
-    },
-    {
         id: 'payment-status',
         label: 'Payment activity',
         description: 'Alerts when invoices are paid, overdue, or require manual follow-up.',
