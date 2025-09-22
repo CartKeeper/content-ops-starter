@@ -230,16 +230,16 @@ export function ContactFormModal({ open, contactId, onClose, onSaved, onError }:
             }}
         >
             <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm" />
-                <Dialog.Content className="fixed inset-0 z-50 mx-auto my-10 flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-800/80 bg-slate-950/90 shadow-2xl focus:outline-none">
+                <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm" />
+                <Dialog.Content className="fixed inset-0 z-50 mx-auto my-12 flex h-fit w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl focus:outline-none dark:border-slate-800 dark:bg-slate-950">
                     <FormProvider {...methods}>
-                        <form onSubmit={onSubmit} className="flex flex-1 flex-col gap-6 p-6">
-                            <div className="flex items-start justify-between gap-4">
+                        <form onSubmit={onSubmit} className="flex h-full flex-col">
+                            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-8 py-6 dark:border-slate-800">
                                 <div className="space-y-2">
-                                    <Dialog.Title className="text-xl font-semibold text-white">
+                                    <Dialog.Title className="text-2xl font-semibold text-slate-900 dark:text-white">
                                         {mode === 'update' ? 'Edit contact' : 'Add contact'}
                                     </Dialog.Title>
-                                    <Dialog.Description className="text-sm text-slate-300">
+                                    <Dialog.Description className="text-sm text-slate-500 dark:text-slate-300">
                                         {mode === 'update'
                                             ? 'Update contact details and keep their profile aligned.'
                                             : 'Capture a new lead without leaving the workspace.'}
@@ -248,7 +248,7 @@ export function ContactFormModal({ open, contactId, onClose, onSaved, onError }:
                                 <Dialog.Close asChild>
                                     <button
                                         type="button"
-                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700/70 text-slate-300 transition hover:border-slate-500 hover:text-white"
+                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
                                         aria-label="Close"
                                     >
                                         ×
@@ -256,50 +256,61 @@ export function ContactFormModal({ open, contactId, onClose, onSaved, onError }:
                                 </Dialog.Close>
                             </div>
 
-                            {submitError ? (
-                                <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                                    {submitError}
+                            <div className="flex-1 overflow-y-auto px-8 py-6">
+                                <div className="space-y-6">
+                                    {submitError ? (
+                                        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+                                            {submitError}
+                                        </div>
+                                    ) : null}
+
+                                    {isLoading ? (
+                                        <div className="flex h-40 items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                                            Loading contact…
+                                        </div>
+                                    ) : (
+                                        <FieldGrid className="gap-6">
+                                            <FieldWrapper name="firstName" label="First name" size="md">
+                                                <TextInput name="firstName" placeholder="Jamie" autoComplete="given-name" />
+                                            </FieldWrapper>
+                                            <FieldWrapper name="lastName" label="Last name" size="md">
+                                                <TextInput name="lastName" placeholder="Rivera" autoComplete="family-name" />
+                                            </FieldWrapper>
+                                            <FieldWrapper name="business" label="Business" size="lg">
+                                                <TextInput name="business" placeholder="Aperture Studio" autoComplete="organization" />
+                                            </FieldWrapper>
+                                            <FieldWrapper name="email" label="Email" size="lg" helpText="Used for hand-offs and quick replies.">
+                                                <TextInput name="email" type="email" placeholder="jamie@example.com" autoComplete="email" />
+                                            </FieldWrapper>
+                                            <FieldWrapper name="phone" label="Phone" size="sm">
+                                                <TextInput name="phone" type="tel" placeholder="(555) 010-1234" autoComplete="tel" />
+                                            </FieldWrapper>
+                                            <FieldWrapper name="address" label="Address" size="xl">
+                                                <TextInput name="address" placeholder="872 Market Street" autoComplete="street-address" />
+                                            </FieldWrapper>
+                                            <FieldWrapper name="city" label="City" size="md">
+                                                <TextInput name="city" placeholder="San Francisco" autoComplete="address-level2" />
+                                            </FieldWrapper>
+                                            <FieldWrapper name="state" label="State / Region" size="sm">
+                                                <TextInput name="state" placeholder="CA" autoComplete="address-level1" />
+                                            </FieldWrapper>
+                                            <FieldWrapper
+                                                name="notes"
+                                                label="Notes"
+                                                size="xl"
+                                                helpText="Keep context, preferences, and follow-up reminders together."
+                                            >
+                                                <Textarea name="notes" rows={4} placeholder="Add context or follow-up details" />
+                                            </FieldWrapper>
+                                        </FieldGrid>
+                                    )}
                                 </div>
-                            ) : null}
+                            </div>
 
-                            {isLoading ? (
-                                <div className="flex flex-1 items-center justify-center text-sm text-slate-400">Loading contact…</div>
-                            ) : (
-                                <FieldGrid className="gap-4">
-                                    <FieldWrapper name="firstName" label="First name" size="md">
-                                        <TextInput name="firstName" placeholder="Jamie" autoComplete="given-name" />
-                                    </FieldWrapper>
-                                    <FieldWrapper name="lastName" label="Last name" size="md">
-                                        <TextInput name="lastName" placeholder="Rivera" autoComplete="family-name" />
-                                    </FieldWrapper>
-                                    <FieldWrapper name="business" label="Business" size="lg">
-                                        <TextInput name="business" placeholder="Aperture Studio" autoComplete="organization" />
-                                    </FieldWrapper>
-                                    <FieldWrapper name="email" label="Email" size="lg" helpText="Used for hand-offs and quick replies.">
-                                        <TextInput name="email" type="email" placeholder="jamie@example.com" autoComplete="email" />
-                                    </FieldWrapper>
-                                    <FieldWrapper name="phone" label="Phone" size="sm">
-                                        <TextInput name="phone" type="tel" placeholder="(555) 010-1234" autoComplete="tel" />
-                                    </FieldWrapper>
-                                    <FieldWrapper name="address" label="Address" size="xl">
-                                        <TextInput name="address" placeholder="872 Market Street" autoComplete="street-address" />
-                                    </FieldWrapper>
-                                    <FieldWrapper name="city" label="City" size="md">
-                                        <TextInput name="city" placeholder="San Francisco" autoComplete="address-level2" />
-                                    </FieldWrapper>
-                                    <FieldWrapper name="state" label="State / Region" size="sm">
-                                        <TextInput name="state" placeholder="CA" autoComplete="address-level1" />
-                                    </FieldWrapper>
-                                    <FieldWrapper name="notes" label="Notes" size="xl" helpText="Keep context, preferences, and follow-up reminders together.">
-                                        <Textarea name="notes" rows={4} placeholder="Add context or follow-up details" />
-                                    </FieldWrapper>
-                                </FieldGrid>
-                            )}
-
-                            <div className="flex justify-end gap-3">
+                            <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-8 py-6 dark:border-slate-800 dark:bg-slate-900/60 md:flex-row md:items-center md:justify-end">
                                 <button
                                     type="button"
-                                    className="rounded-2xl border border-slate-800/70 bg-slate-900/60 px-4 py-2 text-sm text-slate-300 transition hover:border-slate-600 hover:text-white"
+                                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950"
                                     onClick={onClose}
                                     disabled={isSubmitting}
                                 >
@@ -307,7 +318,7 @@ export function ContactFormModal({ open, contactId, onClose, onSaved, onError }:
                                 </button>
                                 <button
                                     type="submit"
-                                    className="rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="inline-flex items-center justify-center rounded-2xl border border-transparent bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-offset-slate-950"
                                     disabled={isSubmitting || isLoading}
                                 >
                                     {isSubmitting
