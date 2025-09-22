@@ -293,9 +293,16 @@ async function handleGetSupabase(
 }
 
 type CreateContactPayload = {
+    first_name?: unknown;
+    last_name?: unknown;
+    firstName?: unknown;
+    lastName?: unknown;
     name?: unknown;
     email?: unknown;
     phone?: unknown;
+    address?: unknown;
+    city?: unknown;
+    state?: unknown;
     notes?: unknown;
     business?: unknown;
 };
@@ -345,18 +352,30 @@ async function handlePostSupabase(
         return;
     }
 
-    const name = sanitizeString(payload.name);
+    let first = sanitizeString(payload.first_name ?? payload.firstName);
+    let last = sanitizeString(payload.last_name ?? payload.lastName);
 
-    if (!name) {
-        res.status(400).json({ error: 'Name is required' });
-        return;
+    if (!first && !last) {
+        const name = sanitizeString(payload.name);
+        if (name) {
+            const parsed = splitName(name);
+            first = parsed.first;
+            last = parsed.last;
+        }
     }
 
-    const { first, last } = splitName(name);
     const email = sanitizeString(payload.email);
     const phone = sanitizeString(payload.phone);
+    const address = sanitizeString(payload.address);
+    const city = sanitizeString(payload.city);
+    const state = sanitizeString(payload.state);
     const business = sanitizeString(payload.business);
     const notes = sanitizeString(payload.notes);
+
+    if (!first && !last && !business && !email) {
+        res.status(400).json({ error: 'Provide at least a first name, last name, business, or email for the contact' });
+        return;
+    }
 
     const supabase = getSupabaseClient();
     const now = new Date().toISOString();
@@ -366,6 +385,9 @@ async function handlePostSupabase(
         last_name: last,
         email,
         phone,
+        address,
+        city,
+        state,
         business,
         notes,
         created_at: now,

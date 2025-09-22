@@ -20,6 +20,7 @@ import DataTable from '../../components/data/DataTable';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Textarea } from '../../components/ui/textarea';
 import { LayoutShell, PageHeader } from '../../components/dashboard';
 import { formatDate } from '../../lib/formatters';
 import type { ContactRecord } from '../../types/contact';
@@ -439,20 +440,43 @@ function getStageBadge(stage: ContactStage): string {
     return STAGE_BADGE_VARIANTS[stage] ?? STAGE_BADGE_VARIANTS.new;
 }
 
-const addContactSchema = z.object({
-    name: z.string().trim().min(1, 'Name is required'),
-    email: z
-        .string()
-        .trim()
-        .optional()
-        .transform((value) => (value === '' ? undefined : value))
-        .refine((value) => !value || z.string().email().safeParse(value).success, 'Enter a valid email'),
-    phone: z
-        .string()
-        .trim()
-        .optional()
-        .transform((value) => (value === '' ? undefined : value))
-});
+const optionalTextField = z.preprocess(
+    (value) => {
+        if (typeof value !== 'string') {
+            return undefined;
+        }
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+    },
+    z.string().optional()
+);
+
+const emailField = optionalTextField.refine(
+    (value) => !value || z.string().email().safeParse(value).success,
+    'Enter a valid email'
+);
+
+const addContactSchema = z
+    .object({
+        first_name: optionalTextField,
+        last_name: optionalTextField,
+        email: emailField,
+        phone: optionalTextField,
+        address: optionalTextField,
+        city: optionalTextField,
+        state: optionalTextField,
+        business: optionalTextField,
+        notes: optionalTextField
+    })
+    .superRefine((data, context) => {
+        if (!data.first_name && !data.last_name && !data.business && !data.email) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['first_name'],
+                message: 'Provide at least a first name, last name, business, or email'
+            });
+        }
+    });
 
 type AddContactFormValues = z.infer<typeof addContactSchema>;
 
@@ -471,19 +495,45 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
         formState: { errors }
     } = useForm<AddContactFormValues>({
         resolver: zodResolver(addContactSchema),
-        defaultValues: { name: '', email: '', phone: '' }
+        defaultValues: {
+            first_name: '',
+            last_name: '',
+            email: '',
+            phone: '',
+            address: '',
+            city: '',
+            state: '',
+            business: '',
+            notes: ''
+        }
     });
 
     const [isSubmitting, setIsSubmitting] = React.useState(false);
-    const nameInputRef = React.useRef<HTMLInputElement | null>(null);
+    const firstNameInputRef = React.useRef<HTMLInputElement | null>(null);
 
-    const nameField = register('name');
+    const firstNameField = register('first_name');
+    const lastNameField = register('last_name');
     const emailField = register('email');
     const phoneField = register('phone');
+    const addressField = register('address');
+    const cityField = register('city');
+    const stateField = register('state');
+    const businessField = register('business');
+    const notesField = register('notes');
 
     React.useEffect(() => {
         if (!open) {
-            reset({ name: '', email: '', phone: '' });
+            reset({
+                first_name: '',
+                last_name: '',
+                email: '',
+                phone: '',
+                address: '',
+                city: '',
+                state: '',
+                business: '',
+                notes: ''
+            });
         }
     }, [open, reset]);
 
@@ -494,9 +544,15 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    name: values.name,
+                    first_name: values.first_name,
+                    last_name: values.last_name,
                     email: values.email,
-                    phone: values.phone
+                    phone: values.phone,
+                    address: values.address,
+                    city: values.city,
+                    state: values.state,
+                    business: values.business,
+                    notes: values.notes
                 })
             });
 
@@ -522,7 +578,7 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                 onOpenAutoFocus={(event) => {
                     event.preventDefault();
                     if (typeof window !== 'undefined') {
-                        window.requestAnimationFrame(() => nameInputRef.current?.focus());
+                        window.requestAnimationFrame(() => firstNameInputRef.current?.focus());
                     }
                 }}
             >
@@ -532,44 +588,113 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                         <DialogDescription>Capture a new lead without leaving the table.</DialogDescription>
                     </DialogHeader>
                     <div className="modal-body">
-                        <div className="mb-3">
-                            <Label htmlFor="contact-name">Name</Label>
-                            <Input
-                                id="contact-name"
-                                placeholder="Jamie Rivera"
-                                className={errors.name ? 'is-invalid' : undefined}
-                                {...nameField}
-                                ref={(element) => {
-                                    nameField.ref(element);
-                                    nameInputRef.current = element;
-                                }}
-                                disabled={isSubmitting}
-                            />
-                            <FieldError message={errors.name?.message} />
-                        </div>
-                        <div className="mb-3">
-                            <Label htmlFor="contact-email">Email</Label>
-                            <Input
-                                id="contact-email"
-                                type="email"
-                                placeholder="jamie@example.com"
-                                className={errors.email ? 'is-invalid' : undefined}
-                                {...emailField}
-                                disabled={isSubmitting}
-                            />
-                            <FieldError message={errors.email?.message} />
-                        </div>
-                        <div className="mb-3">
-                            <Label htmlFor="contact-phone">Phone</Label>
-                            <Input
-                                id="contact-phone"
-                                type="tel"
-                                placeholder="(555) 010-1234"
-                                className={errors.phone ? 'is-invalid' : undefined}
-                                {...phoneField}
-                                disabled={isSubmitting}
-                            />
-                            <FieldError message={errors.phone?.message} />
+                        <div className="row g-3">
+                            <div className="col-md-6">
+                                <Label htmlFor="contact-first-name">First name</Label>
+                                <Input
+                                    id="contact-first-name"
+                                    placeholder="Jamie"
+                                    className={errors.first_name ? 'is-invalid' : undefined}
+                                    {...firstNameField}
+                                    ref={(element) => {
+                                        firstNameField.ref(element);
+                                        firstNameInputRef.current = element;
+                                    }}
+                                    disabled={isSubmitting}
+                                />
+                                <FieldError message={errors.first_name?.message} />
+                            </div>
+                            <div className="col-md-6">
+                                <Label htmlFor="contact-last-name">Last name</Label>
+                                <Input
+                                    id="contact-last-name"
+                                    placeholder="Rivera"
+                                    className={errors.last_name ? 'is-invalid' : undefined}
+                                    {...lastNameField}
+                                    disabled={isSubmitting}
+                                />
+                                <FieldError message={errors.last_name?.message} />
+                            </div>
+                            <div className="col-12">
+                                <Label htmlFor="contact-business">Business</Label>
+                                <Input
+                                    id="contact-business"
+                                    placeholder="Aperture Studio"
+                                    className={errors.business ? 'is-invalid' : undefined}
+                                    {...businessField}
+                                    disabled={isSubmitting}
+                                />
+                                <FieldError message={errors.business?.message} />
+                            </div>
+                            <div className="col-md-6">
+                                <Label htmlFor="contact-email">Email</Label>
+                                <Input
+                                    id="contact-email"
+                                    type="email"
+                                    placeholder="jamie@example.com"
+                                    className={errors.email ? 'is-invalid' : undefined}
+                                    {...emailField}
+                                    disabled={isSubmitting}
+                                />
+                                <FieldError message={errors.email?.message} />
+                            </div>
+                            <div className="col-md-6">
+                                <Label htmlFor="contact-phone">Phone</Label>
+                                <Input
+                                    id="contact-phone"
+                                    type="tel"
+                                    placeholder="(555) 010-1234"
+                                    className={errors.phone ? 'is-invalid' : undefined}
+                                    {...phoneField}
+                                    disabled={isSubmitting}
+                                />
+                                <FieldError message={errors.phone?.message} />
+                            </div>
+                            <div className="col-12">
+                                <Label htmlFor="contact-address">Address</Label>
+                                <Input
+                                    id="contact-address"
+                                    placeholder="872 Market Street"
+                                    className={errors.address ? 'is-invalid' : undefined}
+                                    {...addressField}
+                                    disabled={isSubmitting}
+                                />
+                                <FieldError message={errors.address?.message} />
+                            </div>
+                            <div className="col-md-8">
+                                <Label htmlFor="contact-city">City</Label>
+                                <Input
+                                    id="contact-city"
+                                    placeholder="San Francisco"
+                                    className={errors.city ? 'is-invalid' : undefined}
+                                    {...cityField}
+                                    disabled={isSubmitting}
+                                />
+                                <FieldError message={errors.city?.message} />
+                            </div>
+                            <div className="col-md-4">
+                                <Label htmlFor="contact-state">State</Label>
+                                <Input
+                                    id="contact-state"
+                                    placeholder="CA"
+                                    className={errors.state ? 'is-invalid' : undefined}
+                                    {...stateField}
+                                    disabled={isSubmitting}
+                                />
+                                <FieldError message={errors.state?.message} />
+                            </div>
+                            <div className="col-12">
+                                <Label htmlFor="contact-notes">Notes</Label>
+                                <Textarea
+                                    id="contact-notes"
+                                    placeholder="Add context or follow-up details"
+                                    className={errors.notes ? 'is-invalid' : undefined}
+                                    rows={3}
+                                    {...notesField}
+                                    disabled={isSubmitting}
+                                />
+                                <FieldError message={errors.notes?.message} />
+                            </div>
                         </div>
                     </div>
                     <DialogFooter>
