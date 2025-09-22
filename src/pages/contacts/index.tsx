@@ -56,6 +56,11 @@ type ContactTableRow = {
 
 type ToastMessage = { id: string; title: string; tone: 'success' | 'error'; description?: string };
 
+export type AddContactDialogHandle = {
+    open: () => void;
+    close: () => void;
+};
+
 const CONTACT_SORT_OPTIONS: Array<SortOption & { state: SortingState }> = [
     { id: 'name-asc', label: 'Name (A-Z)', state: [{ id: 'name', desc: false }] },
     { id: 'name-desc', label: 'Name (Z-A)', state: [{ id: 'name', desc: true }] },
@@ -105,7 +110,7 @@ function ContactsWorkspace() {
     const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
     const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
     const [notifications, setNotifications] = React.useState<ToastMessage[]>([]);
-    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+    const addContactDialogRef = React.useRef<AddContactDialogHandle | null>(null);
 
     const queryKey = React.useMemo(() => {
         const params = new URLSearchParams();
@@ -271,6 +276,10 @@ function ContactsWorkspace() {
         []
     );
 
+    const handleAddContactClick = React.useCallback(() => {
+        addContactDialogRef.current?.open();
+    }, [addContactDialogRef]);
+
     const emptyMessage = React.useMemo(() => {
         const totalKnown = contactsResponse?.meta.total ?? 0;
         const workspaceEmpty = totalKnown === 0;
@@ -280,7 +289,7 @@ function ContactsWorkspace() {
                     <p className="fw-semibold mb-1">No contacts yet</p>
                     <p className="text-secondary">Start building your network.</p>
                     <div className="mt-3">
-                        <Button type="button" onClick={() => setIsDialogOpen(true)}>
+                        <Button type="button" onClick={handleAddContactClick}>
                             Add contact
                         </Button>
                     </div>
@@ -293,7 +302,7 @@ function ContactsWorkspace() {
         }
 
         return <p className="mb-0">No contacts found.</p>;
-    }, [contactsResponse?.meta.total, hasAnyFilters]);
+    }, [contactsResponse?.meta.total, handleAddContactClick, hasAnyFilters]);
 
     const handleContactCreated = React.useCallback(
         async (record: ContactRecord) => {
@@ -358,7 +367,7 @@ function ContactsWorkspace() {
     return (
         <LayoutShell>
             <PageHeader title="Contacts" description="Manage your studio’s contact list.">
-                <Button type="button" onClick={() => setIsDialogOpen(true)}>
+                <Button type="button" onClick={handleAddContactClick}>
                     Add contact
                 </Button>
             </PageHeader>
@@ -421,8 +430,7 @@ function ContactsWorkspace() {
             </div>
 
             <AddContactDialog
-                open={isDialogOpen}
-                onOpenChange={setIsDialogOpen}
+                ref={addContactDialogRef}
                 onSuccess={handleContactCreated}
                 onError={handleContactError}
             />
@@ -481,13 +489,15 @@ const addContactSchema = z
 type AddContactFormValues = z.infer<typeof addContactSchema>;
 
 type AddContactDialogProps = {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
     onSuccess: (record: ContactRecord) => Promise<void> | void;
     onError: (message: string) => void;
 };
 
-function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContactDialogProps) {
+const AddContactDialog = React.forwardRef<AddContactDialogHandle, AddContactDialogProps>(function AddContactDialog(
+    { onSuccess, onError },
+    ref
+) {
+    const [open, setOpen] = React.useState(false);
     const {
         register,
         handleSubmit,
@@ -537,6 +547,29 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
         }
     }, [open, reset]);
 
+    const closeDialog = React.useCallback(() => {
+        setOpen(false);
+    }, []);
+
+    const handleDialogOpenChange = React.useCallback(
+        (next: boolean) => {
+            if (!next && isSubmitting) {
+                return;
+            }
+            setOpen(next);
+        },
+        [isSubmitting]
+    );
+
+    React.useImperativeHandle(
+        ref,
+        () => ({
+            open: () => setOpen(true),
+            close: closeDialog,
+        }),
+        [closeDialog]
+    );
+
     const onSubmit = handleSubmit(async (values) => {
         setIsSubmitting(true);
         try {
@@ -563,7 +596,7 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
             }
 
             await onSuccess(payload.data);
-            onOpenChange(false);
+            closeDialog();
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to save contact';
             onError(message);
@@ -573,7 +606,7 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
     });
 
     return (
-        <Dialog open={open} onOpenChange={(next) => (!isSubmitting ? onOpenChange(next) : undefined)}>
+        <Dialog open={open} onOpenChange={handleDialogOpenChange}>
             <DialogContent
                 onOpenAutoFocus={(event) => {
                     event.preventDefault();
@@ -588,7 +621,10 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                         <DialogDescription>Capture a new lead without leaving the table.</DialogDescription>
                     </DialogHeader>
                     <div className="modal-body">
-                        <div className="row g-3">
+                        <div className="row gy-3 gx-3">
+                            <div className="col-12">
+                                <p className="text-uppercase text-secondary fw-semibold small mb-0">Primary details</p>
+                            </div>
                             <div className="col-md-6">
                                 <Label htmlFor="contact-first-name">First name</Label>
                                 <Input
@@ -626,6 +662,12 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                                 />
                                 <FieldError message={errors.business?.message} />
                             </div>
+                            <div className="col-12">
+                                <hr className="my-2" />
+                            </div>
+                            <div className="col-12">
+                                <p className="text-uppercase text-secondary fw-semibold small mb-0">Contact information</p>
+                            </div>
                             <div className="col-md-6">
                                 <Label htmlFor="contact-email">Email</Label>
                                 <Input
@@ -649,6 +691,12 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                                     disabled={isSubmitting}
                                 />
                                 <FieldError message={errors.phone?.message} />
+                            </div>
+                            <div className="col-12">
+                                <hr className="my-2" />
+                            </div>
+                            <div className="col-12">
+                                <p className="text-uppercase text-secondary fw-semibold small mb-0">Address</p>
                             </div>
                             <div className="col-12">
                                 <Label htmlFor="contact-address">Address</Label>
@@ -684,6 +732,12 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                                 <FieldError message={errors.state?.message} />
                             </div>
                             <div className="col-12">
+                                <hr className="my-2" />
+                            </div>
+                            <div className="col-12">
+                                <p className="text-uppercase text-secondary fw-semibold small mb-0">Notes</p>
+                            </div>
+                            <div className="col-12">
                                 <Label htmlFor="contact-notes">Notes</Label>
                                 <Textarea
                                     id="contact-notes"
@@ -698,7 +752,7 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                        <Button type="button" variant="ghost" onClick={closeDialog} disabled={isSubmitting}>
                             Cancel
                         </Button>
                         <Button type="submit" isLoading={isSubmitting} disabled={isSubmitting}>
@@ -709,7 +763,9 @@ function AddContactDialog({ open, onOpenChange, onSuccess, onError }: AddContact
             </DialogContent>
         </Dialog>
     );
-}
+});
+
+AddContactDialog.displayName = 'AddContactDialog';
 
 type FieldErrorProps = { message?: string };
 
