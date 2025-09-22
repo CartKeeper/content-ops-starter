@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import dayjs from 'dayjs';
 
 import type { BookingStatus } from './BookingList';
@@ -289,24 +289,26 @@ export function QuickSetupModal({ open, onClose }: QuickSetupModalProps) {
 
     return (
         <Dialog.Root open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-            <Dialog.Portal forceMount>
-                <Dialog.Overlay asChild>
-                    <motion.div
-                        className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeOut' }}
-                    />
-                </Dialog.Overlay>
-                <Dialog.Content asChild>
-                    <motion.div
-                        className="relative z-[101] w-full max-w-5xl rounded-[32px] border border-white/20 bg-white/85 p-8 shadow-2xl backdrop-blur-xl transition dark:border-slate-700/60 dark:bg-slate-950/80"
-                        initial={{ opacity: 0, y: 32, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -24, scale: 0.98 }}
-                        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                    >
+            <AnimatePresence>
+                {open ? (
+                    <Dialog.Portal forceMount>
+                        <Dialog.Overlay asChild>
+                            <motion.div
+                                className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2, ease: 'easeOut' }}
+                            />
+                        </Dialog.Overlay>
+                        <Dialog.Content asChild>
+                            <motion.div
+                                className="relative z-[101] w-full max-w-5xl rounded-[32px] border border-white/20 bg-white/85 p-8 shadow-2xl backdrop-blur-xl transition dark:border-slate-700/60 dark:bg-slate-950/80"
+                                initial={{ opacity: 0, y: 32, scale: 0.98 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -24, scale: 0.98 }}
+                                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                            >
                         <Dialog.Close asChild>
                             <button
                                 type="button"
@@ -603,6 +605,8 @@ export function QuickSetupModal({ open, onClose }: QuickSetupModalProps) {
                     </motion.div>
                 </Dialog.Content>
             </Dialog.Portal>
+                ) : null}
+            </AnimatePresence>
         </Dialog.Root>
     );
 }
