@@ -25,6 +25,7 @@ import {
 } from './icons';
 import { useCrmAuth } from './CrmAuthGuard';
 import { useIntegrations } from './integration-context';
+import { QuickSetupModal } from './QuickSetupModal';
 
 type WorkspaceLayoutProps = {
     children: React.ReactNode;
@@ -36,12 +37,15 @@ type NavItem = {
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
 
-type QuickAction = {
-    href: string;
+type QuickActionBase = {
     label: string;
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     variant: 'primary' | 'outline';
 };
+
+type QuickAction =
+    | (QuickActionBase & { href: string; onClick?: undefined })
+    | (QuickActionBase & { href?: undefined; onClick: () => void });
 
 type AccentOption = {
     id: string;
@@ -150,13 +154,6 @@ const navItems: NavItem[] = [
     { href: '/projects', label: 'Projects', icon: FolderIcon },
     { href: '/accounts-payable', label: 'Accounts Payable', icon: ReceiptIcon },
     { href: '/settings', label: 'Settings', icon: SettingsIcon }
-];
-
-const quickActions: QuickAction[] = [
-    { href: '/studio/calendars', label: 'New booking', icon: CalendarIcon, variant: 'primary' },
-    { href: '/studio/calendars', label: 'Quick set up', icon: CheckIcon, variant: 'outline' },
-    { href: '/studio/calendars', label: 'Plan a shoot', icon: PhotoIcon, variant: 'primary' },
-    { href: '/invoices', label: 'Review billing', icon: ReceiptIcon, variant: 'outline' }
 ];
 
 const ACCENT_STORAGE_KEY = 'crm-accent-preference';
@@ -414,6 +411,9 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
     const { connectedIntegrations } = useIntegrations();
     const identity = useNetlifyIdentity();
     const { signOut } = useCrmAuth();
+    const [isQuickSetupOpen, setIsQuickSetupOpen] = React.useState(false);
+    const handleOpenQuickSetup = React.useCallback(() => setIsQuickSetupOpen(true), []);
+    const handleCloseQuickSetup = React.useCallback(() => setIsQuickSetupOpen(false), []);
 
     const trimmedName = typeof identity.user?.name === 'string' ? identity.user.name.trim() : '';
     const trimmedEmail = typeof identity.user?.email === 'string' ? identity.user.email.trim() : '';
@@ -473,6 +473,16 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
             console.error('Sign out failed', error);
         }
     }, [closeProfile, signOut]);
+
+    const quickActions: QuickAction[] = React.useMemo(
+        () => [
+            { href: '/studio/calendars', label: 'New booking', icon: CalendarIcon, variant: 'primary' },
+            { onClick: handleOpenQuickSetup, label: 'Quick set up', icon: CheckIcon, variant: 'outline' },
+            { href: '/studio/calendars', label: 'Plan a shoot', icon: PhotoIcon, variant: 'primary' },
+            { href: '/invoices', label: 'Review billing', icon: ReceiptIcon, variant: 'outline' }
+        ],
+        [handleOpenQuickSetup]
+    );
 
     const [accent, setAccent] = React.useState<string>(() => {
         if (typeof window === 'undefined') {
@@ -1129,15 +1139,29 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                             action.variant === 'primary' ? 'btn-primary' : 'btn-outline-primary'
                                         );
                                         const ActionIcon = action.icon;
+                                        if ('href' in action && action.href) {
+                                            return (
+                                                <Link
+                                                    key={`quick-action-${action.href}-${action.label}`}
+                                                    href={action.href}
+                                                    className={actionClassName}
+                                                >
+                                                    <ActionIcon className="icon" aria-hidden />
+                                                    <span>{action.label}</span>
+                                                </Link>
+                                            );
+                                        }
+
                                         return (
-                                            <Link
-                                                key={`quick-action-${action.href}-${action.label}`}
-                                                href={action.href}
+                                            <button
+                                                key={`quick-action-${action.label}`}
+                                                type="button"
                                                 className={actionClassName}
+                                                onClick={action.onClick}
                                             >
                                                 <ActionIcon className="icon" aria-hidden />
                                                 <span>{action.label}</span>
-                                            </Link>
+                                            </button>
                                         );
                                     })}
                                 </nav>
@@ -1149,6 +1173,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                     <div className="container-xl">{children}</div>
                 </main>
             </div>
+            <QuickSetupModal open={isQuickSetupOpen} onClose={handleCloseQuickSetup} />
         </div>
     );
 }
