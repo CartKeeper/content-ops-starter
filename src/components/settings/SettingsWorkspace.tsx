@@ -57,14 +57,28 @@ type NoticeState = {
     message: string;
 };
 
+type EmailConnectionStatus = 'connected' | 'disconnected';
+
+type EmailSettingsFormState = {
+    provider: string;
+    fromName: string;
+    fromEmail: string;
+    replyTo: string;
+    smtpHost: string;
+    smtpPort: string;
+    encryption: 'none' | 'ssl' | 'tls';
+    username: string;
+    password: string;
+};
+
 type SettingsWorkspaceProps = {
     activeSection: SettingsSection;
 };
 
-const NOTICE_CLASS: Record<NoticeState['type'], string> = {
-    success: 'alert-success',
-    error: 'alert-danger',
-    info: 'alert-secondary'
+const NOTICE_STYLES: Record<NoticeState['type'], string> = {
+    success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
+    error: 'border-red-500/40 bg-red-500/10 text-red-200',
+    info: 'border-slate-500/40 bg-slate-500/15 text-slate-200'
 };
 
 const SECTION_TITLES: Record<SettingsSection, string> = SETTINGS_TABS.reduce(
@@ -79,6 +93,18 @@ const EMPTY_PROFILE_FORM: ProfileFormState = {
     phone: '',
     welcomeMessage: DEFAULT_WELCOME_MESSAGE,
     avatarUrl: ''
+};
+
+const EMPTY_EMAIL_SETTINGS: EmailSettingsFormState = {
+    provider: 'Custom SMTP',
+    fromName: 'Aperture Studio',
+    fromEmail: 'hello@aperture.studio',
+    replyTo: 'team@aperture.studio',
+    smtpHost: 'smtp.aperture.studio',
+    smtpPort: '587',
+    encryption: 'tls',
+    username: 'hello@aperture.studio',
+    password: ''
 };
 
 function safeTrim(value: string | null | undefined): string {
@@ -120,6 +146,10 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
     const [isSavingProfile, setIsSavingProfile] = React.useState(false);
     const [isSendingInvite, setIsSendingInvite] = React.useState(false);
     const [notice, setNotice] = React.useState<NoticeState | null>(null);
+    const [emailForm, setEmailForm] = React.useState<EmailSettingsFormState>(EMPTY_EMAIL_SETTINGS);
+    const [emailStatus, setEmailStatus] = React.useState<EmailConnectionStatus>('disconnected');
+    const [isSavingEmail, setIsSavingEmail] = React.useState(false);
+    const [isTestingEmail, setIsTestingEmail] = React.useState(false);
     const isMountedRef = React.useRef(true);
 
     React.useEffect(() => {
@@ -303,6 +333,106 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
         }
     }, [isSendingInvite, profile?.id, profileForm.email]);
 
+    const handleEmailFieldChange = React.useCallback(
+        (key: keyof EmailSettingsFormState) =>
+            (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+                const value = event.target.value;
+                setEmailForm((previous) => ({ ...previous, [key]: value }));
+                if (emailStatus === 'connected') {
+                    setEmailStatus('disconnected');
+                }
+            },
+        [emailStatus]
+    );
+
+    const isEmailFormComplete = React.useMemo(
+        () =>
+            emailForm.fromName.trim().length > 0 &&
+            emailForm.fromEmail.trim().length > 0 &&
+            emailForm.replyTo.trim().length > 0 &&
+            emailForm.smtpHost.trim().length > 0 &&
+            emailForm.smtpPort.trim().length > 0 &&
+            emailForm.username.trim().length > 0 &&
+            emailForm.password.trim().length > 0,
+        [emailForm]
+    );
+
+    const handleEmailSubmit = React.useCallback(
+        async (event: React.FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            if (isSavingEmail) {
+                return;
+            }
+
+            if (isMountedRef.current) {
+                setIsSavingEmail(true);
+                setNotice(null);
+            }
+
+            try {
+                await new Promise<void>((resolve) => {
+                    globalThis.setTimeout(resolve, 900);
+                });
+
+                if (isMountedRef.current) {
+                    setEmailStatus('connected');
+                    setNotice({ type: 'success', message: 'Outgoing email settings saved.' });
+                }
+            } catch (error) {
+                if (isMountedRef.current) {
+                    setNotice({ type: 'error', message: 'Unable to save outgoing email settings.' });
+                }
+            } finally {
+                if (isMountedRef.current) {
+                    setIsSavingEmail(false);
+                }
+            }
+        },
+        [isSavingEmail]
+    );
+
+    const handleTestEmail = React.useCallback(async () => {
+        if (isTestingEmail) {
+            return;
+        }
+        if (!isEmailFormComplete || emailStatus !== 'connected') {
+            setNotice({
+                type: 'error',
+                message: 'Save and connect your outgoing email before sending a test message.'
+            });
+            return;
+        }
+
+        if (isMountedRef.current) {
+            setIsTestingEmail(true);
+            setNotice(null);
+        }
+
+        try {
+            await new Promise<void>((resolve) => {
+                globalThis.setTimeout(resolve, 900);
+            });
+
+            if (isMountedRef.current) {
+                setNotice({ type: 'info', message: 'Test email queued for delivery.' });
+            }
+        } catch (error) {
+            if (isMountedRef.current) {
+                setNotice({ type: 'error', message: 'Unable to send test email.' });
+            }
+        } finally {
+            if (isMountedRef.current) {
+                setIsTestingEmail(false);
+            }
+        }
+    }, [emailStatus, isEmailFormComplete, isTestingEmail]);
+
+    const handleEmailDisconnect = React.useCallback(() => {
+        setEmailStatus('disconnected');
+        setEmailForm((previous) => ({ ...previous, password: '' }));
+        setNotice({ type: 'info', message: 'Outgoing email connection disabled.' });
+    }, []);
+
     const availableOptions = React.useMemo(
         () =>
             availableIntegrations.filter(
@@ -357,8 +487,8 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
     const currentUserId = profile?.id ?? identity.user?.id ?? null;
 
     const statusBadgeTone: Record<IntegrationStatus, string> = {
-        Connected: 'bg-success-lt text-success',
-        Syncing: 'bg-primary-lt text-primary'
+        Connected: 'bg-emerald-500/20 text-emerald-200',
+        Syncing: 'bg-sky-500/20 text-sky-200'
     };
 
     const statusLabels: Record<IntegrationStatus, string> = {
@@ -367,9 +497,10 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
     };
 
     const renderPlaceholder = (title: string, description: string) => (
-        <section className="rounded-3xl border border-slate-800/80 bg-slate-950/60 p-10 text-sm text-slate-300">
-            <h2 className="text-lg font-semibold text-white">{title}</h2>
-            <p className="mt-3 max-w-2xl text-slate-400">{description}</p>
+        <section className="mt-14 rounded-3xl border border-slate-800 bg-slate-950/60 p-10 shadow-[0_30px_80px_-60px_rgba(15,23,42,0.95)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.48em] text-[#4DE5FF]">Coming soon</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">{title}</h2>
+            <p className="mt-2 max-w-2xl text-sm text-slate-300">{description}</p>
         </section>
     );
 
@@ -377,345 +508,539 @@ export function SettingsWorkspace({ activeSection }: SettingsWorkspaceProps) {
 
     if (activeSection === 'general') {
         sectionContent = (
-            <div className="row row-cards">
-                <div className="col-12">
-                    <div className="card">
-                        <div className="card-header d-flex align-items-center justify-content-between">
-                            <div>
-                                <h2 className="card-title mb-0">Studio profile</h2>
-                                <div className="text-secondary">Update contact details and booking hand-offs.</div>
-                            </div>
-                            <span className="badge bg-success-lt text-success">Live</span>
-                        </div>
-                        <div className="card-body">
-                            {isLoadingProfile && !profile ? (
-                                <div className="text-secondary small mb-3">Loading profile…</div>
-                            ) : null}
-                            {notice ? (
-                                <div className={`alert ${NOTICE_CLASS[notice.type]} mb-3`} role="alert">
-                                    {notice.message}
-                                </div>
-                            ) : null}
-                            <form className="row g-3" onSubmit={handleProfileSubmit}>
-                                <div className="col-12">
-                                    <label className="form-label" htmlFor="studio-name">
-                                        Studio name
-                                    </label>
-                                    <input
-                                        id="studio-name"
-                                        type="text"
-                                        className="form-control"
-                                        defaultValue="Aperture Studio"
-                                    />
-                                </div>
-                                <div className="col-12">
-                                    <label className="form-label" htmlFor="profile-avatar">
-                                        Profile photo
-                                    </label>
-                                    <div className="d-flex align-items-center gap-3">
-                                        <span className="avatar avatar-xl" style={{ backgroundImage: `url(${avatarPreview})` }} />
-                                        <div className="flex-grow-1">
-                                            <input
-                                                id="profile-avatar"
-                                                type="url"
-                                                className="form-control"
-                                                value={profileForm.avatarUrl}
-                                                onChange={handleFieldChange('avatarUrl')}
-                                                placeholder="https://"
-                                                disabled={isProfileBusy}
-                                            />
-                                            <div className="form-text">Use a square image for best results.</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="col-md-6">
-                                    <label className="form-label" htmlFor="profile-name">
-                                        Primary contact
-                                    </label>
-                                    <input
-                                        id="profile-name"
-                                        type="text"
-                                        className="form-control"
-                                        value={profileForm.name}
-                                        onChange={handleFieldChange('name')}
-                                        disabled={isProfileBusy}
-                                    />
-                                </div>
-                                <div className="col-md-6">
-                                    <label className="form-label" htmlFor="profile-role">
-                                        Role
-                                    </label>
-                                    <input
-                                        id="profile-role"
-                                        type="text"
-                                        className="form-control"
-                                        value={profileForm.roleTitle}
-                                        onChange={handleFieldChange('roleTitle')}
-                                        disabled={isProfileBusy}
-                                    />
-                                </div>
-                                <div className="col-md-6">
-                                    <label className="form-label" htmlFor="profile-email">
-                                        Email
-                                    </label>
-                                    <input
-                                        id="profile-email"
-                                        type="email"
-                                        className="form-control"
-                                        value={profileForm.email}
-                                        onChange={handleFieldChange('email')}
-                                        disabled={isProfileBusy}
-                                    />
-                                </div>
-                                <div className="col-md-6">
-                                    <label className="form-label" htmlFor="profile-phone">
-                                        Phone number
-                                    </label>
-                                    <input
-                                        id="profile-phone"
-                                        type="tel"
-                                        className="form-control"
-                                        value={profileForm.phone}
-                                        onChange={handleFieldChange('phone')}
-                                        disabled={isProfileBusy}
-                                    />
-                                </div>
-                                <div className="col-12">
-                                    <label className="form-label" htmlFor="profile-welcome">
-                                        Welcome message
-                                    </label>
-                                    <textarea
-                                        id="profile-welcome"
-                                        className="form-control"
-                                        rows={3}
-                                        value={profileForm.welcomeMessage}
-                                        onChange={handleFieldChange('welcomeMessage')}
-                                        disabled={isProfileBusy}
-                                    />
-                                </div>
-                                <div className="col-12 d-flex flex-wrap gap-2">
-                                    <button
-                                        type="submit"
-                                        className="btn btn-primary"
-                                        disabled={isProfileBusy || profileForm.email.trim().length === 0}
-                                    >
-                                        {isSavingProfile ? 'Saving…' : 'Save profile'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline-secondary"
-                                        onClick={handleSendInvite}
-                                        disabled={
-                                            isLoadingProfile ||
-                                            isSendingInvite ||
-                                            profileForm.email.trim().length === 0
-                                        }
-                                    >
-                                        {isSendingInvite ? 'Sending…' : 'Send preview invite'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+            <section className="mt-14 rounded-3xl border border-slate-800 bg-slate-950/60 p-10 shadow-[0_30px_80px_-60px_rgba(15,23,42,0.95)]">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.48em] text-[#4DE5FF]">Studio profile</p>
+                        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Workspace identity</h2>
+                        <p className="mt-2 max-w-3xl text-sm text-slate-300">
+                            Update contact details and booking hand-offs for new projects.
+                        </p>
                     </div>
+                    <span className="inline-flex items-center rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-200">
+                        Live
+                    </span>
                 </div>
-            </div>
+                {isLoadingProfile && !profile ? (
+                    <div className="mt-6 text-sm text-slate-400">Loading profile…</div>
+                ) : null}
+                {notice ? (
+                    <div
+                        className={`mt-6 rounded-2xl border px-5 py-4 text-sm ${NOTICE_STYLES[notice.type]}`}
+                        role="status"
+                    >
+                        {notice.message}
+                    </div>
+                ) : null}
+                <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+                    <form className="space-y-6" onSubmit={handleProfileSubmit}>
+                        <div className="grid gap-6">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-300" htmlFor="studio-name">
+                                    Studio name
+                                </label>
+                                <input
+                                    id="studio-name"
+                                    type="text"
+                                    defaultValue="Aperture Studio"
+                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 sm:flex-row sm:items-center">
+                                <span
+                                    className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900"
+                                    style={{ backgroundImage: `url(${avatarPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                                    aria-hidden
+                                />
+                                <div className="flex-1">
+                                    <label className="block text-xs font-medium text-slate-300" htmlFor="profile-avatar">
+                                        Profile photo URL
+                                    </label>
+                                    <input
+                                        id="profile-avatar"
+                                        type="url"
+                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                        value={profileForm.avatarUrl}
+                                        onChange={handleFieldChange('avatarUrl')}
+                                        placeholder="https://"
+                                        disabled={isProfileBusy}
+                                    />
+                                    <p className="mt-1 text-xs text-slate-400">Use a square image for best results.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-300" htmlFor="profile-name">
+                                    Primary contact
+                                </label>
+                                <input
+                                    id="profile-name"
+                                    type="text"
+                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                    value={profileForm.name}
+                                    onChange={handleFieldChange('name')}
+                                    disabled={isProfileBusy}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-300" htmlFor="profile-role">
+                                    Role
+                                </label>
+                                <input
+                                    id="profile-role"
+                                    type="text"
+                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                    value={profileForm.roleTitle}
+                                    onChange={handleFieldChange('roleTitle')}
+                                    disabled={isProfileBusy}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-300" htmlFor="profile-email">
+                                    Email
+                                </label>
+                                <input
+                                    id="profile-email"
+                                    type="email"
+                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                    value={profileForm.email}
+                                    onChange={handleFieldChange('email')}
+                                    disabled={isProfileBusy}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-300" htmlFor="profile-phone">
+                                    Phone number
+                                </label>
+                                <input
+                                    id="profile-phone"
+                                    type="tel"
+                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                    value={profileForm.phone}
+                                    onChange={handleFieldChange('phone')}
+                                    disabled={isProfileBusy}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-slate-300" htmlFor="profile-welcome">
+                                Welcome message
+                            </label>
+                            <textarea
+                                id="profile-welcome"
+                                className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                rows={4}
+                                value={profileForm.welcomeMessage}
+                                onChange={handleFieldChange('welcomeMessage')}
+                                disabled={isProfileBusy}
+                            />
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                            <button
+                                type="submit"
+                                className="rounded-xl bg-[#4DE5FF] px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-[#86f0ff] disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={isProfileBusy || profileForm.email.trim().length === 0}
+                            >
+                                {isSavingProfile ? 'Saving…' : 'Save profile'}
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-[#4DE5FF] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={handleSendInvite}
+                                disabled={isLoadingProfile || isSendingInvite || profileForm.email.trim().length === 0}
+                            >
+                                {isSendingInvite ? 'Sending…' : 'Send preview invite'}
+                            </button>
+                        </div>
+                    </form>
+                    <form
+                        className="flex h-full flex-col rounded-2xl border border-slate-800/80 bg-slate-900/40 p-6 shadow-[0_20px_45px_-40px_rgba(15,23,42,0.9)]"
+                        onSubmit={handleEmailSubmit}
+                    >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#4DE5FF]">Deliverability</p>
+                                <h3 className="mt-2 text-lg font-semibold text-white">Outgoing email</h3>
+                                <p className="mt-2 text-xs text-slate-400">
+                                    Connect your sending domain to deliver onboarding emails directly from the CRM.
+                                </p>
+                            </div>
+                            <span
+                                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                                    emailStatus === 'connected'
+                                        ? 'bg-emerald-500/20 text-emerald-200'
+                                        : 'bg-slate-800 text-slate-300'
+                                }`}
+                            >
+                                {emailStatus === 'connected' ? 'Connected' : 'Not connected'}
+                            </span>
+                        </div>
+                        <div className="mt-6 grid flex-1 gap-4">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-provider">
+                                        Provider
+                                    </label>
+                                    <select
+                                        id="email-provider"
+                                        value={emailForm.provider}
+                                        onChange={handleEmailFieldChange('provider')}
+                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                    >
+                                        <option value="Custom SMTP">Custom SMTP</option>
+                                        <option value="SendGrid">SendGrid</option>
+                                        <option value="Mailgun">Mailgun</option>
+                                        <option value="Postmark">Postmark</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-encryption">
+                                        Encryption
+                                    </label>
+                                    <select
+                                        id="email-encryption"
+                                        value={emailForm.encryption}
+                                        onChange={handleEmailFieldChange('encryption')}
+                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                    >
+                                        <option value="tls">TLS</option>
+                                        <option value="ssl">SSL</option>
+                                        <option value="none">None</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-from-name">
+                                        From name
+                                    </label>
+                                    <input
+                                        id="email-from-name"
+                                        type="text"
+                                        value={emailForm.fromName}
+                                        onChange={handleEmailFieldChange('fromName')}
+                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                        placeholder="Aperture Studio"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-from-address">
+                                        From email
+                                    </label>
+                                    <input
+                                        id="email-from-address"
+                                        type="email"
+                                        value={emailForm.fromEmail}
+                                        onChange={handleEmailFieldChange('fromEmail')}
+                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                        placeholder="hello@aperture.studio"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-reply-to">
+                                        Reply-to address
+                                    </label>
+                                    <input
+                                        id="email-reply-to"
+                                        type="email"
+                                        value={emailForm.replyTo}
+                                        onChange={handleEmailFieldChange('replyTo')}
+                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                        placeholder="team@aperture.studio"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-username">
+                                        SMTP username
+                                    </label>
+                                    <input
+                                        id="email-username"
+                                        type="text"
+                                        value={emailForm.username}
+                                        onChange={handleEmailFieldChange('username')}
+                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                        placeholder="hello@aperture.studio"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-host">
+                                        SMTP host
+                                    </label>
+                                    <input
+                                        id="email-host"
+                                        type="text"
+                                        value={emailForm.smtpHost}
+                                        onChange={handleEmailFieldChange('smtpHost')}
+                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                        placeholder="smtp.aperture.studio"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-300" htmlFor="email-port">
+                                        Port
+                                    </label>
+                                    <input
+                                        id="email-port"
+                                        type="text"
+                                        value={emailForm.smtpPort}
+                                        onChange={handleEmailFieldChange('smtpPort')}
+                                        className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                        placeholder="587"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-300" htmlFor="email-password">
+                                    SMTP password
+                                </label>
+                                <input
+                                    id="email-password"
+                                    type="password"
+                                    value={emailForm.password}
+                                    onChange={handleEmailFieldChange('password')}
+                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                    placeholder="••••••••"
+                                    autoComplete="new-password"
+                                />
+                            </div>
+                        </div>
+                        <div className="mt-6 flex flex-wrap gap-3">
+                            <button
+                                type="submit"
+                                className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={!isEmailFormComplete || isSavingEmail}
+                            >
+                                {isSavingEmail ? 'Saving…' : emailStatus === 'connected' ? 'Update connection' : 'Save connection'}
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-[#4DE5FF] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={handleTestEmail}
+                                disabled={!isEmailFormComplete || isSavingEmail || isTestingEmail}
+                            >
+                                {isTestingEmail ? 'Sending…' : 'Send test email'}
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-xl border border-slate-800 px-4 py-2 text-sm font-semibold text-slate-400 transition hover:border-red-500 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={handleEmailDisconnect}
+                                disabled={emailStatus === 'disconnected'}
+                            >
+                                Disconnect
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
         );
     } else if (activeSection === 'notifications') {
         sectionContent = (
-            <div className="row row-cards">
-                <div className="col-xl-6">
-                    <div className="card h-100">
-                        <div className="card-header">
-                            <h2 className="card-title mb-0">Notification preferences</h2>
-                            <div className="text-secondary">Choose how the studio stays in sync.</div>
-                        </div>
-                        <div className="card-body d-flex flex-column gap-3">
-                            {notificationPreferences.map((preference) => (
-                                <div key={preference.id} className="form-check form-switch crm-settings-toggle">
-                                    <input
-                                        className="form-check-input"
-                                        type="checkbox"
-                                        role="switch"
-                                        id={preference.id}
-                                        defaultChecked={preference.defaultChecked}
-                                    />
-                                    <label className="form-check-label" htmlFor={preference.id}>
-                                        <span className="fw-semibold d-block">{preference.label}</span>
-                                        <span className="text-secondary">{preference.description}</span>
-                                    </label>
-                                </div>
-                            ))}
-                            <div className="mt-2">
-                                <button type="button" className="btn btn-outline-secondary">
-                                    Update notifications
-                                </button>
-                            </div>
-                        </div>
+            <section className="mt-14 rounded-3xl border border-slate-800 bg-slate-950/60 p-10 shadow-[0_30px_80px_-60px_rgba(15,23,42,0.95)]">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.48em] text-[#4DE5FF]">Communications</p>
+                        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Notification preferences</h2>
+                        <p className="mt-2 max-w-2xl text-sm text-slate-300">
+                            Choose how the studio stays in sync when new activity happens across projects.
+                        </p>
                     </div>
                 </div>
-            </div>
+                <div className="mt-8 space-y-4">
+                    {notificationPreferences.map((preference) => (
+                        <label
+                            key={preference.id}
+                            htmlFor={preference.id}
+                            className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 transition hover:border-[#4DE5FF]/60"
+                        >
+                            <span className="text-sm text-slate-200">
+                                <span className="block font-semibold text-white">{preference.label}</span>
+                                <span className="mt-1 block text-xs text-slate-400">{preference.description}</span>
+                            </span>
+                            <input
+                                id={preference.id}
+                                type="checkbox"
+                                defaultChecked={preference.defaultChecked}
+                                className="h-5 w-5 shrink-0 rounded border-slate-700 bg-slate-950 text-[#4DE5FF] focus:ring-[#4DE5FF]"
+                            />
+                        </label>
+                    ))}
+                </div>
+                <div className="mt-8 flex flex-wrap gap-3">
+                    <button
+                        type="button"
+                        className="rounded-xl bg-[#4DE5FF] px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-[#86f0ff]"
+                    >
+                        Save preferences
+                    </button>
+                    <button
+                        type="button"
+                        className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-[#4DE5FF] hover:text-white"
+                    >
+                        Reset defaults
+                    </button>
+                </div>
+            </section>
         );
     } else if (activeSection === 'integrations') {
         sectionContent = (
-            <div className="row row-cards">
-                <div className="col-12">
-                    <div className="card">
-                        <div className="card-header d-flex align-items-center justify-content-between">
-                            <div>
-                                <h2 className="card-title mb-0">Connected integrations</h2>
-                                <div className="text-secondary">Bring your favorite tools into the workflow.</div>
-                            </div>
-                            <button
-                                type="button"
-                                className="btn btn-outline-secondary"
-                                onClick={() => setIsAddOpen((previous) => !previous)}
-                                aria-expanded={isAddOpen}
-                                disabled={availableOptions.length === 0 && !isAddOpen}
-                            >
-                                {isAddOpen ? 'Close' : 'Add integration'}
-                            </button>
-                        </div>
-                        <div className="card-body d-grid gap-3">
-                            {isAddOpen ? (
-                                <div className="crm-integration-add p-3 border rounded">
-                                    <div className="fw-semibold mb-1">Connect a new integration</div>
-                                    {availableOptions.length > 0 ? (
-                                        <>
-                                            <label className="form-label" htmlFor="integration-select">
-                                                Choose from connected services
-                                            </label>
-                                            <select
-                                                id="integration-select"
-                                                className="form-select"
-                                                value={selectedIntegrationId}
-                                                onChange={(event) => setSelectedIntegrationId(event.target.value)}
-                                            >
-                                                {INTEGRATION_CATEGORIES.map((category) => {
-                                                    const categoryOptions = availableOptions.filter(
-                                                        (option) => option.categoryId === category.id
-                                                    );
-                                                    if (categoryOptions.length === 0) {
-                                                        return null;
-                                                    }
-                                                    return (
-                                                        <optgroup key={category.id} label={category.label}>
-                                                            {categoryOptions.map((option) => (
-                                                                <option key={option.id} value={option.id}>
-                                                                    {option.name}
-                                                                </option>
-                                                            ))}
-                                                        </optgroup>
-                                                    );
-                                                })}
-                                            </select>
-                                            <div className="d-flex gap-2 mt-3">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-primary"
-                                                    onClick={handleAddIntegration}
-                                                    disabled={!selectedIntegrationId}
-                                                >
-                                                    Connect integration
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline-secondary"
-                                                    onClick={() => setIsAddOpen(false)}
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="text-secondary">
-                                            All available integrations are already connected.
-                                        </div>
-                                    )}
-                                </div>
-                            ) : null}
-
-                            {orderedIntegrations.length > 0 ? (
-                                orderedIntegrations.map((integration) => {
-                                    const Icon = integration.definition.icon;
-                                    const iconStyle: React.CSSProperties = {
-                                        backgroundColor: integration.definition.badgeColor,
-                                        color: integration.definition.iconColor ?? '#ffffff'
-                                    };
-
-                                    return (
-                                        <div key={integration.id} className="crm-integration-item">
-                                            <div className="d-flex align-items-center gap-3">
-                                                <span className="crm-integration-icon" style={iconStyle} aria-hidden>
-                                                    <Icon size={20} aria-hidden />
-                                                </span>
-                                                <div>
-                                                    <div className="fw-semibold">{integration.definition.name}</div>
-                                                    <div className="text-secondary small">
-                                                        {integration.definition.description}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="crm-integration-actions">
-                                                <span
-                                                    className={`badge ${statusBadgeTone[integration.status]} d-block mb-2`}
-                                                >
-                                                    {statusLabels[integration.status]}
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-link p-0"
-                                                    onClick={() =>
-                                                        setActiveIntegrationId((previous) =>
-                                                            previous === integration.id ? null : integration.id
-                                                        )
-                                                    }
-                                                    aria-expanded={activeIntegrationId === integration.id}
-                                                >
-                                                    Manage
-                                                </button>
-                                                {activeIntegrationId === integration.id ? (
-                                                    <div className="crm-integration-manage mt-2">
-                                                        <div className="btn-group btn-group-sm" role="group">
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-outline-success"
-                                                                onClick={() => handleStatusChange(integration.id, 'Connected')}
-                                                                disabled={integration.status === 'Connected'}
-                                                            >
-                                                                Mark connected
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-outline-primary"
-                                                                onClick={() => handleStatusChange(integration.id, 'Syncing')}
-                                                                disabled={integration.status === 'Syncing'}
-                                                            >
-                                                                Mark syncing
-                                                            </button>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-outline-danger btn-sm"
-                                                            onClick={() => handleDisconnect(integration.id)}
-                                                        >
-                                                            Disconnect
-                                                        </button>
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <div className="crm-integration-empty text-center text-secondary py-4">
-                                    <p className="mb-2">No integrations are connected yet.</p>
-                                    <p className="mb-0">Use the add integration button to bring tools into your dashboard.</p>
-                                </div>
-                            )}
-                        </div>
+            <section className="mt-14 rounded-3xl border border-slate-800 bg-slate-950/60 p-10 shadow-[0_30px_80px_-60px_rgba(15,23,42,0.95)]">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.48em] text-[#4DE5FF]">Connections</p>
+                        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Connected integrations</h2>
+                        <p className="mt-2 max-w-3xl text-sm text-slate-300">
+                            Bring your favorite tools into the workflow and keep everything in sync.
+                        </p>
                     </div>
+                    <button
+                        type="button"
+                        className="self-start rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-[#4DE5FF] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => setIsAddOpen((previous) => !previous)}
+                        aria-expanded={isAddOpen}
+                        disabled={availableOptions.length === 0 && !isAddOpen}
+                    >
+                        {isAddOpen ? 'Close' : 'Add integration'}
+                    </button>
                 </div>
-            </div>
+                {isAddOpen ? (
+                    <div className="mt-6 rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-6">
+                        <h3 className="text-sm font-semibold text-slate-200">Connect a new integration</h3>
+                        {availableOptions.length > 0 ? (
+                            <>
+                                <label className="mt-4 block text-xs font-medium text-slate-300" htmlFor="integration-select">
+                                    Choose from connected services
+                                </label>
+                                <select
+                                    id="integration-select"
+                                    className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-[#4DE5FF] focus:ring-2 focus:ring-[#4DE5FF]/60"
+                                    value={selectedIntegrationId}
+                                    onChange={(event) => setSelectedIntegrationId(event.target.value)}
+                                >
+                                    {INTEGRATION_CATEGORIES.map((category) => {
+                                        const categoryOptions = availableOptions.filter((option) => option.categoryId === category.id);
+                                        if (categoryOptions.length === 0) {
+                                            return null;
+                                        }
+                                        return (
+                                            <optgroup key={category.id} label={category.label}>
+                                                {categoryOptions.map((option) => (
+                                                    <option key={option.id} value={option.id}>
+                                                        {option.name}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        );
+                                    })}
+                                </select>
+                                <div className="mt-4 flex flex-wrap gap-3">
+                                    <button
+                                        type="button"
+                                        className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                                        onClick={handleAddIntegration}
+                                        disabled={!selectedIntegrationId}
+                                    >
+                                        Connect integration
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-[#4DE5FF] hover:text-white"
+                                        onClick={() => setIsAddOpen(false)}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <p className="mt-4 text-sm text-slate-400">All available integrations are already connected.</p>
+                        )}
+                    </div>
+                ) : null}
+                <div className="mt-8 grid gap-4">
+                    {orderedIntegrations.length > 0 ? (
+                        orderedIntegrations.map((integration) => {
+                            const Icon = integration.definition.icon;
+                            return (
+                                <div
+                                    key={integration.id}
+                                    className="flex flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/40 p-5 shadow-[0_24px_60px_-45px_rgba(15,23,42,0.95)] md:flex-row md:items-center md:justify-between"
+                                >
+                                    <div className="flex items-start gap-4">
+                                        <span
+                                            className="flex h-12 w-12 items-center justify-center rounded-2xl text-base font-semibold text-white"
+                                            style={{ backgroundColor: integration.definition.badgeColor, color: integration.definition.iconColor ?? '#ffffff' }}
+                                            aria-hidden
+                                        >
+                                            <Icon size={20} aria-hidden />
+                                        </span>
+                                        <div>
+                                            <p className="text-sm font-semibold text-white">{integration.definition.name}</p>
+                                            <p className="mt-1 text-xs text-slate-400">{integration.definition.description}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-start gap-2 md:items-end">
+                                        <span
+                                            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeTone[integration.status]}`}
+                                        >
+                                            {statusLabels[integration.status]}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="text-sm font-semibold text-[#4DE5FF] transition hover:text-white"
+                                            onClick={() =>
+                                                setActiveIntegrationId((previous) => (previous === integration.id ? null : integration.id))
+                                            }
+                                            aria-expanded={activeIntegrationId === integration.id}
+                                        >
+                                            {activeIntegrationId === integration.id ? 'Hide controls' : 'Manage'}
+                                        </button>
+                                        {activeIntegrationId === integration.id ? (
+                                            <div className="flex flex-col gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-4 text-sm text-slate-200">
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button
+                                                        type="button"
+                                                        className="rounded-xl border border-emerald-400 px-3 py-1 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        onClick={() => handleStatusChange(integration.id, 'Connected')}
+                                                        disabled={integration.status === 'Connected'}
+                                                    >
+                                                        Mark connected
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="rounded-xl border border-sky-400 px-3 py-1 text-xs font-semibold text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        onClick={() => handleStatusChange(integration.id, 'Syncing')}
+                                                        disabled={integration.status === 'Syncing'}
+                                                    >
+                                                        Mark syncing
+                                                    </button>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="self-start rounded-xl border border-red-500 px-3 py-1 text-xs font-semibold text-red-200 transition hover:bg-red-500/10"
+                                                    onClick={() => handleDisconnect(integration.id)}
+                                                >
+                                                    Disconnect
+                                                </button>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-800/80 bg-slate-900/40 p-10 text-center text-sm text-slate-400">
+                            <p className="font-semibold text-slate-200">No integrations are connected yet.</p>
+                            <p className="mt-2">
+                                Use the add integration button to bring tools into your dashboard and keep client data in sync.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </section>
         );
     } else if (activeSection === 'team') {
         sectionContent = canManageUsers ? (
