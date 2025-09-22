@@ -72,14 +72,21 @@ export function ProjectCard({ project }: ProjectCardProps) {
     const hasDateRange = project.startDate && project.endDate;
 
     return (
-        <DashboardCard>
+        <DashboardCard
+            tabIndex={0}
+            role="article"
+            aria-labelledby={`project-${project.id}-title`}
+            className="focus-visible:outline-indigo-300/80"
+        >
             <div className="flex items-start justify-between gap-6">
                 <div className="space-y-3">
                     <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusMeta.badgeClass}`}>
                         {statusMeta.label}
                     </span>
                     <div>
-                        <h2 className="text-xl font-semibold text-white">{project.title}</h2>
+                        <h2 id={`project-${project.id}-title`} className="text-xl font-semibold text-white">
+                            {project.title}
+                        </h2>
                         <p className="mt-1 text-sm text-slate-400">Client · {project.clientName ?? 'Unknown client'}</p>
                     </div>
                 </div>

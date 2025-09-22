@@ -3,7 +3,6 @@ import Head from 'next/head';
 import useSWR from 'swr';
 
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
-import { LayoutShell, PageHeader, Toolbar, ToolbarSection } from '../../components/dashboard';
 import { NewProjectDrawer, ProjectCard } from '../../components/projects';
 import { PROJECT_STATUS_META } from '../../components/projects/status-meta';
 import { Button } from '../../components/ui/button';
@@ -99,6 +98,119 @@ function useDebouncedValue<T>(value: T, delay = 300) {
     }, [value, delay]);
 
     return debounced;
+}
+
+type ProjectsToolbarProps = {
+    search: string;
+    onSearchChange: (value: string) => void;
+    statusFilter: ProjectStatus | 'ALL';
+    onStatusChange: (value: ProjectStatus | 'ALL') => void;
+    tagFilter: string;
+    onTagChange: (value: string) => void;
+    tagOptions: string[];
+};
+
+function ProjectsToolbar({
+    search,
+    onSearchChange,
+    statusFilter,
+    onStatusChange,
+    tagFilter,
+    onTagChange,
+    tagOptions
+}: ProjectsToolbarProps) {
+    return (
+        <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+            <Input
+                value={search}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="Search projects"
+                className="h-10 min-w-[16rem] w-full flex-1 rounded-2xl border border-slate-800/70 bg-slate-950/60 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
+            />
+            <Select
+                value={statusFilter}
+                onChange={(event) => onStatusChange(event.target.value as ProjectStatus | 'ALL')}
+                className="h-10 w-full min-w-[12rem] rounded-2xl border border-slate-800/70 bg-slate-950/60 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 sm:w-48"
+                aria-label="Highlight status lane"
+            >
+                {STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>
+                        {status === 'ALL'
+                            ? 'All lanes'
+                            : PROJECT_STATUS_META[status as ProjectStatus]?.label ?? status.replace(/_/g, ' ')}
+                    </option>
+                ))}
+            </Select>
+            <Select
+                value={tagFilter}
+                onChange={(event) => onTagChange(event.target.value)}
+                className="h-10 w-full min-w-[12rem] rounded-2xl border border-slate-800/70 bg-slate-950/60 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 sm:w-48"
+                aria-label="Filter by tag"
+            >
+                <option value="">All tags</option>
+                {tagOptions.map((tag) => (
+                    <option key={tag} value={tag}>
+                        {tag}
+                    </option>
+                ))}
+            </Select>
+        </div>
+    );
+}
+
+type ProjectsLaneProps = {
+    lane: (typeof BOARD_LANES)[number];
+    projects: ProjectRecord[];
+    isFocused: boolean;
+    isDimmed: boolean;
+};
+
+function ProjectsLane({ lane, projects, isFocused, isDimmed }: ProjectsLaneProps) {
+    return (
+        <li
+            className={cn(
+                'flex h-[calc(100vh-20rem)] min-h-[28rem] w-[340px] flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-950/60 p-4 shadow-xl shadow-slate-950/40 backdrop-blur',
+                isFocused ? 'ring-2 ring-indigo-400/60' : 'ring-1 ring-inset ring-white/5',
+                isDimmed ? 'opacity-60 transition-opacity' : 'opacity-100'
+            )}
+            role="listitem"
+            aria-labelledby={`${lane.status.toLowerCase()}-lane-title`}
+        >
+            <div className="sticky top-0 z-10 -mx-4 flex flex-col gap-2 rounded-3xl bg-slate-950/80 px-4 pb-3 pt-4 backdrop-blur">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                        <h3 id={`${lane.status.toLowerCase()}-lane-title`} className="text-sm font-semibold text-white">
+                            {lane.label}
+                        </h3>
+                        <p className="text-xs text-slate-400">{lane.description}</p>
+                    </div>
+                    <span
+                        className={cn(
+                            'inline-flex h-7 min-w-[2.5rem] items-center justify-center rounded-full px-2 text-xs font-semibold uppercase tracking-wide',
+                            lane.badgeClass
+                        )}
+                        aria-label={`${lane.label} column has ${projects.length} projects`}
+                    >
+                        {projects.length}
+                    </span>
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-2 pb-4">
+                <div className="space-y-3">
+                    {projects.length > 0 ? (
+                        projects.map((project) => <ProjectCard key={project.id} project={project} />)
+                    ) : (
+                        <div className="flex min-h-[160px] flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-800/60 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
+                            <div>
+                                <p className="font-semibold text-white">{lane.emptyTitle}</p>
+                                <p className="mt-1 text-xs text-slate-400">{lane.emptyDescription}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </li>
+    );
 }
 
 function ProjectsWorkspace() {
@@ -215,61 +327,38 @@ function ProjectsWorkspace() {
     );
 
     const hasError = Boolean(error);
-    const showEmptyState = !isLoading && projects.length === 0 && !hasError;
+    const shouldShowBoard = !hasError && !isLoading;
 
     return (
-        <LayoutShell>
-            <PageHeader
-                title="Projects"
-                description="Monitor project delivery, see upcoming tasks, and keep billing in sync."
-            >
-                <Button onClick={() => setDrawerOpen(true)} className="sm:hidden">
-                    New project
-                </Button>
-            </PageHeader>
-
-            <Toolbar>
-                <ToolbarSection className="gap-4">
-                    <Input
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search projects"
-                        className="h-10 w-64"
-                    />
-                    <Select
-                        value={statusFilter}
-                        onChange={(event) => setStatusFilter(event.target.value as ProjectStatus | 'ALL')}
-                        className="h-10 w-48"
-                        aria-label="Highlight status lane"
-                    >
-                        {STATUS_OPTIONS.map((status) => (
-                            <option key={status} value={status}>
-                                {status === 'ALL' ? 'All lanes' : PROJECT_STATUS_META[status as ProjectStatus]?.label ?? status.replace(/_/g, ' ')}
-                            </option>
-                        ))}
-                    </Select>
-                    <Select
-                        value={tagFilter}
-                        onChange={(event) => setTagFilter(event.target.value)}
-                        className="h-10 w-48"
-                    >
-                        <option value="">All tags</option>
-                        {tagOptions.map((tag) => (
-                            <option key={tag} value={tag}>
-                                {tag}
-                            </option>
-                        ))}
-                    </Select>
-                </ToolbarSection>
-                <ToolbarSection className="justify-end">
-                    <Button onClick={() => setDrawerOpen(true)} className="hidden sm:inline-flex">
+        <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-6 px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-semibold text-white">Projects</h1>
+                    <p className="text-sm text-slate-400">
+                        Monitor project delivery, see upcoming tasks, and keep billing in sync.
+                    </p>
+                </div>
+                <div className="flex w-full justify-start md:w-auto md:justify-end">
+                    <Button onClick={() => setDrawerOpen(true)} className="w-100 w-md-auto">
                         New project
                     </Button>
-                </ToolbarSection>
-            </Toolbar>
+                </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-4">
+                <ProjectsToolbar
+                    search={search}
+                    onSearchChange={setSearch}
+                    statusFilter={statusFilter}
+                    onStatusChange={setStatusFilter}
+                    tagFilter={tagFilter}
+                    onTagChange={setTagFilter}
+                    tagOptions={tagOptions}
+                />
+            </div>
 
             {isLoading ? (
-                <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-10 text-center text-slate-400">
+                <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-10 text-center text-sm text-slate-400">
                     Loading projects…
                 </div>
             ) : null}
@@ -280,68 +369,28 @@ function ProjectsWorkspace() {
                 </div>
             ) : null}
 
-            {showEmptyState ? (
-                <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-16 text-center text-slate-300">
-                    <p className="text-lg font-semibold text-white">No projects yet</p>
-                    <p className="mt-2 text-sm text-slate-400">
-                        When you create your first project it will appear here with its timeline and billing status.
-                    </p>
-                    <div className="mt-6">
-                        <Button onClick={() => setDrawerOpen(true)}>New project</Button>
-                    </div>
-                </div>
-            ) : null}
+            {shouldShowBoard ? (
+                <section aria-label="Projects board" className="relative flex-1">
+                    <div className="overflow-x-auto pb-8">
+                        <ul className="flex items-start gap-6 pr-4" role="list">
+                            {BOARD_LANES.map((lane) => {
+                                const laneProjects = laneBuckets[lane.status] ?? [];
+                                const isFocused = statusFilter !== 'ALL' && statusFilter === lane.status;
+                                const isDimmed = statusFilter !== 'ALL' && statusFilter !== lane.status;
 
-            {projects.length > 0 ? (
-                <div className="-mx-4 mt-6 overflow-x-auto pb-6 lg:mx-0 lg:overflow-x-visible">
-                    <div className="flex min-w-max gap-4 px-4 lg:min-w-0 lg:grid lg:grid-cols-5 lg:gap-6 lg:px-0">
-                        {BOARD_LANES.map((lane) => {
-                            const laneProjects = laneBuckets[lane.status] ?? [];
-                            const isFocused = statusFilter !== 'ALL' && statusFilter === lane.status;
-                            const isDimmed = statusFilter !== 'ALL' && statusFilter !== lane.status;
-
-                            return (
-                                <section
-                                    key={lane.status}
-                                    className={cn(
-                                        'flex w-[280px] flex-col rounded-3xl border border-slate-800/70 bg-slate-950/60 p-4 shadow-xl shadow-slate-950/40 backdrop-blur lg:w-auto',
-                                        isFocused ? 'ring-2 ring-indigo-400/60' : 'ring-1 ring-inset ring-slate-800/70',
-                                        isDimmed ? 'opacity-50 transition-opacity' : 'opacity-100'
-                                    )}
-                                >
-                                    <header className="flex items-start justify-between gap-3">
-                                        <div className="space-y-1">
-                                            <h3 className="text-sm font-semibold text-white">{lane.label}</h3>
-                                            <p className="text-xs text-slate-400">{lane.description}</p>
-                                        </div>
-                                        <span
-                                            className={cn(
-                                                'inline-flex h-7 min-w-[2.5rem] items-center justify-center rounded-full px-2 text-xs font-semibold uppercase tracking-wide',
-                                                lane.badgeClass
-                                            )}
-                                        >
-                                            {laneProjects.length}
-                                        </span>
-                                    </header>
-                                    <div className="mt-4 flex flex-1 flex-col gap-4">
-                                        {laneProjects.length > 0 ? (
-                                            laneProjects.map((project) => (
-                                                <ProjectCard key={project.id} project={project} />
-                                            ))
-                                        ) : (
-                                            <div className="flex min-h-[160px] flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-800/60 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
-                                                <div>
-                                                    <p className="font-semibold text-white">{lane.emptyTitle}</p>
-                                                    <p className="mt-1 text-xs text-slate-400">{lane.emptyDescription}</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </section>
-                            );
-                        })}
+                                return (
+                                    <ProjectsLane
+                                        key={lane.status}
+                                        lane={lane}
+                                        projects={laneProjects}
+                                        isFocused={isFocused}
+                                        isDimmed={isDimmed}
+                                    />
+                                );
+                            })}
+                        </ul>
                     </div>
-                </div>
+                </section>
             ) : null}
 
             <NewProjectDrawer
@@ -350,7 +399,7 @@ function ProjectsWorkspace() {
                 onProjectCreated={handleProjectCreated}
             />
             <Toast toast={toast} />
-        </LayoutShell>
+        </div>
     );
 }
 
