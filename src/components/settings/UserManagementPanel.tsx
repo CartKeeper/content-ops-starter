@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 
 import type { ManagedUserRecord, UserPermissions, UserRole } from '../../types/user';
@@ -155,7 +157,7 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const [notice, setNotice] = React.useState<string | null>(null);
-    const [creation, setCreation] = React.useState<CreationFormState>(createInitialCreationForm);
+    const [creation, setCreation] = React.useState<CreationFormState>(() => createInitialCreationForm());
     const [submitting, setSubmitting] = React.useState(false);
     const [selectedUserId, setSelectedUserId] = React.useState<string | null>(null);
     const [editForm, setEditForm] = React.useState<EditFormState | null>(null);
