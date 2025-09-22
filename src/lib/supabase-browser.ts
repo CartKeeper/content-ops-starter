@@ -3,14 +3,13 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 let browserClient: SupabaseClient | null = null;
 
-const URL_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'PUBLIC_SUPABASE_URL', 'SUPABASE_URL'];
-const ANON_KEY_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_ANON_KEY', 'PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY'];
-
-function readEnvValue(keys: string[]): string | null {
-    for (const key of keys) {
-        const value = process.env[key];
-        if (typeof value === 'string' && value.trim().length > 0) {
-            return value;
+function selectEnvValue(candidates: (string | undefined)[]): string | null {
+    for (const value of candidates) {
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (trimmed.length > 0) {
+                return trimmed;
+            }
         }
     }
 
@@ -18,11 +17,19 @@ function readEnvValue(keys: string[]): string | null {
 }
 
 function resolveSupabaseUrl(): string | null {
-    return readEnvValue(URL_ENV_KEYS);
+    return selectEnvValue([
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_URL
+    ]);
 }
 
 function resolveSupabaseAnonKey(): string | null {
-    return readEnvValue(ANON_KEY_ENV_KEYS);
+    return selectEnvValue([
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        process.env.PUBLIC_SUPABASE_ANON_KEY,
+        process.env.SUPABASE_ANON_KEY
+    ]);
 }
 
 function createFallbackChannel(warn: () => void): RealtimeChannel {
