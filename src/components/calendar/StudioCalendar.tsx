@@ -20,7 +20,7 @@ import {
     fetchCalendarEvents,
     updateCalendarEvent
 } from '../../lib/supabase/calendar';
-import { getSupabaseBrowserClient } from '../../lib/supabase-browser';
+import { getSupabaseBrowserClient, isSupabaseBrowserConfigured } from '../../lib/supabase-browser';
 
 const FullCalendar = dynamic(async () => {
     const module = await import('@fullcalendar/react');
@@ -45,6 +45,28 @@ type CurrentUserRecord = {
     role: string | null;
     roles: string[] | null;
 };
+
+type CalendarPageSectionProps = {
+    actions?: React.ReactNode;
+    children: React.ReactNode;
+};
+
+function CalendarPageSection({ actions, children }: CalendarPageSectionProps) {
+    return (
+        <div className="container py-4">
+            <div className="mb-4 rounded-4 border bg-white p-4 shadow-sm">
+                <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+                    <div>
+                        <h1 className="h4 mb-1">Studio calendar</h1>
+                        <p className="text-secondary mb-0">Manage bookings, hold dates, and coordinate your team.</p>
+                    </div>
+                    {actions ? <div className="d-flex flex-wrap align-items-center gap-2">{actions}</div> : null}
+                </div>
+                {children}
+            </div>
+        </div>
+    );
+}
 
 async function fetchClients(): Promise<ClientOption[]> {
     const supabase = getSupabaseBrowserClient();
@@ -120,7 +142,7 @@ function hasOverlap(
     });
 }
 
-export function StudioCalendar() {
+function StudioCalendarContent() {
     const calendarRef = React.useRef<any>(null);
     const [visibleRange, setVisibleRange] = React.useState<VisibleRange | null>(null);
     const [calendarTitle, setCalendarTitle] = React.useState('');
@@ -566,14 +588,10 @@ export function StudioCalendar() {
     const listAssignButtonVisible = Boolean(currentUserId);
 
     return (
-        <div className="container py-4">
-            <div className="mb-4 rounded-4 border bg-white p-4 shadow-sm">
-                <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-                    <div>
-                        <h1 className="h4 mb-1">Studio calendar</h1>
-                        <p className="text-secondary mb-0">Manage bookings, hold dates, and coordinate your team.</p>
-                    </div>
-                    <div className="d-flex flex-wrap align-items-center gap-2">
+        <>
+            <CalendarPageSection
+                actions={
+                    <>
                         <Button variant="outline" onClick={goToToday}>
                             Today
                         </Button>
@@ -612,9 +630,9 @@ export function StudioCalendar() {
                             </Button>
                         </div>
                         <Button onClick={handleNewEventClick}>New event</Button>
-                    </div>
-                </div>
-
+                    </>
+                }
+            >
                 <div className="d-flex align-items-center justify-content-between mb-3">
                     <h2 className="h5 mb-0">{calendarTitle}</h2>
                     <span className="text-secondary small">Times shown in {DEFAULT_TIME_ZONE}</span>
@@ -654,7 +672,7 @@ export function StudioCalendar() {
                         height="auto"
                     />
                 </div>
-            </div>
+            </CalendarPageSection>
 
             <EventDialog
                 mode={eventDialogMode}
@@ -689,6 +707,30 @@ export function StudioCalendar() {
             />
 
             <Toast toast={toast} />
-        </div>
+        </>
     );
+}
+
+export function StudioCalendar() {
+    const supabaseConfigured = isSupabaseBrowserConfigured();
+
+    if (!supabaseConfigured) {
+        return (
+            <CalendarPageSection>
+                <div className="alert alert-warning" role="status">
+                    <h2 className="h5 mb-2">Connect Supabase to unlock the studio calendar</h2>
+                    <p className="mb-2">
+                        Add <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to your
+                        environment so events, bookings, and assignments can sync in real time.
+                    </p>
+                    <p className="mb-0">
+                        For server-triggered automations, also configure <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code>,
+                        then restart your dev server.
+                    </p>
+                </div>
+            </CalendarPageSection>
+        );
+    }
+
+    return <StudioCalendarContent />;
 }
