@@ -1,31 +1,17 @@
 import * as React from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import useSWR from 'swr';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
 import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
-
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle
-} from '../../components/ui/dialog';
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
 import DataToolbar, { type SortOption, type ToolbarFilter } from '../../components/data/DataToolbar';
 import DataTable from '../../components/data/DataTable';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
 import { LayoutShell, PageHeader } from '../../components/dashboard';
 import { formatDate } from '../../lib/formatters';
 import type { ContactRecord } from '../../types/contact';
 import { getContactName } from '../../types/contact';
 import { deriveStage, type ContactStage } from '../../lib/contacts';
+import ContactFormModal from '../../components/contacts/ContactFormModal';
 
 type OwnerOption = { id: string; name: string | null };
 
@@ -55,11 +41,6 @@ type ContactTableRow = {
 };
 
 type ToastMessage = { id: string; title: string; tone: 'success' | 'error'; description?: string };
-
-export type AddContactDialogHandle = {
-    open: () => void;
-    close: () => void;
-};
 
 const CONTACT_SORT_OPTIONS: Array<SortOption & { state: SortingState }> = [
     { id: 'name-asc', label: 'Name (A-Z)', state: [{ id: 'name', desc: false }] },
@@ -101,6 +82,13 @@ export default function ContactsPage() {
 }
 
 function ContactsWorkspace() {
+    const router = useRouter();
+    const contactIdQuery = router.query?.contactId;
+    const contactIdParam = Array.isArray(contactIdQuery) ? contactIdQuery[0] ?? null : contactIdQuery ?? null;
+    const isCreatingContact = contactIdParam === 'new';
+    const activeContactId = !isCreatingContact && typeof contactIdParam === 'string' ? contactIdParam : null;
+    const isContactModalOpen = contactIdParam != null;
+
     const [search, setSearch] = React.useState('');
     const [stageFilter, setStageFilter] = React.useState<string[]>([]);
     const [statusFilter, setStatusFilter] = React.useState<string[]>([]);
@@ -110,7 +98,19 @@ function ContactsWorkspace() {
     const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
     const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
     const [notifications, setNotifications] = React.useState<ToastMessage[]>([]);
-    const addContactDialogRef = React.useRef<AddContactDialogHandle | null>(null);
+
+    const openContactModal = React.useCallback(
+        (targetId: string) => {
+            const nextQuery = { ...router.query, contactId: targetId } as Record<string, any>;
+            router.push({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true });
+        },
+        [router]
+    );
+
+    const closeContactModal = React.useCallback(() => {
+        const { contactId, ...rest } = router.query;
+        router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }, [router]);
 
     const queryKey = React.useMemo(() => {
         const params = new URLSearchParams();
@@ -277,8 +277,15 @@ function ContactsWorkspace() {
     );
 
     const handleAddContactClick = React.useCallback(() => {
-        addContactDialogRef.current?.open();
-    }, [addContactDialogRef]);
+        openContactModal('new');
+    }, [openContactModal]);
+
+    const handleRowClick = React.useCallback(
+        (row: ContactTableRow) => {
+            openContactModal(row.id);
+        },
+        [openContactModal]
+    );
 
     const emptyMessage = React.useMemo(() => {
         const totalKnown = contactsResponse?.meta.total ?? 0;
@@ -289,9 +296,9 @@ function ContactsWorkspace() {
                     <p className="fw-semibold mb-1">No contacts yet</p>
                     <p className="text-secondary">Start building your network.</p>
                     <div className="mt-3">
-                        <Button type="button" onClick={handleAddContactClick}>
+                        <button type="button" className="btn btn-primary" onClick={handleAddContactClick}>
                             Add contact
-                        </Button>
+                        </button>
                     </div>
                 </div>
             );
@@ -304,10 +311,12 @@ function ContactsWorkspace() {
         return <p className="mb-0">No contacts found.</p>;
     }, [contactsResponse?.meta.total, handleAddContactClick, hasAnyFilters]);
 
-    const handleContactCreated = React.useCallback(
-        async (record: ContactRecord) => {
-            addNotification('Contact added', 'success', getContactName(record));
-            setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+    const handleContactSaved = React.useCallback(
+        async (record: ContactRecord, mode: 'create' | 'update') => {
+            addNotification(mode === 'create' ? 'Contact added' : 'Contact updated', 'success', getContactName(record));
+            if (mode === 'create') {
+                setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+            }
             setRowSelection({});
             await mutateContacts();
         },
@@ -316,7 +325,7 @@ function ContactsWorkspace() {
 
     const handleContactError = React.useCallback(
         (message: string) => {
-            addNotification('Unable to add contact', 'error', message);
+            addNotification('Unable to save contact', 'error', message);
         },
         [addNotification]
     );
@@ -367,9 +376,9 @@ function ContactsWorkspace() {
     return (
         <LayoutShell>
             <PageHeader title="Contacts" description="Manage your studio’s contact list.">
-                <Button type="button" onClick={handleAddContactClick}>
+                <button type="button" className="btn btn-primary" onClick={handleAddContactClick}>
                     Add contact
-                </Button>
+                </button>
             </PageHeader>
 
             <DataToolbar
@@ -424,14 +433,17 @@ function ContactsWorkspace() {
                     manualSorting
                     pageCount={pageCount}
                     getRowId={(row) => row.id}
+                    onRowClick={handleRowClick}
                     isLoading={isContactsLoading && !contactsResponse}
                     emptyMessage={emptyMessage}
                 />
             </div>
 
-            <AddContactDialog
-                ref={addContactDialogRef}
-                onSuccess={handleContactCreated}
+            <ContactFormModal
+                open={isContactModalOpen}
+                contactId={isCreatingContact ? null : activeContactId}
+                onClose={closeContactModal}
+                onSaved={handleContactSaved}
                 onError={handleContactError}
             />
         </LayoutShell>
@@ -446,337 +458,4 @@ const STAGE_BADGE_VARIANTS: Record<ContactStage, string> = {
 
 function getStageBadge(stage: ContactStage): string {
     return STAGE_BADGE_VARIANTS[stage] ?? STAGE_BADGE_VARIANTS.new;
-}
-
-const optionalTextField = z.preprocess(
-    (value) => {
-        if (typeof value !== 'string') {
-            return undefined;
-        }
-        const trimmed = value.trim();
-        return trimmed.length > 0 ? trimmed : undefined;
-    },
-    z.string().optional()
-);
-
-const emailField = optionalTextField.refine(
-    (value) => !value || z.string().email().safeParse(value).success,
-    'Enter a valid email'
-);
-
-const addContactSchema = z
-    .object({
-        first_name: optionalTextField,
-        last_name: optionalTextField,
-        email: emailField,
-        phone: optionalTextField,
-        address: optionalTextField,
-        city: optionalTextField,
-        state: optionalTextField,
-        business: optionalTextField,
-        notes: optionalTextField
-    })
-    .superRefine((data, context) => {
-        if (!data.first_name && !data.last_name && !data.business && !data.email) {
-            context.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['first_name'],
-                message: 'Provide at least a first name, last name, business, or email'
-            });
-        }
-    });
-
-type AddContactFormValues = z.infer<typeof addContactSchema>;
-
-type AddContactDialogProps = {
-    onSuccess: (record: ContactRecord) => Promise<void> | void;
-    onError: (message: string) => void;
-};
-
-const AddContactDialog = React.forwardRef<AddContactDialogHandle, AddContactDialogProps>(function AddContactDialog(
-    { onSuccess, onError },
-    ref
-) {
-    const [open, setOpen] = React.useState(false);
-    const {
-        register,
-        handleSubmit,
-        reset,
-        formState: { errors }
-    } = useForm<AddContactFormValues>({
-        resolver: zodResolver(addContactSchema),
-        defaultValues: {
-            first_name: '',
-            last_name: '',
-            email: '',
-            phone: '',
-            address: '',
-            city: '',
-            state: '',
-            business: '',
-            notes: ''
-        }
-    });
-
-    const [isSubmitting, setIsSubmitting] = React.useState(false);
-    const firstNameInputRef = React.useRef<HTMLInputElement | null>(null);
-
-    const firstNameField = register('first_name');
-    const lastNameField = register('last_name');
-    const emailField = register('email');
-    const phoneField = register('phone');
-    const addressField = register('address');
-    const cityField = register('city');
-    const stateField = register('state');
-    const businessField = register('business');
-    const notesField = register('notes');
-
-    React.useEffect(() => {
-        if (!open) {
-            reset({
-                first_name: '',
-                last_name: '',
-                email: '',
-                phone: '',
-                address: '',
-                city: '',
-                state: '',
-                business: '',
-                notes: ''
-            });
-        }
-    }, [open, reset]);
-
-    const closeDialog = React.useCallback(() => {
-        setOpen(false);
-    }, []);
-
-    const handleDialogOpenChange = React.useCallback(
-        (next: boolean) => {
-            if (!next && isSubmitting) {
-                return;
-            }
-            setOpen(next);
-        },
-        [isSubmitting]
-    );
-
-    React.useImperativeHandle(
-        ref,
-        () => ({
-            open: () => setOpen(true),
-            close: closeDialog,
-        }),
-        [closeDialog]
-    );
-
-    const onSubmit = handleSubmit(async (values) => {
-        setIsSubmitting(true);
-        try {
-            const response = await fetch('/api/contacts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    first_name: values.first_name,
-                    last_name: values.last_name,
-                    email: values.email,
-                    phone: values.phone,
-                    address: values.address,
-                    city: values.city,
-                    state: values.state,
-                    business: values.business,
-                    notes: values.notes
-                })
-            });
-
-            const payload = (await response.json().catch(() => ({}))) as { data?: ContactRecord; error?: string };
-
-            if (!response.ok || !payload.data) {
-                throw new Error(payload.error ?? 'Unable to save contact');
-            }
-
-            await onSuccess(payload.data);
-            closeDialog();
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unable to save contact';
-            onError(message);
-        } finally {
-            setIsSubmitting(false);
-        }
-    });
-
-    return (
-        <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-            <DialogContent
-                onOpenAutoFocus={(event) => {
-                    event.preventDefault();
-                    if (typeof window !== 'undefined') {
-                        window.requestAnimationFrame(() => firstNameInputRef.current?.focus());
-                    }
-                }}
-            >
-                <form onSubmit={onSubmit} noValidate>
-                    <DialogHeader>
-                        <DialogTitle>Add contact</DialogTitle>
-                        <DialogDescription>Capture a new lead without leaving the table.</DialogDescription>
-                    </DialogHeader>
-                    <div className="modal-body">
-                        <div className="row gy-3 gx-3">
-                            <div className="col-12">
-                                <p className="text-uppercase text-secondary fw-semibold small mb-0">Primary details</p>
-                            </div>
-                            <div className="col-md-6">
-                                <Label htmlFor="contact-first-name">First name</Label>
-                                <Input
-                                    id="contact-first-name"
-                                    placeholder="Jamie"
-                                    className={errors.first_name ? 'is-invalid' : undefined}
-                                    {...firstNameField}
-                                    ref={(element) => {
-                                        firstNameField.ref(element);
-                                        firstNameInputRef.current = element;
-                                    }}
-                                    disabled={isSubmitting}
-                                />
-                                <FieldError message={errors.first_name?.message} />
-                            </div>
-                            <div className="col-md-6">
-                                <Label htmlFor="contact-last-name">Last name</Label>
-                                <Input
-                                    id="contact-last-name"
-                                    placeholder="Rivera"
-                                    className={errors.last_name ? 'is-invalid' : undefined}
-                                    {...lastNameField}
-                                    disabled={isSubmitting}
-                                />
-                                <FieldError message={errors.last_name?.message} />
-                            </div>
-                            <div className="col-12">
-                                <Label htmlFor="contact-business">Business</Label>
-                                <Input
-                                    id="contact-business"
-                                    placeholder="Aperture Studio"
-                                    className={errors.business ? 'is-invalid' : undefined}
-                                    {...businessField}
-                                    disabled={isSubmitting}
-                                />
-                                <FieldError message={errors.business?.message} />
-                            </div>
-                            <div className="col-12">
-                                <hr className="my-2" />
-                            </div>
-                            <div className="col-12">
-                                <p className="text-uppercase text-secondary fw-semibold small mb-0">Contact information</p>
-                            </div>
-                            <div className="col-md-6">
-                                <Label htmlFor="contact-email">Email</Label>
-                                <Input
-                                    id="contact-email"
-                                    type="email"
-                                    placeholder="jamie@example.com"
-                                    className={errors.email ? 'is-invalid' : undefined}
-                                    {...emailField}
-                                    disabled={isSubmitting}
-                                />
-                                <FieldError message={errors.email?.message} />
-                            </div>
-                            <div className="col-md-6">
-                                <Label htmlFor="contact-phone">Phone</Label>
-                                <Input
-                                    id="contact-phone"
-                                    type="tel"
-                                    placeholder="(555) 010-1234"
-                                    className={errors.phone ? 'is-invalid' : undefined}
-                                    {...phoneField}
-                                    disabled={isSubmitting}
-                                />
-                                <FieldError message={errors.phone?.message} />
-                            </div>
-                            <div className="col-12">
-                                <hr className="my-2" />
-                            </div>
-                            <div className="col-12">
-                                <p className="text-uppercase text-secondary fw-semibold small mb-0">Address</p>
-                            </div>
-                            <div className="col-12">
-                                <Label htmlFor="contact-address">Address</Label>
-                                <Input
-                                    id="contact-address"
-                                    placeholder="872 Market Street"
-                                    className={errors.address ? 'is-invalid' : undefined}
-                                    {...addressField}
-                                    disabled={isSubmitting}
-                                />
-                                <FieldError message={errors.address?.message} />
-                            </div>
-                            <div className="col-md-8">
-                                <Label htmlFor="contact-city">City</Label>
-                                <Input
-                                    id="contact-city"
-                                    placeholder="San Francisco"
-                                    className={errors.city ? 'is-invalid' : undefined}
-                                    {...cityField}
-                                    disabled={isSubmitting}
-                                />
-                                <FieldError message={errors.city?.message} />
-                            </div>
-                            <div className="col-md-4">
-                                <Label htmlFor="contact-state">State</Label>
-                                <Input
-                                    id="contact-state"
-                                    placeholder="CA"
-                                    className={errors.state ? 'is-invalid' : undefined}
-                                    {...stateField}
-                                    disabled={isSubmitting}
-                                />
-                                <FieldError message={errors.state?.message} />
-                            </div>
-                            <div className="col-12">
-                                <hr className="my-2" />
-                            </div>
-                            <div className="col-12">
-                                <p className="text-uppercase text-secondary fw-semibold small mb-0">Notes</p>
-                            </div>
-                            <div className="col-12">
-                                <Label htmlFor="contact-notes">Notes</Label>
-                                <Textarea
-                                    id="contact-notes"
-                                    placeholder="Add context or follow-up details"
-                                    className={errors.notes ? 'is-invalid' : undefined}
-                                    rows={3}
-                                    {...notesField}
-                                    disabled={isSubmitting}
-                                />
-                                <FieldError message={errors.notes?.message} />
-                            </div>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button type="button" variant="ghost" onClick={closeDialog} disabled={isSubmitting}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" isLoading={isSubmitting} disabled={isSubmitting}>
-                            Save contact
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-});
-
-AddContactDialog.displayName = 'AddContactDialog';
-
-type FieldErrorProps = { message?: string };
-
-function FieldError({ message }: FieldErrorProps) {
-    if (!message) {
-        return null;
-    }
-
-    return (
-        <div className="invalid-feedback d-block" role="alert">
-            {message}
-        </div>
-    );
 }

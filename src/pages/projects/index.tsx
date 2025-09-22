@@ -3,58 +3,13 @@ import Head from 'next/head';
 import useSWR from 'swr';
 
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
-import { NewProjectDrawer, ProjectCard } from '../../components/projects';
+import { NewProjectDrawer } from '../../components/projects';
 import { PROJECT_STATUS_META } from '../../components/projects/status-meta';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { cn } from '../../lib/cn';
+import { formatDate } from '../../lib/formatters';
 import { getSupabaseBrowserClient } from '../../lib/supabase-browser';
 import type { ProjectListResponse, ProjectRecord, ProjectStatus } from '../../types/project';
 
 const STATUS_OPTIONS: Array<ProjectStatus | 'ALL'> = ['ALL', 'PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETE', 'CANCELLED'];
-
-const BOARD_STATUSES: ProjectStatus[] = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETE', 'CANCELLED'];
-
-const LANE_DESCRIPTIONS: Record<
-    ProjectStatus,
-    { description: string; emptyTitle: string; emptyDescription: string }
-> = {
-    PLANNING: {
-        description: 'Kick off work, gather briefs, and align the team.',
-        emptyTitle: 'No planning projects',
-        emptyDescription: 'Create a project to start shaping the next engagement.'
-    },
-    IN_PROGRESS: {
-        description: 'Shoots, edits, and reviews that are actively moving.',
-        emptyTitle: 'Nothing in progress',
-        emptyDescription: 'Update a project to In progress once production begins.'
-    },
-    ON_HOLD: {
-        description: 'Work paused while you await approvals or next steps.',
-        emptyTitle: 'No projects on hold',
-        emptyDescription: 'Projects waiting on feedback or decisions will appear here.'
-    },
-    COMPLETE: {
-        description: 'Wrapped engagements ready for delivery and invoicing.',
-        emptyTitle: 'No completed projects',
-        emptyDescription: 'Mark projects as complete to celebrate the finish line.'
-    },
-    CANCELLED: {
-        description: 'Closed or cancelled engagements kept for reference.',
-        emptyTitle: 'No cancelled projects',
-        emptyDescription: 'Any cancelled work will land here for your records.'
-    }
-};
-
-const BOARD_LANES = BOARD_STATUSES.map((status) => ({
-    status,
-    label: PROJECT_STATUS_META[status].label,
-    badgeClass: PROJECT_STATUS_META[status].badgeClass,
-    description: LANE_DESCRIPTIONS[status].description,
-    emptyTitle: LANE_DESCRIPTIONS[status].emptyTitle,
-    emptyDescription: LANE_DESCRIPTIONS[status].emptyDescription
-}));
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const response = await fetch(url);
@@ -100,131 +55,24 @@ function useDebouncedValue<T>(value: T, delay = 300) {
     return debounced;
 }
 
-type ProjectsToolbarProps = {
+type ProjectsToolbarState = {
     search: string;
-    onSearchChange: (value: string) => void;
-    statusFilter: ProjectStatus | 'ALL';
-    onStatusChange: (value: ProjectStatus | 'ALL') => void;
-    tagFilter: string;
-    onTagChange: (value: string) => void;
-    tagOptions: string[];
+    status: ProjectStatus | 'ALL';
+    tag: string;
 };
-
-function ProjectsToolbar({
-    search,
-    onSearchChange,
-    statusFilter,
-    onStatusChange,
-    tagFilter,
-    onTagChange,
-    tagOptions
-}: ProjectsToolbarProps) {
-    return (
-        <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
-            <Input
-                value={search}
-                onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="Search projects"
-                className="h-10 min-w-[16rem] w-full flex-1 rounded-2xl border border-slate-800/70 bg-slate-950/60 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
-            />
-            <Select
-                value={statusFilter}
-                onChange={(event) => onStatusChange(event.target.value as ProjectStatus | 'ALL')}
-                className="h-10 w-full min-w-[12rem] rounded-2xl border border-slate-800/70 bg-slate-950/60 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 sm:w-48"
-                aria-label="Highlight status lane"
-            >
-                {STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>
-                        {status === 'ALL'
-                            ? 'All lanes'
-                            : PROJECT_STATUS_META[status as ProjectStatus]?.label ?? status.replace(/_/g, ' ')}
-                    </option>
-                ))}
-            </Select>
-            <Select
-                value={tagFilter}
-                onChange={(event) => onTagChange(event.target.value)}
-                className="h-10 w-full min-w-[12rem] rounded-2xl border border-slate-800/70 bg-slate-950/60 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 sm:w-48"
-                aria-label="Filter by tag"
-            >
-                <option value="">All tags</option>
-                {tagOptions.map((tag) => (
-                    <option key={tag} value={tag}>
-                        {tag}
-                    </option>
-                ))}
-            </Select>
-        </div>
-    );
-}
-
-type ProjectsLaneProps = {
-    lane: (typeof BOARD_LANES)[number];
-    projects: ProjectRecord[];
-    isFocused: boolean;
-    isDimmed: boolean;
-};
-
-function ProjectsLane({ lane, projects, isFocused, isDimmed }: ProjectsLaneProps) {
-    return (
-        <li
-            className={cn(
-                'flex h-[calc(100vh-20rem)] min-h-[28rem] w-[340px] flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-950/60 p-4 shadow-xl shadow-slate-950/40 backdrop-blur',
-                isFocused ? 'ring-2 ring-indigo-400/60' : 'ring-1 ring-inset ring-white/5',
-                isDimmed ? 'opacity-60 transition-opacity' : 'opacity-100'
-            )}
-            role="listitem"
-            aria-labelledby={`${lane.status.toLowerCase()}-lane-title`}
-        >
-            <div className="sticky top-0 z-10 -mx-4 flex flex-col gap-2 rounded-3xl bg-slate-950/80 px-4 pb-3 pt-4 backdrop-blur">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                        <h3 id={`${lane.status.toLowerCase()}-lane-title`} className="text-sm font-semibold text-white">
-                            {lane.label}
-                        </h3>
-                        <p className="text-xs text-slate-400">{lane.description}</p>
-                    </div>
-                    <span
-                        className={cn(
-                            'inline-flex h-7 min-w-[2.5rem] items-center justify-center rounded-full px-2 text-xs font-semibold uppercase tracking-wide',
-                            lane.badgeClass
-                        )}
-                        aria-label={`${lane.label} column has ${projects.length} projects`}
-                    >
-                        {projects.length}
-                    </span>
-                </div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-2 pb-4">
-                <div className="space-y-3">
-                    {projects.length > 0 ? (
-                        projects.map((project) => <ProjectCard key={project.id} project={project} />)
-                    ) : (
-                        <div className="flex min-h-[160px] flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-800/60 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
-                            <div>
-                                <p className="font-semibold text-white">{lane.emptyTitle}</p>
-                                <p className="mt-1 text-xs text-slate-400">{lane.emptyDescription}</p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </li>
-    );
-}
 
 function ProjectsWorkspace() {
-    const [search, setSearch] = React.useState('');
-    const [statusFilter, setStatusFilter] = React.useState<ProjectStatus | 'ALL'>('ALL');
-    const [tagFilter, setTagFilter] = React.useState<string>('');
+    const [controls, setControls] = React.useState<ProjectsToolbarState>({ search: '', status: 'ALL', tag: '' });
+    const [drawerMode, setDrawerMode] = React.useState<'create' | 'edit'>('create');
+    const [activeProject, setActiveProject] = React.useState<ProjectRecord | null>(null);
     const [isDrawerOpen, setDrawerOpen] = React.useState(false);
     const [toast, setToast] = React.useState<ToastState | null>(null);
 
-    const debouncedSearch = useDebouncedValue(search.trim().toLowerCase(), 300);
+    const debouncedSearch = useDebouncedValue(controls.search.trim().toLowerCase(), 300);
 
     React.useEffect(() => {
         if (!toast) {
-            return undefined;
+            return;
         }
         const timer = window.setTimeout(() => setToast(null), 3200);
         return () => window.clearTimeout(timer);
@@ -235,13 +83,13 @@ function ProjectsWorkspace() {
         if (debouncedSearch.length > 0) {
             params.set('q', debouncedSearch);
         }
-        if (tagFilter.trim().length > 0) {
-            params.set('tag', tagFilter.trim());
+        if (controls.tag.trim().length > 0) {
+            params.set('tag', controls.tag.trim());
         }
         params.set('page', '1');
         params.set('pageSize', '40');
         return `/api/projects?${params.toString()}`;
-    }, [debouncedSearch, tagFilter]);
+    }, [controls.tag, debouncedSearch]);
 
     const {
         data,
@@ -256,26 +104,18 @@ function ProjectsWorkspace() {
 
     const tagOptions = React.useMemo(() => {
         const set = new Set<string>();
-        for (const project of projects) {
-            for (const tag of project.tags) {
-                set.add(tag);
-            }
-        }
+        projects.forEach((project) => {
+            project.tags.forEach((tag) => set.add(tag));
+        });
         return Array.from(set).sort((a, b) => a.localeCompare(b));
     }, [projects]);
 
-    const laneBuckets = React.useMemo(() => {
-        const buckets = BOARD_STATUSES.reduce((acc, status) => {
-            acc[status] = [] as ProjectRecord[];
-            return acc;
-        }, {} as Record<ProjectStatus, ProjectRecord[]>);
-
-        for (const project of projects) {
-            buckets[project.status]?.push(project);
+    const filteredProjects = React.useMemo(() => {
+        if (controls.status === 'ALL') {
+            return projects;
         }
-
-        return buckets;
-    }, [projects]);
+        return projects.filter((project) => project.status === controls.status);
+    }, [controls.status, projects]);
 
     React.useEffect(() => {
         const client = getSupabaseBrowserClient();
@@ -294,109 +134,219 @@ function ProjectsWorkspace() {
         };
     }, [mutateProjects]);
 
+    const hasError = Boolean(error);
+
+    const openCreateDrawer = React.useCallback(() => {
+        setDrawerMode('create');
+        setActiveProject(null);
+        setDrawerOpen(true);
+    }, []);
+
+    const openEditDrawer = React.useCallback((project: ProjectRecord) => {
+        setDrawerMode('edit');
+        setActiveProject(project);
+        setDrawerOpen(true);
+    }, []);
+
+    const handleDrawerOpenChange = React.useCallback((open: boolean) => {
+        setDrawerOpen(open);
+        if (!open) {
+            setActiveProject(null);
+            setDrawerMode('create');
+        }
+    }, []);
+
     const handleProjectCreated = React.useCallback(
         (project: ProjectRecord) => {
             setToast({ id: Date.now(), message: `${project.title} created`, variant: 'success' });
-
-            const matchesStatus = statusFilter === 'ALL' || project.status === statusFilter;
-            const matchesTag = !tagFilter || project.tags.includes(tagFilter);
-            const matchesSearch =
-                debouncedSearch.length === 0 ||
-                project.title.toLowerCase().includes(debouncedSearch) ||
-                (project.description ?? '').toLowerCase().includes(debouncedSearch);
-
-            if (matchesStatus && matchesTag && matchesSearch) {
-                void mutateProjects(
-                    (current) => {
-                        if (!current) {
-                            return { data: [project], page: 1, pageSize: 40, total: 1 };
-                        }
-                        return {
-                            ...current,
-                            data: [project, ...current.data],
-                            total: current.total + 1
-                        };
-                    },
-                    { revalidate: true, rollbackOnError: true }
-                );
-            } else {
-                void mutateProjects();
-            }
+            setActiveProject(null);
+            setDrawerMode('create');
+            void mutateProjects();
         },
-        [debouncedSearch, mutateProjects, statusFilter, tagFilter]
+        [mutateProjects]
     );
 
-    const hasError = Boolean(error);
-    const shouldShowBoard = !hasError && !isLoading;
+    const handleProjectUpdated = React.useCallback(
+        (project: ProjectRecord) => {
+            setToast({ id: Date.now(), message: `${project.title} updated`, variant: 'success' });
+            setActiveProject(null);
+            setDrawerMode('create');
+            setDrawerOpen(false);
+            void mutateProjects();
+        },
+        [mutateProjects]
+    );
 
-    return (
-        <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-6 px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div className="space-y-1">
-                    <h1 className="text-2xl font-semibold text-white">Projects</h1>
-                    <p className="text-sm text-slate-400">
-                        Monitor project delivery, see upcoming tasks, and keep billing in sync.
-                    </p>
-                </div>
-                <div className="flex w-full justify-start md:w-auto md:justify-end">
-                    <Button onClick={() => setDrawerOpen(true)} className="w-100 w-md-auto">
-                        New project
-                    </Button>
-                </div>
-            </div>
+    const handleSearchChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+        setControls((previous) => ({ ...previous, search: event.target.value }));
+    }, []);
 
-            <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-4">
-                <ProjectsToolbar
-                    search={search}
-                    onSearchChange={setSearch}
-                    statusFilter={statusFilter}
-                    onStatusChange={setStatusFilter}
-                    tagFilter={tagFilter}
-                    onTagChange={setTagFilter}
-                    tagOptions={tagOptions}
-                />
-            </div>
+    const handleStatusChange = React.useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+        setControls((previous) => ({ ...previous, status: event.target.value as ProjectsToolbarState['status'] }));
+    }, []);
 
-            {isLoading ? (
-                <div className="rounded-3xl border border-slate-800/70 bg-slate-950/60 p-10 text-center text-sm text-slate-400">
+    const handleTagChange = React.useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+        setControls((previous) => ({ ...previous, tag: event.target.value }));
+    }, []);
+
+    const renderProjects = () => {
+        if (isLoading) {
+            return (
+                <div className="rounded-2xl border border-slate-800/70 bg-slate-950/60 p-10 text-center text-sm text-slate-400">
                     Loading projects…
                 </div>
-            ) : null}
+            );
+        }
 
-            {hasError ? (
-                <div className="rounded-3xl border border-rose-500/40 bg-rose-500/10 p-6 text-center text-sm text-rose-200">
+        if (hasError) {
+            return (
+                <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-6 text-center text-sm text-rose-200">
                     Unable to load projects. Please try again shortly.
                 </div>
-            ) : null}
+            );
+        }
 
-            {shouldShowBoard ? (
-                <section aria-label="Projects board" className="relative flex-1">
-                    <div className="overflow-x-auto pb-8">
-                        <ul className="flex items-start gap-6 pr-4" role="list">
-                            {BOARD_LANES.map((lane) => {
-                                const laneProjects = laneBuckets[lane.status] ?? [];
-                                const isFocused = statusFilter !== 'ALL' && statusFilter === lane.status;
-                                const isDimmed = statusFilter !== 'ALL' && statusFilter !== lane.status;
+        if (filteredProjects.length === 0) {
+            return (
+                <div className="rounded-2xl border border-slate-800/70 bg-slate-950/60 p-10 text-center text-sm text-slate-400">
+                    {projects.length === 0
+                        ? 'No projects yet. Create your first project.'
+                        : 'No projects match the current filters.'}
+                </div>
+            );
+        }
 
-                                return (
-                                    <ProjectsLane
-                                        key={lane.status}
-                                        lane={lane}
-                                        projects={laneProjects}
-                                        isFocused={isFocused}
-                                        isDimmed={isDimmed}
-                                    />
-                                );
-                            })}
-                        </ul>
+        return (
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {filteredProjects.map((project) => {
+                    const statusMeta = PROJECT_STATUS_META[project.status];
+                    const completedTasks = project.tasks.filter((task) => task.status === 'COMPLETE').length;
+                    const scheduleLabel =
+                        project.startDate && project.endDate
+                            ? `${formatDate(project.startDate)} – ${formatDate(project.endDate)}`
+                            : project.endDate
+                                ? `Due ${formatDate(project.endDate)}`
+                                : 'Schedule TBD';
+
+                    return (
+                        <li key={project.id}>
+                            <button
+                                type="button"
+                                onClick={() => openEditDrawer(project)}
+                                className="group block w-full rounded-2xl border border-slate-800/70 bg-slate-950/60 p-5 text-left transition hover:border-indigo-400/60 hover:bg-slate-950/80"
+                            >
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="space-y-2">
+                                        <span
+                                            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusMeta.badgeClass}`}
+                                        >
+                                            {statusMeta.label}
+                                        </span>
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-white line-clamp-1">{project.title}</h3>
+                                            <p className="text-xs text-slate-400">
+                                                Client · {project.clientName ?? 'Unknown client'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-2xl font-semibold text-white">{project.completionPercent}%</div>
+                                        <div className="text-xs uppercase tracking-wide text-slate-500">Completion</div>
+                                    </div>
+                                </div>
+                                {project.description ? (
+                                    <p className="mt-4 text-sm text-slate-300 line-clamp-3">{project.description}</p>
+                                ) : (
+                                    <p className="mt-4 text-sm text-slate-500">No description yet.</p>
+                                )}
+                                <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+                                    <span>{scheduleLabel}</span>
+                                    <span>
+                                        {completedTasks}/{project.tasks.length} tasks
+                                    </span>
+                                </div>
+                                {project.tags.length > 0 ? (
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        {project.tags.map((tag) => (
+                                            <span
+                                                key={tag}
+                                                className="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-900/70 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-300"
+                                            >
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+        );
+    };
+
+    return (
+        <div className="mx-auto max-w-7xl space-y-8 p-6">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-4">
+                    <div>
+                        <h1 className="text-3xl font-semibold text-white">Projects</h1>
+                        <p className="mt-1 text-sm text-slate-400">
+                            Monitor delivery, see upcoming tasks, and keep billing in sync.
+                        </p>
                     </div>
-                </section>
-            ) : null}
+                    <button
+                        type="button"
+                        onClick={openCreateDrawer}
+                        className="inline-flex items-center justify-center rounded-2xl bg-indigo-500/90 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
+                    >
+                        New project
+                    </button>
+                </div>
+                <div className="w-full max-w-xs space-y-3">
+                    <input
+                        value={controls.search}
+                        onChange={handleSearchChange}
+                        placeholder="Search projects"
+                        className="w-full rounded-2xl border border-slate-800/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
+                    />
+                    <select
+                        value={controls.status}
+                        onChange={handleStatusChange}
+                        className="w-full rounded-2xl border border-slate-800/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
+                        aria-label="Filter by project status"
+                    >
+                        {STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                                {status === 'ALL' ? 'All statuses' : PROJECT_STATUS_META[status].label}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={controls.tag}
+                        onChange={handleTagChange}
+                        className="w-full rounded-2xl border border-slate-800/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
+                        aria-label="Filter by tag"
+                    >
+                        <option value="">All tags</option>
+                        {tagOptions.map((tag) => (
+                            <option key={tag} value={tag}>
+                                {tag}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {renderProjects()}
 
             <NewProjectDrawer
                 open={isDrawerOpen}
-                onOpenChange={setDrawerOpen}
+                mode={drawerMode}
+                project={drawerMode === 'edit' ? activeProject : null}
+                onOpenChange={handleDrawerOpenChange}
                 onProjectCreated={handleProjectCreated}
+                onProjectUpdated={handleProjectUpdated}
             />
             <Toast toast={toast} />
         </div>

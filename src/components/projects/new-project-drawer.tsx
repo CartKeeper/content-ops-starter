@@ -31,7 +31,13 @@ import { Label } from '../ui/label';
 import { Select } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
-import { PROJECT_STATUSES, PROJECT_TASK_STATUSES, type ProjectRecord } from '../../types/project';
+import {
+    PROJECT_STATUSES,
+    PROJECT_TASK_STATUSES,
+    type ProjectInput,
+    type ProjectRecord,
+    type ProjectTaskInput
+} from '../../types/project';
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const response = await fetch(url);
@@ -75,10 +81,70 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+function getDefaultValues(): FormValues {
+    return {
+        title: '',
+        clientId: '',
+        status: 'PLANNING',
+        startDate: '',
+        endDate: '',
+        description: '',
+        tags: [],
+        tasks: []
+    };
+}
+
+function mapProjectToForm(project: ProjectRecord): FormValues {
+    return {
+        title: project.title,
+        clientId: project.clientId,
+        status: project.status,
+        startDate: project.startDate ?? '',
+        endDate: project.endDate ?? '',
+        description: project.description ?? '',
+        tags: Array.isArray(project.tags) ? [...project.tags] : [],
+        tasks: project.tasks.map((task) => ({
+            id: task.id,
+            name: task.name,
+            date: task.date ?? '',
+            location: task.location ?? '',
+            status: task.status ?? 'PENDING'
+        }))
+    };
+}
+
+function sanitizeProject(values: FormValues) {
+    return {
+        title: values.title.trim(),
+        clientId: values.clientId.trim(),
+        status: values.status,
+        startDate: values.startDate.length > 0 ? values.startDate : null,
+        endDate: values.endDate.length > 0 ? values.endDate : null,
+        description:
+            values.description && values.description.trim().length > 0
+                ? values.description.trim()
+                : null,
+        tags: values.tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0)
+    } satisfies ProjectInput;
+}
+
+function sanitizeTask(task: FormValues['tasks'][number], index: number) {
+    return {
+        name: task.name.trim(),
+        date: task.date.length > 0 ? task.date : null,
+        location: task.location && task.location.trim().length > 0 ? task.location.trim() : null,
+        status: task.status ?? 'PENDING',
+        orderIndex: index
+    } satisfies ProjectTaskInput;
+}
+
 type NewProjectDrawerProps = {
     open: boolean;
+    mode?: 'create' | 'edit';
+    project?: ProjectRecord | null;
     onOpenChange: (open: boolean) => void;
     onProjectCreated: (project: ProjectRecord) => void;
+    onProjectUpdated?: (project: ProjectRecord) => void;
 };
 
 type TagsInputProps = {
@@ -264,7 +330,14 @@ function SortableTaskItem({ fieldId, index, register, control, remove, error }: 
     );
 }
 
-export function NewProjectDrawer({ open, onOpenChange, onProjectCreated }: NewProjectDrawerProps) {
+export function NewProjectDrawer({
+    open,
+    mode = 'create',
+    project = null,
+    onOpenChange,
+    onProjectCreated,
+    onProjectUpdated
+}: NewProjectDrawerProps) {
     const {
         register,
         control,
@@ -273,16 +346,7 @@ export function NewProjectDrawer({ open, onOpenChange, onProjectCreated }: NewPr
         formState: { errors, isSubmitting }
     } = useForm<FormValues>({
         resolver: zodResolver(formSchema),
-        defaultValues: {
-            title: '',
-            clientId: '',
-            status: 'PLANNING',
-            startDate: '',
-            endDate: '',
-            description: '',
-            tags: [],
-            tasks: []
-        }
+        defaultValues: getDefaultValues()
     });
 
     const {
@@ -299,12 +363,33 @@ export function NewProjectDrawer({ open, onOpenChange, onProjectCreated }: NewPr
 
     const [submitError, setSubmitError] = React.useState<string | null>(null);
 
+    const isEditMode = mode === 'edit' && project !== null;
+
     const { data: clientsData } = useSWR<{ clients: ClientOption[] }>(
         open ? '/api/projects/clients' : null,
         fetcher
     );
 
     const clients = clientsData?.clients ?? [];
+
+    const clientOptions = React.useMemo(() => {
+        if (!isEditMode || !project) {
+            return clients;
+        }
+
+        const exists = clients.some((client) => client.id === project.clientId);
+        if (exists) {
+            return clients;
+        }
+
+        return [
+            ...clients,
+            {
+                id: project.clientId,
+                name: project.clientName ?? 'Current client'
+            }
+        ];
+    }, [clients, isEditMode, project]);
 
     const onDragEnd = React.useCallback(
         (event: DragEndEvent) => {
@@ -325,65 +410,178 @@ export function NewProjectDrawer({ open, onOpenChange, onProjectCreated }: NewPr
     const onSubmit = React.useCallback(
         async (values: FormValues) => {
             setSubmitError(null);
-            try {
-                const payload = {
-                    project: {
-                        title: values.title.trim(),
-                        clientId: values.clientId.trim(),
-                        status: values.status,
-                        startDate: values.startDate.length > 0 ? values.startDate : null,
-                        endDate: values.endDate.length > 0 ? values.endDate : null,
-                        description:
-                            values.description && values.description.trim().length > 0
-                                ? values.description.trim()
-                                : null,
-                        tags: values.tags
-                    },
-                    tasks: values.tasks.map((task, index) => ({
-                        name: task.name.trim(),
-                        date: task.date.length > 0 ? task.date : null,
-                        location: task.location && task.location.length > 0 ? task.location : null,
-                        status: task.status,
-                        orderIndex: index
-                    }))
-                };
 
-                const response = await fetch('/api/projects', {
-                    method: 'POST',
+            if (!isEditMode) {
+                try {
+                    const response = await fetch('/api/projects', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            project: sanitizeProject(values),
+                            tasks: values.tasks.map((task, index) => sanitizeTask(task, index))
+                        })
+                    });
+
+                    const data = (await response.json().catch(() => null)) as
+                        | { project?: ProjectRecord; error?: string }
+                        | null;
+
+                    if (!response.ok || !data?.project) {
+                        throw new Error(data?.error ?? 'Failed to create project.');
+                    }
+
+                    onProjectCreated(data.project);
+                    reset(getDefaultValues());
+                    onOpenChange(false);
+                } catch (error) {
+                    console.error('Create project failed', error);
+                    setSubmitError(error instanceof Error ? error.message : 'Failed to create project.');
+                }
+                return;
+            }
+
+            if (!project) {
+                setSubmitError('Project data is unavailable.');
+                return;
+            }
+
+            try {
+                const projectId = project.id;
+                const response = await fetch(`/api/projects/${projectId}`, {
+                    method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(sanitizeProject(values))
                 });
 
-                if (!response.ok) {
-                    const data = (await response.json().catch(() => null)) as { error?: string } | null;
-                    throw new Error(data?.error ?? 'Failed to create project.');
+                const projectData = (await response.json().catch(() => null)) as
+                    | { project?: ProjectRecord; error?: string }
+                    | null;
+
+                if (!response.ok || !projectData?.project) {
+                    throw new Error(projectData?.error ?? 'Failed to update project.');
                 }
 
-                const body = (await response.json()) as { project: ProjectRecord };
-                onProjectCreated(body.project);
-                reset();
+                let latestProject = projectData.project;
+                const existingTaskIds = new Set(
+                    (project.tasks ?? [])
+                        .map((task) => task.id)
+                        .filter((taskId): taskId is string => Boolean(taskId))
+                );
+                const submittedTaskIds = new Set<string>();
+                const sanitizedTasks = values.tasks.map((task, index) => sanitizeTask(task, index));
+
+                for (let index = 0; index < values.tasks.length; index += 1) {
+                    const currentTask = values.tasks[index];
+                    const sanitized = sanitizedTasks[index];
+
+                    if (currentTask.id) {
+                        submittedTaskIds.add(currentTask.id);
+                        const taskResponse = await fetch(`/api/projects/${projectId}/tasks/${currentTask.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(sanitized)
+                        });
+
+                        const taskData = (await taskResponse.json().catch(() => null)) as
+                            | { project?: ProjectRecord; error?: string }
+                            | null;
+
+                        if (!taskResponse.ok) {
+                            throw new Error(taskData?.error ?? 'Failed to update task.');
+                        }
+
+                        if (taskData?.project) {
+                            latestProject = taskData.project;
+                        }
+                    } else {
+                        const taskResponse = await fetch(`/api/projects/${projectId}/tasks`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(sanitized)
+                        });
+
+                        const taskData = (await taskResponse.json().catch(() => null)) as
+                            | { project?: ProjectRecord; error?: string }
+                            | null;
+
+                        if (!taskResponse.ok) {
+                            throw new Error(taskData?.error ?? 'Failed to create task.');
+                        }
+
+                        if (taskData?.project) {
+                            latestProject = taskData.project;
+                        }
+                    }
+                }
+
+                for (const existingId of existingTaskIds) {
+                    if (!submittedTaskIds.has(existingId)) {
+                        const deleteResponse = await fetch(`/api/projects/${projectId}/tasks/${existingId}`, {
+                            method: 'DELETE'
+                        });
+
+                        const deleteData = (await deleteResponse.json().catch(() => null)) as
+                            | { project?: ProjectRecord; error?: string }
+                            | null;
+
+                        if (!deleteResponse.ok) {
+                            throw new Error(deleteData?.error ?? 'Failed to delete task.');
+                        }
+
+                        if (deleteData?.project) {
+                            latestProject = deleteData.project;
+                        }
+                    }
+                }
+
+                const projectForCallback = latestProject ?? project;
+                if (projectForCallback) {
+                    if (onProjectUpdated) {
+                        onProjectUpdated(projectForCallback);
+                    }
+                    reset(mapProjectToForm(projectForCallback));
+                }
+
                 onOpenChange(false);
             } catch (error) {
-                console.error('Create project failed', error);
-                setSubmitError(error instanceof Error ? error.message : 'Failed to create project.');
+                console.error('Update project failed', error);
+                setSubmitError(error instanceof Error ? error.message : 'Failed to update project.');
             }
         },
-        [onOpenChange, onProjectCreated, reset]
+        [isEditMode, onOpenChange, onProjectCreated, onProjectUpdated, project, reset]
     );
 
     React.useEffect(() => {
         if (!open) {
             setSubmitError(null);
-            reset();
+            reset(getDefaultValues());
+            return;
         }
-    }, [open, reset]);
+
+        if (isEditMode && project) {
+            reset(mapProjectToForm(project));
+            setSubmitError(null);
+            return;
+        }
+
+        if (!isEditMode) {
+            reset(getDefaultValues());
+            setSubmitError(null);
+        }
+    }, [isEditMode, open, project, reset]);
+
+    const drawerTitle = isEditMode ? 'Edit project' : 'New project';
+    const drawerDescription = isEditMode
+        ? 'Update project details, scheduling, and tasks.'
+        : 'Create a project and track its timeline, tasks, and billing.';
+    const submitLabel = isEditMode ? 'Save changes' : 'Create project';
 
     return (
         <Drawer open={open} onOpenChange={onOpenChange}>
             <DrawerContent>
                 <DrawerHeader>
-                    <DrawerTitle>New project</DrawerTitle>
-                    <DrawerDescription>Create a project and track its timeline, tasks, and billing.</DrawerDescription>
+                    <DrawerTitle>{drawerTitle}</DrawerTitle>
+                    <DrawerDescription>{drawerDescription}</DrawerDescription>
                 </DrawerHeader>
                 <form className="flex flex-1 flex-col gap-6" onSubmit={handleSubmit(onSubmit)}>
                     <div className="grid gap-4">
@@ -394,11 +592,11 @@ export function NewProjectDrawer({ open, onOpenChange, onProjectCreated }: NewPr
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="project-client">Client</Label>
-                            <Select id="project-client" {...register('clientId')} disabled={clients.length === 0}>
+                            <Select id="project-client" {...register('clientId')} disabled={clientOptions.length === 0}>
                                 <option value="" disabled>
-                                    {clients.length === 0 ? 'Loading clients…' : 'Select a client'}
+                                    {clientOptions.length === 0 ? 'Loading clients…' : 'Select a client'}
                                 </option>
-                                {clients.map((client) => (
+                                {clientOptions.map((client) => (
                                     <option key={client.id} value={client.id}>
                                         {client.name}
                                     </option>
@@ -502,7 +700,7 @@ export function NewProjectDrawer({ open, onOpenChange, onProjectCreated }: NewPr
                             </Button>
                         </DrawerClose>
                         <Button type="submit" disabled={isSubmitting} isLoading={isSubmitting}>
-                            Create project
+                            {submitLabel}
                         </Button>
                     </DrawerFooter>
                 </form>
