@@ -3,15 +3,59 @@ import Head from 'next/head';
 import useSWR from 'swr';
 
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
+import { LayoutShell, PageHeader, Toolbar, ToolbarSection } from '../../components/dashboard';
+import { NewProjectDrawer, ProjectCard } from '../../components/projects';
+import { PROJECT_STATUS_META } from '../../components/projects/status-meta';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
-import { LayoutShell, PageHeader, Toolbar, ToolbarSection } from '../../components/dashboard';
-import { NewProjectDrawer, ProjectCard } from '../../components/projects';
+import { cn } from '../../lib/cn';
 import { getSupabaseBrowserClient } from '../../lib/supabase-browser';
 import type { ProjectListResponse, ProjectRecord, ProjectStatus } from '../../types/project';
 
 const STATUS_OPTIONS: Array<ProjectStatus | 'ALL'> = ['ALL', 'PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETE', 'CANCELLED'];
+
+const BOARD_STATUSES: ProjectStatus[] = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETE', 'CANCELLED'];
+
+const LANE_DESCRIPTIONS: Record<
+    ProjectStatus,
+    { description: string; emptyTitle: string; emptyDescription: string }
+> = {
+    PLANNING: {
+        description: 'Kick off work, gather briefs, and align the team.',
+        emptyTitle: 'No planning projects',
+        emptyDescription: 'Create a project to start shaping the next engagement.'
+    },
+    IN_PROGRESS: {
+        description: 'Shoots, edits, and reviews that are actively moving.',
+        emptyTitle: 'Nothing in progress',
+        emptyDescription: 'Update a project to In progress once production begins.'
+    },
+    ON_HOLD: {
+        description: 'Work paused while you await approvals or next steps.',
+        emptyTitle: 'No projects on hold',
+        emptyDescription: 'Projects waiting on feedback or decisions will appear here.'
+    },
+    COMPLETE: {
+        description: 'Wrapped engagements ready for delivery and invoicing.',
+        emptyTitle: 'No completed projects',
+        emptyDescription: 'Mark projects as complete to celebrate the finish line.'
+    },
+    CANCELLED: {
+        description: 'Closed or cancelled engagements kept for reference.',
+        emptyTitle: 'No cancelled projects',
+        emptyDescription: 'Any cancelled work will land here for your records.'
+    }
+};
+
+const BOARD_LANES = BOARD_STATUSES.map((status) => ({
+    status,
+    label: PROJECT_STATUS_META[status].label,
+    badgeClass: PROJECT_STATUS_META[status].badgeClass,
+    description: LANE_DESCRIPTIONS[status].description,
+    emptyTitle: LANE_DESCRIPTIONS[status].emptyTitle,
+    emptyDescription: LANE_DESCRIPTIONS[status].emptyDescription
+}));
 
 const fetcher = async <T,>(url: string): Promise<T> => {
     const response = await fetch(url);
@@ -79,16 +123,13 @@ function ProjectsWorkspace() {
         if (debouncedSearch.length > 0) {
             params.set('q', debouncedSearch);
         }
-        if (statusFilter !== 'ALL') {
-            params.set('status', statusFilter);
-        }
         if (tagFilter.trim().length > 0) {
             params.set('tag', tagFilter.trim());
         }
         params.set('page', '1');
-        params.set('pageSize', '30');
+        params.set('pageSize', '40');
         return `/api/projects?${params.toString()}`;
-    }, [debouncedSearch, statusFilter, tagFilter]);
+    }, [debouncedSearch, tagFilter]);
 
     const {
         data,
@@ -109,6 +150,19 @@ function ProjectsWorkspace() {
             }
         }
         return Array.from(set).sort((a, b) => a.localeCompare(b));
+    }, [projects]);
+
+    const laneBuckets = React.useMemo(() => {
+        const buckets = BOARD_STATUSES.reduce((acc, status) => {
+            acc[status] = [] as ProjectRecord[];
+            return acc;
+        }, {} as Record<ProjectStatus, ProjectRecord[]>);
+
+        for (const project of projects) {
+            buckets[project.status]?.push(project);
+        }
+
+        return buckets;
     }, [projects]);
 
     React.useEffect(() => {
@@ -143,7 +197,7 @@ function ProjectsWorkspace() {
                 void mutateProjects(
                     (current) => {
                         if (!current) {
-                            return { data: [project], page: 1, pageSize: 30, total: 1 };
+                            return { data: [project], page: 1, pageSize: 40, total: 1 };
                         }
                         return {
                             ...current,
@@ -186,10 +240,11 @@ function ProjectsWorkspace() {
                         value={statusFilter}
                         onChange={(event) => setStatusFilter(event.target.value as ProjectStatus | 'ALL')}
                         className="h-10 w-48"
+                        aria-label="Highlight status lane"
                     >
                         {STATUS_OPTIONS.map((status) => (
                             <option key={status} value={status}>
-                                {status === 'ALL' ? 'All statuses' : status.replace(/_/g, ' ')}
+                                {status === 'ALL' ? 'All lanes' : PROJECT_STATUS_META[status as ProjectStatus]?.label ?? status.replace(/_/g, ' ')}
                             </option>
                         ))}
                     </Select>
@@ -238,10 +293,54 @@ function ProjectsWorkspace() {
             ) : null}
 
             {projects.length > 0 ? (
-                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                    {projects.map((project) => (
-                        <ProjectCard key={project.id} project={project} />
-                    ))}
+                <div className="-mx-4 mt-6 overflow-x-auto pb-6 lg:mx-0 lg:overflow-x-visible">
+                    <div className="flex min-w-max gap-4 px-4 lg:min-w-0 lg:grid lg:grid-cols-5 lg:gap-6 lg:px-0">
+                        {BOARD_LANES.map((lane) => {
+                            const laneProjects = laneBuckets[lane.status] ?? [];
+                            const isFocused = statusFilter !== 'ALL' && statusFilter === lane.status;
+                            const isDimmed = statusFilter !== 'ALL' && statusFilter !== lane.status;
+
+                            return (
+                                <section
+                                    key={lane.status}
+                                    className={cn(
+                                        'flex w-[280px] flex-col rounded-3xl border border-slate-800/70 bg-slate-950/60 p-4 shadow-xl shadow-slate-950/40 backdrop-blur lg:w-auto',
+                                        isFocused ? 'ring-2 ring-indigo-400/60' : 'ring-1 ring-inset ring-slate-800/70',
+                                        isDimmed ? 'opacity-50 transition-opacity' : 'opacity-100'
+                                    )}
+                                >
+                                    <header className="flex items-start justify-between gap-3">
+                                        <div className="space-y-1">
+                                            <h3 className="text-sm font-semibold text-white">{lane.label}</h3>
+                                            <p className="text-xs text-slate-400">{lane.description}</p>
+                                        </div>
+                                        <span
+                                            className={cn(
+                                                'inline-flex h-7 min-w-[2.5rem] items-center justify-center rounded-full px-2 text-xs font-semibold uppercase tracking-wide',
+                                                lane.badgeClass
+                                            )}
+                                        >
+                                            {laneProjects.length}
+                                        </span>
+                                    </header>
+                                    <div className="mt-4 flex flex-1 flex-col gap-4">
+                                        {laneProjects.length > 0 ? (
+                                            laneProjects.map((project) => (
+                                                <ProjectCard key={project.id} project={project} />
+                                            ))
+                                        ) : (
+                                            <div className="flex min-h-[160px] flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-800/60 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
+                                                <div>
+                                                    <p className="font-semibold text-white">{lane.emptyTitle}</p>
+                                                    <p className="mt-1 text-xs text-slate-400">{lane.emptyDescription}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </section>
+                            );
+                        })}
+                    </div>
                 </div>
             ) : null}
 
