@@ -32,11 +32,10 @@ type SelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'name'> &
 
 function baseInputClasses(invalid?: boolean) {
     return cn(
-        'w-full rounded-2xl border px-3 py-2 text-sm text-white transition focus-visible:outline-none',
+        'w-full rounded-2xl border px-3 py-2 text-sm transition focus-visible:outline-none',
         invalid
-            ? 'border-red-500/70 bg-red-950/30 focus-visible:border-red-400 focus-visible:ring-2 focus-visible:ring-red-500/40'
-            : 'border-slate-800/80 bg-slate-950/80 focus-visible:border-[#4DE5FF] focus-visible:ring-2 focus-visible:ring-[#4DE5FF]/50',
-        'placeholder:text-slate-500'
+            ? 'border-rose-300 bg-rose-50 text-rose-900 placeholder:text-rose-400 focus-visible:border-rose-400 focus-visible:ring-2 focus-visible:ring-rose-200 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100 dark:placeholder:text-rose-300 dark:focus-visible:border-rose-400 dark:focus-visible:ring-rose-500/30'
+            : 'border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-200 dark:border-slate-800/80 dark:bg-slate-950/80 dark:text-white dark:placeholder:text-slate-500 dark:focus-visible:border-[#4DE5FF] dark:focus-visible:ring-[#4DE5FF]/50'
     );
 }
 

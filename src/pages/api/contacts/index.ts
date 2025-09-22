@@ -212,10 +212,40 @@ async function handleGetSupabase(
     res: NextApiResponse<ContactsResponse>,
     session: SessionPayload
 ) {
-    const queryState = parseQuery(req);
     const supabase = getSupabaseClient();
 
+    const contactIdParam = req.query.id;
+    const rawContactId = Array.isArray(contactIdParam) ? contactIdParam[0] : contactIdParam;
+    const contactId = typeof rawContactId === 'string' ? rawContactId.trim() : null;
+
     const canViewAll = session.role === 'admin' || session.permissions.canManageUsers;
+
+    if (contactId) {
+        let singleQuery = supabase.from('contacts').select('*').eq('id', contactId);
+
+        if (!canViewAll) {
+            singleQuery = singleQuery.eq('owner_user_id', session.userId);
+        }
+
+        const { data, error, status } = await singleQuery.single();
+        const record = (data ?? null) as ContactRecord | null;
+
+        if (error || !record) {
+            const notFound = status === 404 || status === 406 || error?.code === 'PGRST116';
+
+            if (!notFound) {
+                console.error('Failed to fetch contact from Supabase', error);
+            }
+
+            res.status(notFound ? 404 : 500).json({ error: notFound ? 'Contact not found.' : 'Unable to load contact.' });
+            return;
+        }
+
+        res.status(200).json({ data: record });
+        return;
+    }
+
+    const queryState = parseQuery(req);
     const normalizedStatuses = normalizeStatuses(queryState.stages, queryState.statuses);
     const includeUnassignedOwner = queryState.owners.includes('unassigned');
     const ownerIds = canViewAll
