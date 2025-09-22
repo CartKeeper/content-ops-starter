@@ -303,7 +303,7 @@ export function QuickSetupModal({ open, onClose }: QuickSetupModalProps) {
                         </Dialog.Overlay>
                         <Dialog.Content asChild>
                             <motion.div
-                                className="relative z-[101] w-full max-w-5xl rounded-[32px] border border-white/20 bg-white/85 p-8 shadow-2xl backdrop-blur-xl transition dark:border-slate-700/60 dark:bg-slate-950/80"
+                                className="fixed left-1/2 top-1/2 z-[101] w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-[32px] border border-white/20 bg-white/85 p-8 shadow-2xl backdrop-blur-xl transition dark:border-slate-700/60 dark:bg-slate-950/80"
                                 initial={{ opacity: 0, y: 32, scale: 0.98 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -24, scale: 0.98 }}
