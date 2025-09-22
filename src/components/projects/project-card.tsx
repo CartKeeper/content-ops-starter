@@ -7,33 +7,12 @@ import { formatCurrency, formatDate } from '../../lib/formatters';
 import {
     type ProjectInvoiceSnippet,
     type ProjectRecord,
-    type ProjectStatus,
     type ProjectTaskRecord,
     type ProjectTaskStatus
 } from '../../types/project';
+import { formatProjectStatusLabel, getProjectStatusMeta } from './status-meta';
 
-const projectStatusMap = {
-    PLANNING: {
-        label: 'Planning',
-        badgeClass: 'border-amber-400/40 bg-amber-500/15 text-amber-200'
-    },
-    IN_PROGRESS: {
-        label: 'In progress',
-        badgeClass: 'border-indigo-400/40 bg-indigo-500/15 text-indigo-200'
-    },
-    ON_HOLD: {
-        label: 'On hold',
-        badgeClass: 'border-slate-400/40 bg-slate-500/15 text-slate-200'
-    },
-    COMPLETE: {
-        label: 'Complete',
-        badgeClass: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
-    },
-    CANCELLED: {
-        label: 'Cancelled',
-        badgeClass: 'border-rose-400/40 bg-rose-500/15 text-rose-200'
-    }
-} satisfies Record<ProjectStatus, { label: string; badgeClass: string }>;
+const formatStatusLabel = formatProjectStatusLabel;
 
 const taskStatusMap = {
     PENDING: { label: 'Pending', className: 'border-amber-400/40 bg-amber-500/15 text-amber-200' },
@@ -50,41 +29,6 @@ const invoiceStatusMap: Record<ProjectInvoiceSnippet['status'], string> = {
 };
 
 const neutralBadgeClass = 'border-slate-500/40 bg-slate-500/15 text-slate-200';
-
-function formatStatusLabel(rawStatus?: string | null): string {
-    if (!rawStatus) {
-        return 'Unknown Status';
-    }
-
-    const cleaned = rawStatus
-        .replace(/([a-z])([A-Z])/g, '$1 $2')
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    if (!cleaned) {
-        return 'Unknown Status';
-    }
-
-    return cleaned
-        .split(' ')
-        .filter(Boolean)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ');
-}
-
-function getProjectStatusMeta(status: string | undefined) {
-    const meta = projectStatusMap[status as keyof typeof projectStatusMap];
-
-    if (meta) {
-        return meta;
-    }
-
-    return {
-        label: formatStatusLabel(status),
-        badgeClass: neutralBadgeClass
-    };
-}
 
 function getTaskStatusMeta(status: string | undefined) {
     const meta = taskStatusMap[status as keyof typeof taskStatusMap];
