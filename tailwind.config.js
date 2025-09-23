@@ -2,7 +2,7 @@ const plugin = require('tailwindcss/plugin');
 const themeStyle = require('./content/data/style.json');
 
 module.exports = {
-    darkMode: 'class',
+    darkMode: ['class'],
     content: ['./src/**/*.{js,ts,jsx,tsx}', './content/**/*', './.sourcebit-nextjs-cache.json'],
     safelist: [
         'text-neutral',
@@ -20,6 +20,9 @@ module.exports = {
                 lg: 'var(--space-5)',
                 xl: 'var(--space-6)'
             }
+        },
+        fontFamily: {
+            sans: ['var(--font-sans)']
         },
         extend: {
             boxShadow: {
@@ -68,7 +71,6 @@ module.exports = {
                 }
             },
             fontFamily: {
-                sans: ['Inter', 'sans-serif'],
                 serif: ['Roboto Slab', 'serif']
             },
             gridTemplateColumns: {
