@@ -9,6 +9,7 @@ import '../css/main.css';
 import { NetlifyIdentityProvider } from '../components/auth';
 import { QuickActionSettingsProvider } from '../components/crm/quick-action-settings';
 import { IntegrationProvider } from '../components/crm/integration-context';
+import { ThemeProvider } from '../components/theme/ThemeProvider';
 
 export default function MyApp({ Component, pageProps }) {
     useEffect(() => {
@@ -24,12 +25,14 @@ export default function MyApp({ Component, pageProps }) {
     }, []);
 
     return (
-        <NetlifyIdentityProvider>
-            <QuickActionSettingsProvider>
-                <IntegrationProvider>
-                    <Component {...pageProps} />
-                </IntegrationProvider>
-            </QuickActionSettingsProvider>
-        </NetlifyIdentityProvider>
+        <ThemeProvider>
+            <NetlifyIdentityProvider>
+                <QuickActionSettingsProvider>
+                    <IntegrationProvider>
+                        <Component {...pageProps} />
+                    </IntegrationProvider>
+                </QuickActionSettingsProvider>
+            </NetlifyIdentityProvider>
+        </ThemeProvider>
     );
 }

@@ -5,7 +5,6 @@ import { useRouter } from 'next/router';
 import type { IconType } from 'react-icons';
 
 import { INTEGRATION_CATEGORIES } from '../../data/integrations';
-import { useThemeMode } from '../../utils/use-theme-mode';
 import { useNetlifyIdentity } from '../auth';
 import { ApertureMark } from './ApertureMark';
 import {
@@ -13,7 +12,6 @@ import {
     AppsIcon,
     BellIcon,
     CalendarIcon,
-    CheckIcon,
     FolderIcon,
     MoonIcon,
     PhotoIcon,
@@ -25,6 +23,8 @@ import {
 } from './icons';
 import { useCrmAuth } from './CrmAuthGuard';
 import { useIntegrations } from './integration-context';
+import { ThemeMenu } from './ThemeMenu';
+import { resolveThemeMode, useThemeStore } from '../../utils/theme-store';
 
 type WorkspaceLayoutProps = {
     children: React.ReactNode;
@@ -35,58 +35,6 @@ type NavItem = {
     label: string;
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
-
-type AccentOption = {
-    id: string;
-    label: string;
-    swatch: string;
-    soft: string;
-    contrast?: string;
-};
-
-type RgbTuple = [number, number, number];
-
-function hexToRgbTuple(hex: string): RgbTuple | null {
-    const value = hex.replace('#', '').trim();
-    if (value.length !== 3 && value.length !== 6) {
-        return null;
-    }
-
-    const normalized = value.length === 3 ? value.split('').map((char) => char + char).join('') : value;
-
-    const numeric = Number.parseInt(normalized, 16);
-    if (Number.isNaN(numeric)) {
-        return null;
-    }
-
-    return [
-        (numeric >> 16) & 255,
-        (numeric >> 8) & 255,
-        numeric & 255
-    ];
-}
-
-function rgbTupleToHex([r, g, b]: RgbTuple) {
-    const toHex = (value: number) => value.toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-function mixRgb(color: RgbTuple, target: RgbTuple, amount: number): RgbTuple {
-    const clamp = (value: number) => Math.min(255, Math.max(0, value));
-    return [
-        Math.round(clamp(color[0] * (1 - amount) + target[0] * amount)),
-        Math.round(clamp(color[1] * (1 - amount) + target[1] * amount)),
-        Math.round(clamp(color[2] * (1 - amount) + target[2] * amount))
-    ];
-}
-
-function darkenRgb(color: RgbTuple, amount: number): RgbTuple {
-    return mixRgb(color, [0, 0, 0], amount);
-}
-
-function brightenRgb(color: RgbTuple, amount: number): RgbTuple {
-    return mixRgb(color, [255, 255, 255], amount);
-}
 
 function formatRoleLabel(role: string | null | undefined, roles: string[] | null | undefined): string | null {
     const resolvedRole = role ?? (Array.isArray(roles) && roles.length > 0 ? roles[0] : null);
@@ -144,20 +92,6 @@ const navItems: NavItem[] = [
     { href: '/accounts-payable', label: 'Accounts Payable', icon: ReceiptIcon },
     { href: '/settings', label: 'Settings', icon: SettingsIcon }
 ];
-
-const ACCENT_STORAGE_KEY = 'crm-accent-preference';
-const OUTLINE_MODE_STORAGE_KEY = 'crm-outline-mode';
-const DEFAULT_ACCENT_ID = 'indigo';
-
-const accentOptions: AccentOption[] = [
-    { id: 'slate', label: 'Slate', swatch: '#475569', soft: 'rgba(71, 85, 105, 0.18)' },
-    { id: 'indigo', label: 'Indigo', swatch: '#6366f1', soft: 'rgba(99, 102, 241, 0.22)' },
-    { id: 'violet', label: 'Violet', swatch: '#8b5cf6', soft: 'rgba(139, 92, 246, 0.22)' },
-    { id: 'emerald', label: 'Emerald', swatch: '#10b981', soft: 'rgba(16, 185, 129, 0.2)' },
-    { id: 'amber', label: 'Amber', swatch: '#f59e0b', soft: 'rgba(245, 158, 11, 0.25)', contrast: '#111827' },
-    { id: 'rose', label: 'Rose', swatch: '#f43f5e', soft: 'rgba(244, 63, 94, 0.2)' }
-];
-
 
 const notifications: NotificationItem[] = [
     {
@@ -395,7 +329,9 @@ function useDropdown<T extends HTMLElement>({
 
 export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
     const router = useRouter();
-    const { theme, setTheme, toggleTheme } = useThemeMode();
+    const { resolvedThemeMode } = useThemeStore((themeState) => ({
+        resolvedThemeMode: resolveThemeMode(themeState.current),
+    }));
     const [isNavOpen, setIsNavOpen] = React.useState(false);
     const { connectedIntegrations } = useIntegrations();
     const identity = useNetlifyIdentity();
@@ -459,34 +395,6 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         }
     }, [closeProfile, signOut]);
 
-    const [accent, setAccent] = React.useState<string>(() => {
-        if (typeof window === 'undefined') {
-            return DEFAULT_ACCENT_ID;
-        }
-        try {
-            const stored = window.localStorage.getItem(ACCENT_STORAGE_KEY);
-            if (stored && accentOptions.some((option) => option.id === stored)) {
-                return stored;
-            }
-        } catch (error) {
-            console.warn('Unable to read stored accent preference', error);
-        }
-        return DEFAULT_ACCENT_ID;
-    });
-
-    const [isOutlineMode, setIsOutlineMode] = React.useState<boolean>(() => {
-        if (typeof window === 'undefined') {
-            return false;
-        }
-        try {
-            const stored = window.localStorage.getItem(OUTLINE_MODE_STORAGE_KEY);
-            return stored === 'true';
-        } catch (error) {
-            console.warn('Unable to read stored outline preference', error);
-        }
-        return false;
-    });
-
     const activeItem = React.useMemo(() => {
         const path = router.pathname;
         return navItems.find((item) => matchPath(path, item.href)) ?? null;
@@ -516,84 +424,6 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
             document.removeEventListener('keydown', handleKeydown);
         };
     }, [closeApps, closeThemeMenu, closeNotifications, closeProfile]);
-
-    React.useEffect(() => {
-        const selectedAccent = accentOptions.find((option) => option.id === accent) ?? accentOptions[0];
-
-        if (typeof document !== 'undefined') {
-            const root = document.documentElement;
-            const accentRgb = hexToRgbTuple(selectedAccent.swatch);
-
-            root.style.setProperty('--crm-accent', selectedAccent.swatch);
-            root.style.setProperty('--crm-accent-soft', selectedAccent.soft);
-            root.style.setProperty('--crm-accent-contrast', selectedAccent.contrast ?? '#ffffff');
-
-            if (accentRgb) {
-                const hoverHex = rgbTupleToHex(darkenRgb(accentRgb, 0.08));
-                const activeHex = rgbTupleToHex(darkenRgb(accentRgb, 0.16));
-                const brightHex = rgbTupleToHex(brightenRgb(accentRgb, 0.2));
-                const rgbValue = accentRgb.join(', ');
-
-                root.style.setProperty('--crm-accent-rgb', rgbValue);
-                root.style.setProperty('--crm-accent-hover', hoverHex);
-                root.style.setProperty('--crm-accent-active', activeHex);
-                root.style.setProperty('--crm-accent-bright', brightHex);
-                root.style.setProperty('--crm-accent-glow', `rgba(${rgbValue}, 0.35)`);
-                root.style.setProperty('--crm-accent-glow-strong', `rgba(${rgbValue}, 0.55)`);
-
-                root.style.setProperty('--tblr-primary', selectedAccent.swatch);
-                root.style.setProperty('--tblr-primary-rgb', rgbValue);
-                root.style.setProperty('--tblr-link-color', selectedAccent.swatch);
-                root.style.setProperty('--tblr-link-hover-color', hoverHex);
-                root.style.setProperty('--tblr-primary-hover', hoverHex);
-                root.style.setProperty('--tblr-primary-fg', selectedAccent.contrast ?? '#ffffff');
-            }
-
-            const body = document.body;
-            if (body) {
-                body.dataset.crmAccent = selectedAccent.id;
-            }
-        }
-
-        try {
-            if (typeof window !== 'undefined') {
-                window.localStorage.setItem(ACCENT_STORAGE_KEY, accent);
-            }
-        } catch (error) {
-            console.warn('Unable to persist accent preference', error);
-        }
-    }, [accent]);
-
-    React.useEffect(() => {
-        if (typeof document === 'undefined') {
-            return;
-        }
-
-        const body = document.body;
-        if (!body) {
-            return;
-        }
-
-        body.classList.toggle('crm-outline-mode', isOutlineMode);
-
-        try {
-            if (typeof window !== 'undefined') {
-                window.localStorage.setItem(OUTLINE_MODE_STORAGE_KEY, isOutlineMode ? 'true' : 'false');
-            }
-        } catch (error) {
-            console.warn('Unable to persist outline preference', error);
-        }
-    }, [isOutlineMode]);
-
-    const activeAccent = accentOptions.find((option) => option.id === accent) ?? accentOptions[0];
-
-    const handleSelectAccent = React.useCallback((nextAccent: string) => {
-        setAccent(nextAccent);
-    }, []);
-
-    const toggleOutlineMode = React.useCallback(() => {
-        setIsOutlineMode((previous) => !previous);
-    }, []);
 
     const headingLabel = activeItem ? activeItem.label : 'Workspace';
 
@@ -636,8 +466,8 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
     }, [connectedIntegrations]);
 
     return (
-        <div className={classNames('page', theme === 'dark' ? 'theme-dark' : 'theme-light')}>
-            <header className="navbar navbar-expand-md shadow-sm border-bottom crm-top-nav" data-bs-theme={theme}>
+        <div className={classNames('page', resolvedThemeMode === 'dark' ? 'theme-dark' : 'theme-light')}>
+            <header className="navbar navbar-expand-md shadow-sm border-bottom crm-top-nav" data-bs-theme={resolvedThemeMode}>
                 <div className="container-xl">
                     <Link href="/dashboard" className="navbar-brand d-flex align-items-center gap-2">
                         <span className="avatar avatar-sm bg-primary-lt text-primary">
@@ -858,7 +688,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                 onClick={toggleThemeMenu}
                                 data-dropdown-toggle
                             >
-                                {theme === 'dark' ? (
+                                {resolvedThemeMode === 'dark' ? (
                                     <MoonIcon className="icon" aria-hidden />
                                 ) : (
                                     <SunIcon className="icon" aria-hidden />
@@ -874,124 +704,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                     }
                                 )}
                             >
-                                <div className="card crm-theme-menu">
-                                    <div className="card-header">
-                                        <h4 className="card-title mb-0">Theme settings</h4>
-                                        <div className="text-secondary">Fine-tune your control center.</div>
-                                    </div>
-                                    <div className="card-body">
-                                        <div className="mb-4">
-                                            <div className="crm-dropdown-label">Color mode</div>
-                                            <div className="btn-list">
-                                                <button
-                                                    type="button"
-                                                    className={classNames('btn', {
-                                                        'btn-primary': theme === 'light',
-                                                        'btn-outline-secondary': theme !== 'light'
-                                                    })}
-                                                    onClick={() => setTheme('light')}
-                                                >
-                                                    <SunIcon className="icon" aria-hidden /> Light
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className={classNames('btn', {
-                                                        'btn-primary': theme === 'dark',
-                                                        'btn-outline-secondary': theme !== 'dark'
-                                                    })}
-                                                    onClick={() => setTheme('dark')}
-                                                >
-                                                    <MoonIcon className="icon" aria-hidden /> Dark
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline-secondary"
-                                                    onClick={toggleTheme}
-                                                >
-                                                    Auto toggle
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="mb-4">
-                                            <div className="crm-dropdown-label">Accent color</div>
-                                            <div className="row g-2">
-                                                {accentOptions.map((option) => {
-                                                    const isActive = option.id === accent;
-                                                    return (
-                                                        <div className="col-4" key={option.id}>
-                                                            <button
-                                                                type="button"
-                                                                className={classNames('crm-color-choice w-100', {
-                                                                    active: isActive
-                                                                })}
-                                                                style={{
-                                                                    backgroundColor: option.swatch,
-                                                                    boxShadow: isActive
-                                                                        ? `0 0 0 4px ${option.soft}`
-                                                                        : undefined,
-                                                                    color: option.contrast ?? '#ffffff'
-                                                                }}
-                                                                onClick={() => handleSelectAccent(option.id)}
-                                                                aria-pressed={isActive}
-                                                            >
-                                                                <span className="crm-color-check" aria-hidden>
-                                                                    <CheckIcon className="icon" />
-                                                                </span>
-                                                                <span className="crm-color-label">{option.label}</span>
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                        <div className="mb-4">
-                                            <div className="d-flex align-items-start justify-content-between gap-3">
-                                                <div>
-                                                    <div className="crm-dropdown-label mb-1">Outline mode</div>
-                                                    <div className="text-secondary small">
-                                                        Add neon outlines to dashboard cards and controls.
-                                                    </div>
-                                                </div>
-                                                <div className="form-check form-switch mb-0">
-                                                    <input
-                                                        id="outline-mode-toggle"
-                                                        type="checkbox"
-                                                        className="form-check-input"
-                                                        role="switch"
-                                                        checked={isOutlineMode}
-                                                        onChange={toggleOutlineMode}
-                                                    />
-                                                    <label className="visually-hidden" htmlFor="outline-mode-toggle">
-                                                        Toggle outline mode
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div className="crm-dropdown-label">Current selection</div>
-                                            <div className="d-flex align-items-center justify-content-between gap-3">
-                                                <div>
-                                                    <div className="fw-semibold">
-                                                        {theme === 'dark' ? 'Dark mode' : 'Light mode'}
-                                                    </div>
-                                                    <div className="text-secondary">
-                                                        <div>Accent: {activeAccent.label}</div>
-                                                        <div>Outline: {isOutlineMode ? 'Enabled' : 'Off'}</div>
-                                                    </div>
-                                                </div>
-                                                <span
-                                                    className="badge text-uppercase fw-semibold"
-                                                    style={{
-                                                        backgroundColor: activeAccent.soft,
-                                                        color: activeAccent.swatch
-                                                    }}
-                                                >
-                                                    Saved
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <ThemeMenu />
                             </div>
                         </div>
                         <div
@@ -1084,7 +797,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                     </div>
                 </div>
             </header>
-            <div className="page-wrapper" data-bs-theme={theme}>
+            <div className="page-wrapper" data-bs-theme={resolvedThemeMode}>
                 <section className="crm-page-header">
                     <div className="container-xl">
                         <div className="crm-page-heading">

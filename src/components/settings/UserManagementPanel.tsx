@@ -1,11 +1,36 @@
 'use client';
 
 import * as React from 'react';
+import classNames from 'classnames';
 
+import type {
+    ThemeAccent,
+    ThemeBackgroundPalette,
+    ThemeBackgroundSettings,
+    ThemeModeSetting,
+    ThemeOutlineLevel,
+    ThemeOutlineSettings,
+    ThemePreferences,
+} from '../../types/theme';
+import {
+    ACCENT_DEFINITIONS,
+    DARK_BACKGROUND_TOKENS,
+    DEFAULT_THEME,
+    LIGHT_BACKGROUND_TOKENS,
+    THEME_ACCENT_OPTIONS,
+    THEME_BACKGROUND_OPTIONS,
+} from '../../utils/theme-constants';
+import { resolveThemeMode, useThemeStore } from '../../utils/theme-store';
 import type { ManagedUserRecord, UserPermissions, UserRole } from '../../types/user';
+import { CheckIcon, MoonIcon, SunIcon } from '../crm/icons';
 
 type UserManagementPanelProps = {
     currentUserId: string | null;
+};
+
+type ThemeSelectionState = {
+    useWorkspaceDefault: boolean;
+    prefs: ThemePreferences;
 };
 
 type CreationFormState = {
@@ -13,6 +38,7 @@ type CreationFormState = {
     email: string;
     role: UserRole;
     permissions: UserPermissions;
+    theme: ThemeSelectionState;
 };
 
 type RoleFilterValue = 'all' | UserRole;
@@ -48,6 +74,83 @@ type DirtyChangeHandler = (userId: string, dirty: boolean) => void;
 
 type ToastHandler = (toast: ToastInput) => void;
 
+type CreateUserPayload = {
+    name: string;
+    email: string;
+    role: UserRole;
+    permissions: UserPermissions;
+    theme: { useWorkspaceDefault: boolean; prefs?: ThemePreferences };
+};
+
+type ThemePartial = Partial<Omit<ThemePreferences, 'background' | 'outline'>> & {
+    background?: Partial<ThemeBackgroundSettings>;
+    outline?: Partial<ThemeOutlineSettings>;
+};
+
+const BACKGROUND_LABELS: Record<ThemeBackgroundPalette, string> = {
+    slate: 'Slate',
+    zinc: 'Zinc',
+    indigo: 'Indigo',
+    emerald: 'Emerald',
+    violet: 'Violet',
+    amber: 'Amber',
+    rose: 'Rose',
+    'dark-gray': 'Dark Gray',
+};
+
+const OUTLINE_LABELS: Record<ThemeOutlineLevel, string> = {
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+};
+
+const MODE_LABELS: Record<ThemeModeSetting, string> = {
+    system: 'System',
+    light: 'Light',
+    dark: 'Dark',
+};
+
+const THEME_OUTLINE_OPTIONS: { id: ThemeOutlineLevel; label: string; description: string }[] = [
+    { id: 'low', label: 'Low', description: 'Subtle glow' },
+    { id: 'medium', label: 'Medium', description: 'Balanced glow' },
+    { id: 'high', label: 'High', description: 'Maximum glow' },
+];
+
+function cloneThemePrefs(theme: ThemePreferences): ThemePreferences {
+    return {
+        mode: theme.mode,
+        accent: theme.accent,
+        background: { ...theme.background },
+        outline: { ...theme.outline },
+    };
+}
+
+function mergeTheme(base: ThemePreferences, updates: ThemePartial): ThemePreferences {
+    return {
+        mode: updates.mode ?? base.mode,
+        accent: updates.accent ?? base.accent,
+        background: {
+            light: updates.background?.light ?? base.background.light,
+            dark: updates.background?.dark ?? base.background.dark,
+        },
+        outline: {
+            enabled: updates.outline?.enabled ?? base.outline.enabled,
+            level: updates.outline?.level ?? base.outline.level,
+        },
+    };
+}
+
+function themesAreEqual(a: ThemePreferences, b: ThemePreferences): boolean {
+    return (
+        a.mode === b.mode &&
+        a.accent === b.accent &&
+        a.background.light === b.background.light &&
+        a.background.dark === b.background.dark &&
+        a.outline.enabled === b.outline.enabled &&
+        a.outline.level === b.outline.level
+    );
+}
+
 const STANDARD_DEFAULT_PERMISSIONS: UserPermissions = {
     canManageUsers: false,
     canEditSettings: false,
@@ -64,12 +167,17 @@ const RESTRICTED_DEFAULT_PERMISSIONS: UserPermissions = {
     canManageCalendar: true,
 };
 
-function createInitialCreationForm(): CreationFormState {
+function createInitialCreationForm(workspaceTheme?: ThemePreferences): CreationFormState {
+    const baseTheme = cloneThemePrefs(workspaceTheme ?? DEFAULT_THEME);
     return {
         name: '',
         email: '',
         role: 'standard',
         permissions: { ...STANDARD_DEFAULT_PERMISSIONS },
+        theme: {
+            useWorkspaceDefault: true,
+            prefs: baseTheme,
+        },
     };
 }
 
@@ -142,12 +250,7 @@ async function fetchUsers(): Promise<ManagedUserRecord[]> {
     return Array.isArray(payload?.users) ? payload.users : [];
 }
 
-async function createUser(payload: {
-    name: string;
-    email: string;
-    role: UserRole;
-    permissions: UserPermissions;
-}): Promise<ManagedUserRecord> {
+async function createUser(payload: CreateUserPayload): Promise<ManagedUserRecord> {
     const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -211,11 +314,246 @@ function getInitials(name: string | null, email: string): string {
     return fallback.slice(0, 2);
 }
 
+type ThemeSelectionCardProps = {
+    value: ThemePreferences;
+    useWorkspaceDefault: boolean;
+    workspaceTheme: ThemePreferences;
+    onToggleWorkspaceDefault: (useDefault: boolean) => void;
+    onChange: (partial: ThemePartial) => void;
+    disabled?: boolean;
+};
+
+function ThemeSelectionCard({
+    value,
+    useWorkspaceDefault,
+    workspaceTheme,
+    onToggleWorkspaceDefault,
+    onChange,
+    disabled = false,
+}: ThemeSelectionCardProps) {
+    const resolvedMode = resolveThemeMode(value);
+    const toggleId = React.useId();
+    const outlineToggleId = React.useId();
+    const controlsDisabled = disabled || useWorkspaceDefault;
+    const workspaceOutlineSummary = workspaceTheme.outline.enabled
+        ? `${OUTLINE_LABELS[workspaceTheme.outline.level]} glow`
+        : 'Outline off';
+    const workspaceSummary = `${ACCENT_DEFINITIONS[workspaceTheme.accent].label} accent · ${BACKGROUND_LABELS[workspaceTheme.background.light]} light / ${BACKGROUND_LABELS[workspaceTheme.background.dark]} dark · ${workspaceOutlineSummary}`;
+
+    return (
+        <fieldset className="space-y-4 rounded-[12px] border border-slate-800/80 bg-slate-900/60 p-4">
+            <legend className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                Theme defaults
+            </legend>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="text-xs text-slate-400">
+                    Choose how this teammate will see the workspace on their first sign-in. They can personalize it
+                    later from the theme menu.
+                </div>
+                <div className="form-check form-switch shrink-0">
+                    <input
+                        id={toggleId}
+                        type="checkbox"
+                        className="form-check-input"
+                        role="switch"
+                        checked={useWorkspaceDefault}
+                        onChange={(event) => onToggleWorkspaceDefault(event.target.checked)}
+                        disabled={disabled}
+                    />
+                    <label className="form-check-label text-xs text-slate-300" htmlFor={toggleId}>
+                        Use workspace default
+                    </label>
+                </div>
+            </div>
+            <div className="rounded-[10px] border border-slate-800/70 bg-slate-950/40 p-3 text-[11px] text-slate-400">
+                Workspace default: {workspaceSummary}
+            </div>
+            {!useWorkspaceDefault ? (
+                <div className="space-y-4">
+                    <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Mode</div>
+                        <div className="crm-theme-mode-buttons mt-2" role="group" aria-label="Theme mode">
+                            <button
+                                type="button"
+                                className={classNames('crm-theme-mode-button', { active: value.mode === 'system' })}
+                                onClick={() => onChange({ mode: 'system' })}
+                                disabled={controlsDisabled}
+                                aria-pressed={value.mode === 'system'}
+                            >
+                                <span className="crm-theme-mode-icon" aria-hidden>
+                                    {resolvedMode === 'dark' ? (
+                                        <MoonIcon className="icon" />
+                                    ) : (
+                                        <SunIcon className="icon" />
+                                    )}
+                                </span>
+                                System
+                            </button>
+                            <button
+                                type="button"
+                                className={classNames('crm-theme-mode-button', { active: value.mode === 'light' })}
+                                onClick={() => onChange({ mode: 'light' })}
+                                disabled={controlsDisabled}
+                                aria-pressed={value.mode === 'light'}
+                            >
+                                <SunIcon className="icon" aria-hidden /> Light
+                            </button>
+                            <button
+                                type="button"
+                                className={classNames('crm-theme-mode-button', { active: value.mode === 'dark' })}
+                                onClick={() => onChange({ mode: 'dark' })}
+                                disabled={controlsDisabled}
+                                aria-pressed={value.mode === 'dark'}
+                            >
+                                <MoonIcon className="icon" aria-hidden /> Dark
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Accent</div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {THEME_ACCENT_OPTIONS.map((accent) => {
+                                const definition = ACCENT_DEFINITIONS[accent];
+                                const isActive = value.accent === accent;
+                                return (
+                                    <button
+                                        key={accent}
+                                        type="button"
+                                        className={classNames('crm-theme-accent', { active: isActive })}
+                                        style={{
+                                            backgroundColor: definition.hex,
+                                            color: definition.contrast,
+                                            boxShadow: isActive ? `0 0 0 3px ${definition.soft}` : undefined,
+                                        }}
+                                        onClick={() => onChange({ accent })}
+                                        disabled={controlsDisabled}
+                                        aria-pressed={isActive}
+                                    >
+                                        <span className="crm-theme-accent-label">{definition.label}</span>
+                                        <span className="crm-theme-accent-check" aria-hidden>
+                                            <CheckIcon className="icon" />
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                Light backgrounds
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                {THEME_BACKGROUND_OPTIONS.map((palette) => {
+                                    const tokens = LIGHT_BACKGROUND_TOKENS[palette];
+                                    const isActive = value.background.light === palette;
+                                    return (
+                                        <button
+                                            key={`light-${palette}`}
+                                            type="button"
+                                            className={classNames('crm-theme-background', { active: isActive })}
+                                            onClick={() => onChange({ background: { light: palette } })}
+                                            disabled={controlsDisabled}
+                                            aria-pressed={isActive}
+                                        >
+                                            <span className="crm-theme-background-sample">
+                                                <span style={{ backgroundColor: tokens.canvas }} />
+                                                <span style={{ backgroundColor: tokens.surface }} />
+                                                <span style={{ backgroundColor: tokens.elevated }} />
+                                            </span>
+                                            <span className="crm-theme-background-label">{BACKGROUND_LABELS[palette]}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                Dark backgrounds
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                {THEME_BACKGROUND_OPTIONS.map((palette) => {
+                                    const tokens = DARK_BACKGROUND_TOKENS[palette];
+                                    const isActive = value.background.dark === palette;
+                                    return (
+                                        <button
+                                            key={`dark-${palette}`}
+                                            type="button"
+                                            className={classNames('crm-theme-background', { active: isActive })}
+                                            onClick={() => onChange({ background: { dark: palette } })}
+                                            disabled={controlsDisabled}
+                                            aria-pressed={isActive}
+                                        >
+                                            <span className="crm-theme-background-sample">
+                                                <span style={{ backgroundColor: tokens.canvas }} />
+                                                <span style={{ backgroundColor: tokens.surface }} />
+                                                <span style={{ backgroundColor: tokens.elevated }} />
+                                            </span>
+                                            <span className="crm-theme-background-label">{BACKGROUND_LABELS[palette]}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            Outline glow
+                        </div>
+                        <div className="mt-2 space-y-3">
+                            <div className="form-check form-switch">
+                                <input
+                                    id={outlineToggleId}
+                                    type="checkbox"
+                                    className="form-check-input"
+                                    role="switch"
+                                    checked={value.outline.enabled}
+                                    onChange={(event) => onChange({ outline: { enabled: event.target.checked } })}
+                                    disabled={controlsDisabled}
+                                />
+                                <label className="form-check-label text-xs text-slate-300" htmlFor={outlineToggleId}>
+                                    Enable outline glow
+                                </label>
+                            </div>
+                            <div className="crm-theme-outline-levels" role="group" aria-label="Outline brightness">
+                                {THEME_OUTLINE_OPTIONS.map((option) => {
+                                    const isActive = value.outline.level === option.id;
+                                    return (
+                                        <button
+                                            key={option.id}
+                                            type="button"
+                                            className={classNames('crm-theme-outline-level', { active: isActive })}
+                                            onClick={() => onChange({ outline: { level: option.id } })}
+                                            disabled={controlsDisabled || !value.outline.enabled}
+                                            aria-pressed={isActive}
+                                        >
+                                            <span className="crm-theme-outline-level-label">{option.label}</span>
+                                            <span className="crm-theme-outline-level-desc">{option.description}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="rounded-[10px] border border-slate-800/70 bg-slate-950/40 p-3 text-[11px] text-slate-300">
+                        Active selection: Mode{' '}
+                        {value.mode === 'system' ? `System (${resolvedMode})` : MODE_LABELS[value.mode]} · Accent{' '}
+                        {ACCENT_DEFINITIONS[value.accent].label} · Backgrounds{' '}
+                        {BACKGROUND_LABELS[value.background.light]} light / {BACKGROUND_LABELS[value.background.dark]} dark · Outline{' '}
+                        {value.outline.enabled ? `${OUTLINE_LABELS[value.outline.level]} glow` : 'Off'}
+                    </div>
+                </div>
+            ) : null}
+        </fieldset>
+    );
+}
+
 export function UserManagementPanel({ currentUserId }: UserManagementPanelProps) {
+    const workspaceTheme = useThemeStore((theme) => theme.workspace);
     const [users, setUsers] = React.useState<ManagedUserRecord[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [globalError, setGlobalError] = React.useState<string | null>(null);
-    const [creation, setCreation] = React.useState<CreationFormState>(() => createInitialCreationForm());
+    const [creation, setCreation] = React.useState<CreationFormState>(() => createInitialCreationForm(workspaceTheme));
     const [creationError, setCreationError] = React.useState<string | null>(null);
     const [submitting, setSubmitting] = React.useState(false);
     const [toast, setToast] = React.useState<Toast | null>(null);
@@ -253,6 +591,25 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
         };
     }, []);
 
+    React.useEffect(() => {
+        setCreation((previous) => {
+            if (!previous.theme.useWorkspaceDefault) {
+                return previous;
+            }
+            const nextPrefs = cloneThemePrefs(workspaceTheme);
+            if (themesAreEqual(previous.theme.prefs, nextPrefs)) {
+                return previous;
+            }
+            return {
+                ...previous,
+                theme: {
+                    useWorkspaceDefault: true,
+                    prefs: nextPrefs,
+                },
+            };
+        });
+    }, [workspaceTheme]);
+
     const pushToast = React.useCallback<ToastHandler>((nextToast) => {
         setToast({ id: Date.now(), ...nextToast });
     }, []);
@@ -266,7 +623,7 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
     }, [toast]);
 
     const handleCreationFieldChange = React.useCallback(
-        (key: keyof CreationFormState) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        (key: 'name' | 'email' | 'role') => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
             const value = event.target.value;
             setCreation((previous) => {
                 if (key === 'role') {
@@ -298,6 +655,56 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
         [],
     );
 
+    const handleThemeUseWorkspaceDefaultChange = React.useCallback(
+        (useDefault: boolean) => {
+            setCreationError(null);
+            setCreation((previous) => {
+                if (useDefault) {
+                    return {
+                        ...previous,
+                        theme: {
+                            useWorkspaceDefault: true,
+                            prefs: cloneThemePrefs(workspaceTheme),
+                        },
+                    };
+                }
+
+                const startingPrefs = previous.theme.useWorkspaceDefault
+                    ? cloneThemePrefs(workspaceTheme)
+                    : cloneThemePrefs(previous.theme.prefs);
+
+                return {
+                    ...previous,
+                    theme: {
+                        useWorkspaceDefault: false,
+                        prefs: startingPrefs,
+                    },
+                };
+            });
+        },
+        [setCreationError, workspaceTheme],
+    );
+
+    const applyThemePartial = React.useCallback(
+        (partial: ThemePartial) => {
+            setCreationError(null);
+            setCreation((previous) => {
+                if (previous.theme.useWorkspaceDefault) {
+                    return previous;
+                }
+                const nextPrefs = mergeTheme(previous.theme.prefs, partial);
+                return {
+                    ...previous,
+                    theme: {
+                        useWorkspaceDefault: false,
+                        prefs: nextPrefs,
+                    },
+                };
+            });
+        },
+        [setCreationError],
+    );
+
     const handleCreateSubmit = React.useCallback(
         async (event: React.FormEvent<HTMLFormElement>) => {
             event.preventDefault();
@@ -315,15 +722,19 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
             setGlobalError(null);
 
             try {
+                const themePayload = creation.theme.useWorkspaceDefault
+                    ? { useWorkspaceDefault: true as const }
+                    : { useWorkspaceDefault: false as const, prefs: cloneThemePrefs(creation.theme.prefs) };
                 const user = await createUser({
                     email: creation.email,
                     name: creation.name,
                     role: creation.role,
                     permissions: creation.permissions,
+                    theme: themePayload,
                 });
 
                 setUsers((previous) => [user, ...previous]);
-                setCreation(createInitialCreationForm());
+                setCreation(createInitialCreationForm(workspaceTheme));
                 setExpandedIds((previous) => {
                     const next = new Set(previous);
                     next.add(user.id);
@@ -338,7 +749,7 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
                 setSubmitting(false);
             }
         },
-        [creation, pushToast, submitting],
+        [creation, pushToast, submitting, workspaceTheme],
     );
 
     const filteredUsers = React.useMemo(() => {
@@ -568,6 +979,14 @@ export function UserManagementPanel({ currentUserId }: UserManagementPanelProps)
                                 onChange={handleCreationPermissionToggle('canManageCalendar')}
                             />
                         </fieldset>
+                        <ThemeSelectionCard
+                            value={creation.theme.prefs}
+                            useWorkspaceDefault={creation.theme.useWorkspaceDefault}
+                            workspaceTheme={workspaceTheme}
+                            onToggleWorkspaceDefault={handleThemeUseWorkspaceDefaultChange}
+                            onChange={applyThemePartial}
+                            disabled={submitting}
+                        />
                         {creationError ? (
                             <div className="rounded-[12px] border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
                                 {creationError}
