@@ -65,7 +65,10 @@ export function QuickActionModal({
 }: QuickActionModalProps) {
     const formRef = React.useRef<HTMLFormElement | null>(null);
     const { getActiveFieldsForModal } = useQuickActionSettings();
-    const dynamicFields = getActiveFieldsForModal(type);
+    const dynamicFields = React.useMemo(
+        () => getActiveFieldsForModal(type),
+        [getActiveFieldsForModal, type],
+    );
 
     const fields = React.useMemo<InternalField[]>(() => {
         const mappedBase = baseFields.map<InternalField>((field) => ({
