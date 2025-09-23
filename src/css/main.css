@@ -4,9 +4,57 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    /* spacing scale tuned to Tabler rhythm */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+
+    /* radii */
+    --radius-card: 1rem;
+    --radius-pill: 999px;
+
+    /* elevations */
+    --shadow-card: 0 1px 0 rgba(15, 23, 42, 0.04), 0 10px 30px rgba(15, 23, 42, 0.06);
+
+    /* surfaces */
+    --surface-page: #f4f6fb;
+    --surface-muted: #eff2f8;
+    --surface-raised: #ffffff;
+    --surface-card: #ffffff;
+    --surface-inverse: #0f172a;
+
+    /* text */
+    --text-primary: #0f172a;
+    --text-secondary: rgba(15, 23, 42, 0.6);
+    --text-inverse: #ffffff;
+
+    /* borders */
+    --border-subtle: rgba(15, 23, 42, 0.08);
+    --border-strong: rgba(15, 23, 42, 0.16);
+
+    /* accent palette (oklch values mapped to CSS color) */
+    --accent-indigo: oklch(0.56 0.19 0.55);
+    --accent-emerald: oklch(0.73 0.12 151);
+    --accent-violet: oklch(0.53 0.16 296);
+    --accent-amber: oklch(0.78 0.14 84);
+    --accent-rose: oklch(0.62 0.2 25);
+
+    --accent-primary: var(--accent-indigo);
+
+    color-scheme: light;
+}
+
 @layer base {
     body {
-        @apply text-base;
+        @apply text-base antialiased;
+        color: var(--text-primary);
+        background-color: var(--surface-page);
     }
     h1,
     .h1,
@@ -417,6 +465,52 @@
         height: 10px;
         border-radius: 9999px;
         border-width: 2px;
+    }
+}
+
+@layer utilities {
+    .bg-page {
+        background-color: var(--surface-page);
+    }
+
+    .bg-surface {
+        background-color: var(--surface-card);
+    }
+
+    .bg-surface-muted {
+        background-color: var(--surface-muted);
+    }
+
+    .text-subtle {
+        color: var(--text-secondary);
+    }
+
+    .text-inverse {
+        color: var(--text-inverse);
+    }
+
+    .border-subtle {
+        border-color: var(--border-subtle);
+    }
+
+    .border-strong {
+        border-color: var(--border-strong);
+    }
+
+    .rounded-card {
+        border-radius: var(--radius-card);
+    }
+
+    .rounded-pill {
+        border-radius: var(--radius-pill);
+    }
+
+    .shadow-card {
+        box-shadow: var(--shadow-card);
+    }
+
+    .ring-accent {
+        box-shadow: 0 0 0 1px var(--accent-primary);
     }
 }
 

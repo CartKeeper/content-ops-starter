@@ -12,16 +12,53 @@ module.exports = {
         },
     ],
     theme: {
+        container: {
+            center: true,
+            padding: {
+                DEFAULT: 'var(--space-4)',
+                sm: 'var(--space-4)',
+                lg: 'var(--space-5)',
+                xl: 'var(--space-6)'
+            }
+        },
         extend: {
             boxShadow: {
-                header: '0px 2px 8px rgba(27, 32, 50, .08)'
+                header: '0px 2px 8px rgba(27, 32, 50, .08)',
+                card: 'var(--shadow-card)'
+            },
+            borderRadius: {
+                card: 'var(--radius-card)',
+                pill: 'var(--radius-pill)'
             },
             colors: {
                 light: themeStyle.light,
                 dark: themeStyle.dark,
                 neutral: themeStyle.neutral,
                 neutralAlt: themeStyle.neutralAlt,
-                primary: themeStyle.primary
+                primary: themeStyle.primary,
+                surface: {
+                    DEFAULT: 'var(--surface-card)',
+                    muted: 'var(--surface-muted)',
+                    raised: 'var(--surface-raised)',
+                    inverse: 'var(--surface-inverse)',
+                    page: 'var(--surface-page)'
+                },
+                accent: {
+                    indigo: 'var(--accent-indigo)',
+                    emerald: 'var(--accent-emerald)',
+                    violet: 'var(--accent-violet)',
+                    amber: 'var(--accent-amber)',
+                    rose: 'var(--accent-rose)'
+                },
+                border: {
+                    subtle: 'var(--border-subtle)',
+                    strong: 'var(--border-strong)'
+                },
+                text: {
+                    primary: 'var(--text-primary)',
+                    subtle: 'var(--text-secondary)',
+                    inverse: 'var(--text-inverse)'
+                }
             },
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],
@@ -44,6 +81,16 @@ module.exports = {
                 '2/3': '66.666%',
                 '3/4': '75%',
                 '9/16': '56.25%'
+            },
+            spacing: {
+                1: 'var(--space-1)',
+                2: 'var(--space-2)',
+                3: 'var(--space-3)',
+                4: 'var(--space-4)',
+                5: 'var(--space-5)',
+                6: 'var(--space-6)',
+                8: 'var(--space-8)',
+                10: 'var(--space-10)'
             },
             screens: {
                 xs: '480px'
