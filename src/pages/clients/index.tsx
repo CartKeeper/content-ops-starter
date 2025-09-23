@@ -341,8 +341,13 @@ function AddClientDialog({ open, onOpenChange, onCreated, onError }: AddClientDi
 
     const [serverError, setServerError] = React.useState<string | null>(null);
 
+    const previousOpenRef = React.useRef(open);
+
     React.useEffect(() => {
-        if (!open) {
+        const wasPreviouslyOpen = previousOpenRef.current;
+        previousOpenRef.current = open;
+
+        if (wasPreviouslyOpen && !open) {
             reset(defaultFormValues);
             clearErrors();
             setServerError(null);
