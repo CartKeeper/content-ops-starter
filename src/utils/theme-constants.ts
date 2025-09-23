@@ -22,7 +22,7 @@ type OutlineTokens = {
 };
 
 export const DEFAULT_THEME: ThemePreferences = {
-    mode: 'dark',
+    mode: 'light',
     accent: 'indigo',
     background: { light: 'slate', dark: 'zinc' },
     outline: { enabled: false, level: 'medium' },
