@@ -1,25 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Slab:wght@400;500;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+    --content-margin: clamp(1.25rem, 4vw, 1.75rem);
+
     /* base CRM theme tokens */
     --crm-bg-canvas: #f4f6fb;
     --crm-bg-surface: #ffffff;
     --crm-bg-elevated: #f8fafc;
     --crm-border-card: rgba(15, 23, 42, 0.08);
-    --crm-border-muted: rgba(15, 23, 42, 0.16);
+    --crm-border-muted: rgba(15, 23, 42, 0.18);
     --crm-accent: #6366f1;
-    --crm-accent-soft: rgba(99, 102, 241, 0.22);
+    --crm-accent-soft: rgba(99, 102, 241, 0.18);
     --crm-accent-hover: #4f46e5;
     --crm-accent-active: #4338ca;
-    --crm-accent-bright: #8b9cf9;
-    --crm-accent-contrast: #ffffff;
+    --crm-accent-bright: #a5b4fc;
+    --crm-accent-contrast: #0f172a;
     --crm-accent-rgb: 99, 102, 241;
-    --crm-accent-glow: rgba(99, 102, 241, 0.35);
-    --crm-accent-glow-strong: rgba(99, 102, 241, 0.55);
+    --crm-accent-glow: rgba(99, 102, 241, 0.32);
+    --crm-accent-glow-strong: rgba(99, 102, 241, 0.48);
     --outline-alpha: 0.45;
     --outline-blur: 14px;
     --outline-spread: 2px;
@@ -44,7 +44,6 @@
 
     /* derived aliases for Tailwind mapping */
     --surface-page: var(--crm-bg-canvas);
-    --surface-muted: var(--crm-bg-surface);
     --surface-muted: color-mix(in srgb, var(--crm-bg-canvas) 60%, var(--crm-bg-surface) 40%);
     --surface-raised: var(--crm-bg-elevated);
     --surface-card: var(--crm-bg-surface);
@@ -52,8 +51,8 @@
 
     /* text */
     --text-primary: #0f172a;
-    --text-secondary: rgba(15, 23, 42, 0.6);
-    --text-inverse: #ffffff;
+    --text-secondary: #475569;
+    --text-inverse: #f8fafc;
 
     /* borders */
     --border-subtle: var(--crm-border-card);
@@ -69,6 +68,36 @@
     --accent-primary: var(--accent-indigo);
 
     color-scheme: light;
+}
+
+.dark {
+    color-scheme: dark;
+
+    --crm-bg-canvas: #0b1020;
+    --crm-bg-surface: #11172a;
+    --crm-bg-elevated: #18213a;
+    --crm-border-card: rgba(255, 255, 255, 0.06);
+    --crm-border-muted: rgba(255, 255, 255, 0.12);
+    --crm-accent: #818cf8;
+    --crm-accent-soft: rgba(129, 140, 248, 0.22);
+    --crm-accent-hover: #6366f1;
+    --crm-accent-active: #4f46e5;
+    --crm-accent-bright: #a5b4fc;
+    --crm-accent-contrast: #0b1020;
+    --crm-accent-rgb: 129, 140, 248;
+    --crm-accent-glow: rgba(129, 140, 248, 0.35);
+    --crm-accent-glow-strong: rgba(129, 140, 248, 0.55);
+    --surface-page: #0b1020;
+    --surface-muted: #11172a;
+    --surface-raised: #18213a;
+    --surface-card: #18213a;
+    --surface-inverse: #f8fafc;
+    --text-primary: #f4f4f5;
+    --text-secondary: rgba(244, 244, 245, 0.7);
+    --text-inverse: #0f172a;
+    --border-subtle: rgba(148, 163, 184, 0.35);
+    --border-strong: rgba(148, 163, 184, 0.55);
+    --outline-color: 239 84% 65%;
 }
 
 html:not([data-tour-active='true']) .driver-overlay,
@@ -581,35 +610,13 @@ html:not([data-tour-active='true']) [data-driver='stage'] {
     }
 }
 
-:root {
-    --content-margin: clamp(1.25rem, 4vw, 1.75rem);
-    --crm-accent: #6366f1;
-    --crm-accent-soft: rgba(99, 102, 241, 0.22);
-    --crm-accent-contrast: #ffffff;
-    --crm-accent-hover: #5b5ede;
-    --crm-accent-active: #5356ca;
-    --crm-accent-bright: #8285f4;
-    --crm-accent-rgb: 99, 102, 241;
-    --crm-accent-glow: rgba(99, 102, 241, 0.35);
-    --crm-accent-glow-strong: rgba(99, 102, 241, 0.55);
-    --crm-bg-canvas: #0b1020;
-    --crm-bg-surface: #11172a;
-    --crm-bg-elevated: #18213a;
-    --crm-border-card: rgba(255, 255, 255, 0.06);
-    --crm-border-muted: rgba(255, 255, 255, 0.12);
-    --outline-color: 239 84% 65%;
-    --outline-alpha: 0.45;
-    --outline-blur: 14px;
-    --outline-spread: 2px;
-}
-
 body[data-bs-theme='dark'] {
     --crm-accent-soft: rgba(var(--crm-accent-rgb), 0.28);
 }
 
 body {
-    background-color: var(--crm-bg-canvas);
-    color: inherit;
+    background-color: var(--surface-page);
+    color: var(--text-primary);
 }
 
 .page {
