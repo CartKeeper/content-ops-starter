@@ -253,19 +253,41 @@ function StudioCalendarContent() {
     }, [events]);
 
     const handleDatesSet = React.useCallback((arg: any) => {
-        setVisibleRange({ start: arg.start.toISOString(), end: arg.end.toISOString() });
-        setCalendarTitle(arg.view.title);
-        const viewType = arg.view.type;
-        if (viewType === 'dayGridMonth' || viewType === 'timeGridWeek' || viewType === 'timeGridDay' || viewType === 'listWeek') {
-            setCurrentView(viewType);
+        if (!arg) {
+            return;
+        }
+        const { start, end, view } = arg;
+        if (start instanceof Date && end instanceof Date) {
+            setVisibleRange({ start: start.toISOString(), end: end.toISOString() });
+        }
+        if (view) {
+            setCalendarTitle(view.title ?? '');
+            const viewType = view.type;
+            if (
+                viewType === 'dayGridMonth' ||
+                viewType === 'timeGridWeek' ||
+                viewType === 'timeGridDay' ||
+                viewType === 'listWeek'
+            ) {
+                setCurrentView(viewType);
+            }
         }
     }, []);
 
     const handleCalendarReady = React.useCallback((calendar: any) => {
         calendarRef.current = calendar;
-        setCalendarTitle(calendar.view.title);
-        setCurrentView(calendar.view.type as typeof currentView);
-        setVisibleRange({ start: calendar.view.activeStart.toISOString(), end: calendar.view.activeEnd.toISOString() });
+        const view = calendar?.view;
+        if (view) {
+            setCalendarTitle(view.title ?? '');
+            const viewType = view.type as typeof currentView | undefined;
+            if (viewType) {
+                setCurrentView(viewType);
+            }
+            const { activeStart, activeEnd } = view as { activeStart?: Date; activeEnd?: Date };
+            if (activeStart instanceof Date && activeEnd instanceof Date) {
+                setVisibleRange({ start: activeStart.toISOString(), end: activeEnd.toISOString() });
+            }
+        }
     }, []);
 
     const openCreateDialog = React.useCallback((range: { start: Date; end: Date; allDay: boolean }) => {
@@ -293,7 +315,7 @@ function StudioCalendarContent() {
                 setToast({ id: Date.now(), message: 'Sign in to create events.', variant: 'error' });
                 return;
             }
-            selection.view.calendar.unselect();
+            selection.view?.calendar?.unselect?.();
             openCreateDialog({ start: selection.start, end: selection.end, allDay: selection.allDay });
         },
         [currentUserId, openCreateDialog]
@@ -343,7 +365,7 @@ function StudioCalendarContent() {
                 return undefined;
             }
 
-            if (arg.view.type.startsWith('list') && currentUserId) {
+            if (arg.view?.type?.startsWith('list') && currentUserId) {
                 return (
                     <div className="d-flex w-100 align-items-center justify-content-between gap-3">
                         <div>
