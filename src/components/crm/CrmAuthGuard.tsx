@@ -39,6 +39,17 @@ export function CrmAuthGuard({ children, loadingMessage }: CrmAuthGuardProps) {
         }
     }, [identity.isAuthenticated, identity.isReady, router]);
 
+    const signOut = React.useCallback(() => identity.logout(), [identity]);
+
+    const contextValue = React.useMemo<CrmAuthContextValue>(
+        () => ({
+            isAuthenticated: identity.isAuthenticated,
+            guardEnabled: identity.isReady,
+            signOut,
+        }),
+        [identity.isAuthenticated, identity.isReady, signOut],
+    );
+
     if (!identity.isReady) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 py-16 text-slate-200">
@@ -57,11 +68,6 @@ export function CrmAuthGuard({ children, loadingMessage }: CrmAuthGuardProps) {
     if (!identity.isAuthenticated) {
         return null;
     }
-
-    const contextValue = React.useMemo<CrmAuthContextValue>(
-        () => ({ isAuthenticated: true, guardEnabled: true, signOut: () => identity.logout() }),
-        [identity]
-    );
 
     return <CrmAuthContext.Provider value={contextValue}>{children}</CrmAuthContext.Provider>;
 }
