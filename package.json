@@ -26,6 +26,7 @@
         "@supabase/supabase-js": "^2.57.4",
         "@tabler/core": "^1.4.0",
         "@tabler/icons-react": "^3.35.0",
+        "docusign-esign": "^6.5.0",
         "@tanstack/react-table": "^8.20.5",
         "@tanstack/react-virtual": "^3.10.8",
         "@types/pdfkit": "^0.17.3",
@@ -55,7 +56,8 @@
         "swiper": "^11.1.4",
         "swr": "^2.3.6",
         "tailwindcss": "^3.4.3",
-        "zod": "^4.1.9"
+        "zod": "^4.1.9",
+        "zustand": "^5.0.1"
     },
     "devDependencies": {
         "@base2/pretty-print-object": "^1.0.2",

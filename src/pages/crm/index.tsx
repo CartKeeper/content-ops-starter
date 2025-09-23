@@ -1,5 +1,6 @@
 import * as React from 'react';
 import type { GetStaticProps } from 'next';
+import clsx from 'classnames';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -7,19 +8,14 @@ import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import fs from 'fs/promises';
 import path from 'path';
-import { LuDollarSign, LuUser } from 'react-icons/lu';
 
 import {
     BookingList,
     ClientTable,
     CrmAuthGuard,
-    DashboardCard,
     InvoiceTable,
     OverviewChart,
-    SectionCard,
-    StatCard,
     TaskList,
-    WorkspaceLayout,
     type BookingRecord,
     type BookingStatus,
     type ChartPoint,
@@ -33,6 +29,19 @@ import { tasks as defaultTasks } from '../../data/crm';
 import type { InvoiceStatus } from '../../types/invoice';
 import { readCmsCollection } from '../../utils/read-cms-collection';
 import { useAutoDismiss } from '../../utils/use-auto-dismiss';
+import {
+    AppShell,
+    Card,
+    CardBody,
+    CardHeader,
+    PageHeader,
+    Stat,
+    type StatTrend,
+} from '../../ui';
+import type { IconKey } from '../../ui/icons';
+import { DashboardGrid, type DashboardCardKey, type DashboardViewMode } from '../../ui/dashboard/DashboardGrid';
+import { DashboardViewToggle } from '../../ui/dashboard/DashboardViewToggle';
+import { useDashboardView } from '../../ui/hooks/useDashboardView';
 
 dayjs.extend(isBetween);
 
@@ -112,16 +121,7 @@ type SecondaryPanelVisibility = {
     galleriesToDeliver?: boolean;
 };
 
-type DashboardViewMode = 'overview' | 'revenue' | 'client';
-
 type DashboardMetricKey = 'shootsScheduled' | 'invoicesPaid' | 'outstandingBalance' | 'activeClients';
-
-type DashboardPanelKey =
-    | 'upcomingShoots'
-    | 'activeClients'
-    | 'openInvoices'
-    | 'studioTasks'
-    | 'galleriesToDeliver';
 
 const DASHBOARD_VIEWS: DashboardViewMode[] = ['overview', 'revenue', 'client'];
 
@@ -129,20 +129,6 @@ const METRIC_ORDER: Record<DashboardViewMode, DashboardMetricKey[]> = {
     overview: ['shootsScheduled', 'invoicesPaid', 'outstandingBalance', 'activeClients'],
     revenue: ['invoicesPaid', 'outstandingBalance', 'shootsScheduled', 'activeClients'],
     client: ['activeClients', 'shootsScheduled', 'invoicesPaid', 'outstandingBalance']
-};
-
-const PANEL_ORDER: Record<DashboardViewMode, DashboardPanelKey[]> = {
-    overview: ['upcomingShoots', 'activeClients', 'openInvoices', 'studioTasks'],
-    revenue: ['openInvoices', 'upcomingShoots', 'activeClients', 'studioTasks'],
-    client: ['activeClients', 'upcomingShoots', 'studioTasks', 'galleriesToDeliver', 'openInvoices']
-};
-
-const PANEL_CLASSNAMES: Record<DashboardPanelKey, string> = {
-    upcomingShoots: 'col-12 col-xl-6',
-    activeClients: 'col-12 col-xl-6',
-    openInvoices: 'col-12 col-xl-4',
-    studioTasks: 'col-12 col-xl-4',
-    galleriesToDeliver: 'col-12 col-xl-4'
 };
 
 type MetricSnapshot = {
@@ -197,6 +183,10 @@ const preciseCurrencyFormatter = new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 2
 });
 
+const integerFormatter = new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0
+});
+
 const BOOKING_STATUSES: BookingStatus[] = ['Confirmed', 'Pending', 'Editing'];
 const INVOICE_STATUSES: InvoiceStatus[] = ['Draft', 'Sent', 'Paid', 'Overdue'];
 const GALLERY_STATUSES: GalleryStatus[] = ['Pending', 'Delivered', 'In Review'];
@@ -207,6 +197,30 @@ function formatCurrency(value: number): string {
 
 function formatCurrencyExact(value: number): string {
     return preciseCurrencyFormatter.format(value);
+}
+
+function formatPercentDelta(value: number): string {
+    if (!Number.isFinite(value)) {
+        return '0%';
+    }
+
+    if (Math.abs(value) < 0.01) {
+        return '0%';
+    }
+
+    const absolute = Math.abs(value);
+    const precision = absolute >= 10 ? 0 : 1;
+    const formatted = absolute.toFixed(precision).replace(/\.0$/, '');
+    const prefix = value > 0 ? '+' : value < 0 ? '-' : '';
+    return `${prefix}${formatted}%`;
+}
+
+function resolveTrend(value: number): StatTrend {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.01) {
+        return 'neutral';
+    }
+
+    return value > 0 ? 'up' : 'down';
 }
 
 function normalizeBookingStatus(value: string | undefined): BookingStatus {
@@ -1021,10 +1035,10 @@ function CrmDashboardWorkspace({
     const [pdfInvoiceId, setPdfInvoiceId] = React.useState<string | null>(null);
     const [checkoutInvoiceId, setCheckoutInvoiceId] = React.useState<string | null>(null);
     const [feedback, setFeedback] = React.useState<FeedbackNotice | null>(null);
-    const [view, setView] = React.useState<DashboardViewMode>('overview');
-    const [isTransitioning, setIsTransitioning] = React.useState(false);
-    const viewInitializedRef = React.useRef(false);
-    const previousViewRef = React.useRef<DashboardViewMode>('overview');
+    const { view, setView, availableViews } = useDashboardView<DashboardViewMode>({
+        availableViews: DASHBOARD_VIEWS,
+        defaultView: 'overview',
+    });
 
     useAutoDismiss(feedback, () => setFeedback(null));
 
@@ -1047,116 +1061,7 @@ function CrmDashboardWorkspace({
         );
     }, [normalizedIdentityEmail, users]);
 
-    const dashboardViewStorageKey = React.useMemo(() => {
-        const identifier = currentUser?.id ?? normalizedIdentityEmail ?? 'default';
-        return `crm:dashboard:view:${identifier}`;
-    }, [currentUser?.id, normalizedIdentityEmail]);
-
     const isAdmin = identity.isAdmin;
-
-    React.useEffect(() => {
-        if (!router.isReady) {
-            return;
-        }
-
-        const queryValue = router.query.view;
-        const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue;
-        const normalized = typeof raw === 'string' ? raw.trim().toLowerCase() : null;
-        const hasValidParam = normalized ? DASHBOARD_VIEWS.includes(normalized as DashboardViewMode) : false;
-
-        if (!viewInitializedRef.current) {
-            let initial: DashboardViewMode = 'overview';
-
-            if (hasValidParam) {
-                initial = normalized as DashboardViewMode;
-            } else if (typeof window !== 'undefined') {
-                try {
-                    const stored = window.localStorage.getItem(dashboardViewStorageKey);
-                    if (stored && DASHBOARD_VIEWS.includes(stored as DashboardViewMode)) {
-                        initial = stored as DashboardViewMode;
-                    }
-                } catch (error) {
-                    console.warn('Unable to restore dashboard view preference', error);
-                }
-            }
-
-            viewInitializedRef.current = true;
-            previousViewRef.current = initial;
-            setView(initial);
-            return;
-        }
-
-        if (hasValidParam) {
-            const nextView = normalized as DashboardViewMode;
-            if (nextView !== view) {
-                setView(nextView);
-            }
-            return;
-        }
-
-        if (!hasValidParam && view !== 'overview') {
-            setView('overview');
-        }
-    }, [dashboardViewStorageKey, router.isReady, router.query.view, setView, view]);
-
-    React.useEffect(() => {
-        if (!router.isReady || !viewInitializedRef.current) {
-            return;
-        }
-
-        const queryValue = router.query.view;
-        const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue;
-        const normalized = typeof raw === 'string' ? raw.trim().toLowerCase() : null;
-        const effectiveParam = normalized && DASHBOARD_VIEWS.includes(normalized as DashboardViewMode)
-            ? (normalized as DashboardViewMode)
-            : 'overview';
-
-        if (effectiveParam === view) {
-            return;
-        }
-
-        const nextQuery: Record<string, string | string[]> = { ...router.query };
-
-        if (view === 'overview') {
-            delete nextQuery.view;
-        } else {
-            nextQuery.view = view;
-        }
-
-        void router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true });
-    }, [router, view]);
-
-    React.useEffect(() => {
-        if (!viewInitializedRef.current || typeof window === 'undefined') {
-            return;
-        }
-
-        try {
-            window.localStorage.setItem(dashboardViewStorageKey, view);
-        } catch (error) {
-            console.warn('Unable to persist dashboard view preference', error);
-        }
-    }, [dashboardViewStorageKey, view]);
-
-    React.useEffect(() => {
-        if (!viewInitializedRef.current) {
-            return;
-        }
-
-        if (previousViewRef.current === view) {
-            return;
-        }
-
-        previousViewRef.current = view;
-
-        if (typeof window === 'undefined') {
-            return;
-        }
-
-        setIsTransitioning(true);
-        const timer = window.setTimeout(() => setIsTransitioning(false), 220);
-        return () => window.clearTimeout(timer);
-    }, [view]);
 
     React.useEffect(() => {
         const combo = {
@@ -1191,10 +1096,10 @@ function CrmDashboardWorkspace({
             if (combo.lastKey === 'g') {
                 if (key === 'r') {
                     event.preventDefault();
-                    setView((current) => (current === 'revenue' ? 'overview' : 'revenue'));
+                    setView(view === 'revenue' ? 'overview' : 'revenue');
                 } else if (key === 'c') {
                     event.preventDefault();
-                    setView((current) => (current === 'client' ? 'overview' : 'client'));
+                    setView(view === 'client' ? 'overview' : 'client');
                 } else if (key === 'o') {
                     event.preventDefault();
                     setView('overview');
@@ -1221,7 +1126,7 @@ function CrmDashboardWorkspace({
             window.removeEventListener('keydown', handleKeydown);
             resetCombo();
         };
-    }, [setView]);
+    }, [setView, view]);
 
     const summaryMetrics = React.useMemo(() => {
         if (isAdmin) {
@@ -1239,40 +1144,6 @@ function CrmDashboardWorkspace({
     }, [currentUser, isAdmin, metrics.overall, metrics.perUser]);
 
     const summaryOwnerName = summaryMetrics.userId ? summaryMetrics.label : studioName;
-
-    const metricCards = React.useMemo(
-        () => ({
-            shootsScheduled: {
-                title: 'Shoots scheduled',
-                value: `${summaryMetrics.scheduledThisWeek}`,
-                change: summaryMetrics.scheduledChange,
-                changeLabel: 'vs last week',
-                icon: <CalendarGlyph />
-            },
-            invoicesPaid: {
-                title: 'Invoices paid',
-                value: formatCurrency(summaryMetrics.paidThisMonth),
-                change: summaryMetrics.revenueChange,
-                changeLabel: 'vs last month',
-                icon: <RevenueGlyph />
-            },
-            outstandingBalance: {
-                title: 'Outstanding balance',
-                value: formatCurrency(summaryMetrics.outstandingBalance),
-                change: summaryMetrics.outstandingChange,
-                changeLabel: 'vs prior month',
-                icon: <BalanceGlyph />
-            },
-            activeClients: {
-                title: 'Active clients',
-                value: `${summaryMetrics.activeClientCount}`,
-                change: summaryMetrics.retentionChange,
-                changeLabel: 'retention delta',
-                icon: <ClientsGlyph />
-            }
-        }),
-        [summaryMetrics]
-    );
 
     const orderedUserMetrics = React.useMemo(
         () =>
@@ -1450,128 +1321,184 @@ function CrmDashboardWorkspace({
         [identity, notify]
     );
 
-    const metricOrder = METRIC_ORDER[view];
-    const panelOrder = PANEL_ORDER[view];
-    const transitionClassName = isTransitioning ? 'dashboard-transition is-transitioning' : 'dashboard-transition';
-
-    const teamPerformanceSection =
-        isAdmin && orderedUserMetrics.length > 0 ? (
-            <div key="team-performance" className={`row row-cards mt-4 ${transitionClassName}`}>
-                <div className="col-12">
-                    <SectionCard
-                        title="Team performance"
-                        description="Break down shoots and revenue momentum by photographer."
-                    >
-                        <div className="table-responsive">
-                            <table className="table card-table table-vcenter">
-                                <thead>
-                                    <tr>
-                                        <th>Team member</th>
-                                        <th>Scheduled</th>
-                                        <th>Paid this month</th>
-                                        <th>Outstanding</th>
-                                        <th>Active clients</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {orderedUserMetrics.map((entry) => (
-                                        <tr key={entry.userId ?? entry.label}>
-                                            <td>
-                                                <div className="fw-semibold">{entry.label}</div>
-                                                <div className="text-secondary small">
-                                                    {entry.scheduledThisWeek} shoots scheduled ·{' '}
-                                                    {formatCurrencyExact(entry.paidThisMonth)} collected
-                                                </div>
-                                            </td>
-                                            <td>{entry.scheduledThisWeek}</td>
-                                            <td>{formatCurrencyExact(entry.paidThisMonth)}</td>
-                                            <td>{formatCurrencyExact(entry.outstandingBalance)}</td>
-                                            <td>{entry.activeClientCount}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </SectionCard>
-                </div>
-            </div>
-        )
-        : null;
-
-    const insightsSection = (
-        <div key="insights" className={`row row-cards mt-4 ${transitionClassName}`}>
-            <div className="col-lg-7">
-                <OverviewChart data={chartData} />
-            </div>
-            <div className="col-lg-5">
-                <DashboardCard
-                    title="Studio signal"
-                    value={formatCurrencyExact(summaryMetrics.paidThisMonth + summaryMetrics.outstandingBalance)}
-                    trend={{
-                        value: `${summaryMetrics.scheduledThisWeek} sessions in pipeline`,
-                        label: 'Combined revenue potential',
-                        isPositive: summaryMetrics.scheduledChange >= 0
-                    }}
-                >
-                    <div className="mb-2">
-                        {summaryOwnerName} is tracking {summaryMetrics.activeClientCount} active clients with{' '}
-                        {upcomingBookings.length} upcoming shoots on the calendar. Finance is watching {openInvoices.length} open
-                        invoices this cycle.
-                    </div>
-                    {settings?.custom_fields && settings.custom_fields.length > 0 ? (
-                        <ul className="list-unstyled small mb-0">
-                            {settings.custom_fields.map((field, index) => (
-                                <li key={index}>
-                                    <span className="fw-semibold">{field.label}:</span> {field.value ?? '—'}
-                                </li>
-                            ))}
-                        </ul>
-                    ) : null}
-                </DashboardCard>
-            </div>
-        </div>
+    const metricStats = React.useMemo(
+        () =>
+            ({
+                shootsScheduled: {
+                    icon: 'calendar',
+                    label: 'Shoots scheduled',
+                    value: integerFormatter.format(summaryMetrics.scheduledThisWeek),
+                    helper: 'Sessions booked this week.',
+                    delta: {
+                        value: formatPercentDelta(summaryMetrics.scheduledChange),
+                        trend: resolveTrend(summaryMetrics.scheduledChange),
+                        srLabel: 'Change vs last week',
+                    },
+                },
+                invoicesPaid: {
+                    icon: 'dollar',
+                    label: 'Invoices paid',
+                    value: formatCurrency(summaryMetrics.paidThisMonth),
+                    helper: 'Collected this month.',
+                    delta: {
+                        value: formatPercentDelta(summaryMetrics.revenueChange),
+                        trend: resolveTrend(summaryMetrics.revenueChange),
+                        srLabel: 'Change vs last month',
+                    },
+                },
+                outstandingBalance: {
+                    icon: 'invoices',
+                    label: 'Outstanding balance',
+                    value: formatCurrency(summaryMetrics.outstandingBalance),
+                    helper: 'Awaiting payment.',
+                    delta: {
+                        value: formatPercentDelta(summaryMetrics.outstandingChange),
+                        trend: resolveTrend(summaryMetrics.outstandingChange),
+                        srLabel: 'Change vs prior month',
+                    },
+                },
+                activeClients: {
+                    icon: 'users',
+                    label: 'Active clients',
+                    value: integerFormatter.format(summaryMetrics.activeClientCount),
+                    helper: Number.isFinite(summaryMetrics.retentionRate)
+                        ? `${Math.round(summaryMetrics.retentionRate)}% retention rate`
+                        : 'Retention rate tracking unavailable.',
+                    delta: {
+                        value: formatPercentDelta(summaryMetrics.retentionChange),
+                        trend: resolveTrend(summaryMetrics.retentionChange),
+                        srLabel: 'Retention delta',
+                    },
+                },
+            }) satisfies Record<
+                DashboardMetricKey,
+                {
+                    icon: IconKey;
+                    label: string;
+                    value: string;
+                    helper: string;
+                    delta: { value: string; trend: StatTrend; srLabel: string };
+                }
+            >,
+        [summaryMetrics],
     );
 
-    const panelNodes: Record<DashboardPanelKey, React.ReactNode | null> = {
-        upcomingShoots:
-            secondaryPanelVisibility.upcomingShoots !== false ? (
-                <SectionCard
-                    title="Upcoming Shoots"
+    const metricOrder = METRIC_ORDER[view];
+    const metricSubtitle = summaryMetrics.userId
+        ? `Viewing activity attributed to ${summaryMetrics.label}.`
+        : isAdmin
+        ? 'Aggregated totals across the studio team.'
+        : undefined;
+
+    const revenuePotential = summaryMetrics.paidThisMonth + summaryMetrics.outstandingBalance;
+    const pillButtonClassName =
+        'inline-flex items-center gap-2 rounded-pill border border-border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-bright focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
+
+    const showUpcomingShoots = secondaryPanelVisibility.upcomingShoots !== false;
+    const showActiveClients = secondaryPanelVisibility.activeClients !== false;
+    const showOpenInvoices = secondaryPanelVisibility.openInvoices !== false;
+    const showStudioTasks = secondaryPanelVisibility.studioTasks !== false;
+    const showGalleries = secondaryPanelVisibility.galleriesToDeliver !== false;
+    const openInvoicesCount = openInvoices.length;
+
+    const dashboardCards: Partial<Record<DashboardCardKey, React.ReactNode>> = {
+        'overview-chart': (
+            <Card variant="chart" className="h-full">
+                <CardHeader
+                    title="Studio overview"
+                    description="Shoots scheduled and revenue performance across time horizons."
+                />
+                <CardBody padding={false} className="px-6 pb-6 pt-0">
+                    <OverviewChart data={chartData} />
+                </CardBody>
+            </Card>
+        ),
+        'studio-signal': (
+            <Card className="h-full">
+                <CardHeader title="Studio signal" description="Combined revenue potential." />
+                <CardBody className="space-y-4">
+                    <div className="rounded-card bg-surface-muted px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-text-subtle">
+                            Revenue potential
+                        </p>
+                        <p className="text-2xl font-semibold text-text-primary">
+                            {formatCurrencyExact(revenuePotential)}
+                        </p>
+                        <p className="text-sm text-text-subtle">
+                            {integerFormatter.format(summaryMetrics.scheduledThisWeek)} sessions in pipeline
+                        </p>
+                    </div>
+                    <p className="text-sm leading-6 text-text-subtle">
+                        {`${summaryOwnerName} is tracking ${summaryMetrics.activeClientCount} active clients with ${upcomingBookings.length} upcoming shoots on the calendar. Finance is watching ${openInvoicesCount} open invoices this cycle.`}
+                    </p>
+                    {settings?.custom_fields && settings.custom_fields.length > 0 ? (
+                        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                            {settings.custom_fields.map((field, index) => (
+                                <div key={index} className="flex flex-col gap-1">
+                                    <dt className="text-xs font-semibold uppercase tracking-wide text-text-subtle">
+                                        {field.label}
+                                    </dt>
+                                    <dd className="text-text-primary">{field.value ?? '—'}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    ) : null}
+                </CardBody>
+            </Card>
+        ),
+    };
+
+    if (showUpcomingShoots) {
+        dashboardCards['upcoming-shoots'] = (
+            <Card className="h-full">
+                <CardHeader
+                    title="Upcoming shoots"
                     description="Stay ready for every session with a quick view of the week ahead."
-                    action={
-                        <Link href="/studio/calendars" className="btn btn-sm btn-outline-primary">
+                    actions={
+                        <Link href="/studio/calendars" className={pillButtonClassName}>
                             Open calendar
                         </Link>
                     }
-                >
+                />
+                <CardBody padding={false} className="px-6 py-5">
                     <BookingList bookings={upcomingBookings} />
-                </SectionCard>
-            ) : null,
-        activeClients:
-            secondaryPanelVisibility.activeClients !== false ? (
-                <SectionCard
-                    title="Active Clients"
+                </CardBody>
+            </Card>
+        );
+    }
+
+    if (showActiveClients) {
+        dashboardCards['active-clients'] = (
+            <Card className="h-full">
+                <CardHeader
+                    title="Active clients"
                     description="From loyal regulars to new leads, see who needs attention next."
-                    action={
-                        <Link href="/clients" className="btn btn-sm btn-outline-primary">
+                    actions={
+                        <Link href="/clients" className={pillButtonClassName}>
                             View all clients
                         </Link>
                     }
-                >
+                />
+                <CardBody padding={false} className="px-6 py-5">
                     <ClientTable clients={clients} />
-                </SectionCard>
-            ) : null,
-        openInvoices:
-            secondaryPanelVisibility.openInvoices !== false ? (
-                <SectionCard
-                    title="Open Invoices"
+                </CardBody>
+            </Card>
+        );
+    }
+
+    if (showOpenInvoices) {
+        dashboardCards['open-invoices'] = (
+            <Card className="h-full">
+                <CardHeader
+                    title="Open invoices"
                     description="Collect payments faster with a focused list of outstanding balances."
-                    action={
-                        <Link href="/invoices" className="btn btn-sm btn-outline-primary">
+                    actions={
+                        <Link href="/invoices" className={pillButtonClassName}>
                             View all invoices
                         </Link>
                     }
-                >
+                />
+                <CardBody padding={false} className="px-6 py-5">
                     <InvoiceTable
                         invoices={openInvoices}
                         onUpdateStatus={canManageStudio ? handleUpdateInvoiceStatus : undefined}
@@ -1580,330 +1507,205 @@ function CrmDashboardWorkspace({
                         generatingInvoiceId={pdfInvoiceId}
                         checkoutInvoiceId={checkoutInvoiceId}
                     />
-                </SectionCard>
-            ) : null,
-        studioTasks:
-            secondaryPanelVisibility.studioTasks !== false ? (
-                <SectionCard
-                    title="Studio Tasks"
+                </CardBody>
+            </Card>
+        );
+    }
+
+    if (showStudioTasks) {
+        dashboardCards['studio-tasks'] = (
+            <Card className="h-full">
+                <CardHeader
+                    title="Studio tasks"
                     description="Keep production moving with next actions across your team."
-                    action={
-                        canManageStudio ? <button className="btn btn-sm btn-outline-primary">Create task</button> : undefined
+                    actions={
+                        canManageStudio ? (
+                            <button type="button" className={pillButtonClassName}>
+                                Create task
+                            </button>
+                        ) : undefined
                     }
-                >
+                />
+                <CardBody padding={false} className="px-6 py-5">
                     <TaskList tasks={tasks} />
-                </SectionCard>
-            ) : null,
-        galleriesToDeliver:
-            secondaryPanelVisibility.galleriesToDeliver !== false ? (
-                <SectionCard
+                </CardBody>
+            </Card>
+        );
+    }
+
+    if (showGalleries) {
+        dashboardCards.galleries = (
+            <Card className="h-full">
+                <CardHeader
                     title="Galleries to deliver"
                     description="Deliver polished galleries to keep clients delighted and informed."
-                    action={
-                        <Link href="/galleries" className="btn btn-sm btn-outline-primary">
+                    actions={
+                        <Link href="/galleries" className={pillButtonClassName}>
                             Review galleries
                         </Link>
                     }
-                >
+                />
+                <CardBody className="space-y-4">
                     {pendingGalleries.length > 0 ? (
-                        <ul className="list-unstyled mb-0">
+                        <ul className="space-y-3">
                             {pendingGalleries.slice(0, 4).map((gallery) => (
-                                <li
-                                    key={gallery.id}
-                                    className="d-flex align-items-start justify-content-between py-2"
-                                >
+                                <li key={gallery.id} className="flex items-start justify-between gap-3">
                                     <div>
-                                        <div className="fw-semibold">{gallery.client}</div>
-                                        <div className="text-secondary small">{gallery.project}</div>
+                                        <p className="text-sm font-medium text-text-primary">{gallery.client}</p>
+                                        <p className="text-xs text-text-subtle">{gallery.project}</p>
                                     </div>
-                                    <span className="badge bg-warning-lt text-warning">Pending</span>
+                                    <span className="inline-flex items-center rounded-pill bg-surface-muted px-3 py-1 text-xs font-semibold text-text-subtle">
+                                        Pending
+                                    </span>
                                 </li>
                             ))}
                             {pendingGalleries.length > 4 ? (
-                                <li className="text-secondary small pt-1">
+                                <li className="text-xs text-text-subtle">
                                     +{pendingGalleries.length - 4} more awaiting delivery
                                 </li>
                             ) : null}
                         </ul>
                     ) : (
-                        <div className="text-secondary small">All galleries are delivered. Nice work!</div>
+                        <p className="text-sm text-text-subtle">All galleries are delivered. Nice work!</p>
                     )}
                     {deliveredGalleryCount > 0 ? (
-                        <div className="text-secondary small mt-3">
-                            <span className="fw-semibold">{deliveredGalleryCount}</span> recently delivered for review.
-                        </div>
+                        <p className="text-xs text-text-subtle">
+                            <span className="font-semibold text-text-primary">{deliveredGalleryCount}</span> recently delivered for review.
+                        </p>
                     ) : null}
-                </SectionCard>
-            ) : null
-    };
-
-    const panelElements = panelOrder.reduce<React.ReactNode[]>((acc, key, index) => {
-        const node = panelNodes[key];
-        if (!node) {
-            return acc;
-        }
-
-        acc.push(
-            <div key={key} className={`${PANEL_CLASSNAMES[key]} dashboard-panel`} style={{ order: index }}>
-                {node}
-            </div>
+                </CardBody>
+            </Card>
         );
-        return acc;
-    }, []);
+    }
 
-    const panelsSection = panelElements.length > 0 ? (
-        <div key="panels" className={`row row-cards mt-4 ${transitionClassName}`}>
-            {panelElements}
-        </div>
-    ) : null;
-
-    const sectionOrder: Record<DashboardViewMode, Array<'teamPerformance' | 'insights' | 'panels'>> = {
-        overview: ['teamPerformance', 'insights', 'panels'],
-        revenue: ['insights', 'panels', 'teamPerformance'],
-        client: ['panels', 'insights', 'teamPerformance']
-    };
-
-    const sections: Record<'teamPerformance' | 'insights' | 'panels', React.ReactNode | null> = {
-        teamPerformance: teamPerformanceSection,
-        insights: insightsSection,
-        panels: panelsSection
-    };
+    if (isAdmin && orderedUserMetrics.length > 0) {
+        dashboardCards['team-performance'] = (
+            <Card className="h-full">
+                <CardHeader
+                    title="Team performance"
+                    description="Break down shoots and revenue momentum by photographer."
+                />
+                <CardBody padding={false} className="overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-border-subtle text-sm">
+                            <thead className="bg-surface-muted text-left text-xs font-semibold uppercase tracking-wide text-text-subtle">
+                                <tr>
+                                    <th scope="col" className="px-6 py-3 font-semibold">
+                                        Team member
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 font-semibold">
+                                        Scheduled
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 font-semibold">
+                                        Paid this month
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 font-semibold">
+                                        Outstanding
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 font-semibold">
+                                        Active clients
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border-subtle bg-surface">
+                                {orderedUserMetrics.map((entry) => (
+                                    <tr key={entry.userId ?? entry.label}>
+                                        <td className="px-6 py-4 align-top">
+                                            <div className="text-sm font-medium text-text-primary">{entry.label}</div>
+                                            <div className="mt-1 text-xs text-text-subtle">
+                                                {integerFormatter.format(entry.scheduledThisWeek)} shoots scheduled ·{' '}
+                                                {formatCurrencyExact(entry.paidThisMonth)} collected
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 align-top text-text-primary">
+                                            {integerFormatter.format(entry.scheduledThisWeek)}
+                                        </td>
+                                        <td className="px-6 py-4 align-top text-text-primary">
+                                            {formatCurrencyExact(entry.paidThisMonth)}
+                                        </td>
+                                        <td className="px-6 py-4 align-top text-text-primary">
+                                            {formatCurrencyExact(entry.outstandingBalance)}
+                                        </td>
+                                        <td className="px-6 py-4 align-top text-text-primary">
+                                            {integerFormatter.format(entry.activeClientCount)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardBody>
+            </Card>
+        );
+    }
 
     return (
         <>
             <Head>
                 <title>{studioName} · Photography CRM</title>
             </Head>
-            <WorkspaceLayout>
-                <div className="page-header d-print-none position-relative pb-2 mb-2">
-                    <div className="row align-items-center">
-                        <div className="col">
-                            <div className="page-pretitle mb-1">Workspace snapshot</div>
-                            <h2 className="page-title mb-1">{studioName} dashboard</h2>
-                            <div className="text-secondary mt-1">
-                                Monitor bookings, revenue momentum, and client health with a refreshed Tabler-inspired layout.
+            <AppShell currentPath={router.asPath}>
+                <div className="space-y-10">
+                    <div className="relative">
+                        <PageHeader
+                            pretitle="Workspace snapshot"
+                            title={`${studioName} dashboard`}
+                            description="Monitor bookings, revenue momentum, and client health in one workspace snapshot."
+                            className="pb-16"
+                        />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-4">
+                            <div className="mx-auto flex w-full max-w-7xl justify-end px-4">
+                                <DashboardViewToggle value={view} views={availableViews} onChange={setView} />
                             </div>
                         </div>
                     </div>
-                    <DashboardViewToggleButtons
-                        view={view}
-                        onSelect={(mode) => setView((current) => (current === mode ? 'overview' : mode))}
-                    />
-                </div>
-
-                {feedback ? (
-                    <div
-                        className={`alert mt-3 ${feedback.type === 'success' ? 'alert-success' : 'alert-danger'}`}
-                        role="status"
-                    >
-                        {feedback.message}
-                    </div>
-                ) : null}
-
-                <div className="mt-4 text-secondary text-uppercase fw-semibold small">
-                    Metrics · {summaryMetrics.label}
-                </div>
-                {summaryMetrics.userId ? (
-                    <div className="text-secondary small mt-1">
-                        Viewing activity attributed to {summaryMetrics.label}.
-                    </div>
-                ) : isAdmin ? (
-                    <div className="text-secondary small mt-1">
-                        Aggregated totals across the studio team.
-                    </div>
-                ) : null}
-
-                <div className={`row row-cards mt-4 pt-4 ${transitionClassName}`}>
-                    {metricOrder.map((key, index) => {
-                        const metric = metricCards[key];
-                        if (!metric) {
-                            return null;
-                        }
-
-                        return (
-                            <div key={key} className="col-sm-6 col-xl-3" style={{ order: index }}>
-                                <StatCard
-                                    title={metric.title}
-                                    value={metric.value}
-                                    change={metric.change}
-                                    changeLabel={metric.changeLabel}
-                                    icon={metric.icon}
-                                />
+                    {feedback ? (
+                        <div className="mx-auto w-full max-w-7xl px-4">
+                            <div
+                                className={clsx(
+                                    'rounded-card border px-4 py-3 text-sm font-medium',
+                                    feedback.type === 'success'
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                        : 'border-rose-200 bg-rose-50 text-rose-700',
+                                )}
+                                role="status"
+                            >
+                                {feedback.message}
                             </div>
-                        );
-                    })}
+                        </div>
+                    ) : null}
+                    <section className="mx-auto w-full max-w-7xl px-4">
+                        <div className="flex flex-col gap-2">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-text-subtle">
+                                Metrics · {summaryMetrics.label}
+                            </span>
+                            {metricSubtitle ? <p className="text-sm text-text-subtle">{metricSubtitle}</p> : null}
+                        </div>
+                        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            {metricOrder.map((key) => {
+                                const stat = metricStats[key];
+                                if (!stat) {
+                                    return null;
+                                }
+                                return (
+                                    <Stat
+                                        key={key}
+                                        icon={stat.icon}
+                                        label={stat.label}
+                                        value={stat.value}
+                                        helper={stat.helper}
+                                        delta={stat.delta}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </section>
+                    <section className="mx-auto w-full max-w-7xl px-4">
+                        <DashboardGrid view={view} cards={dashboardCards} />
+                    </section>
                 </div>
-
-                {sectionOrder[view].map((key) => {
-                    const section = sections[key];
-                    return section ? section : null;
-                })}
-
-                <style jsx>{`
-                    .dashboard-view-toggle {
-                        position: absolute;
-                        right: 0;
-                        bottom: -1.5rem;
-                        display: inline-flex;
-                        gap: 0.5rem;
-                        padding: 0.25rem;
-                        border-radius: 9999px;
-                        background-color: var(--tblr-card-bg, #ffffff);
-                        border: 1px solid var(--tblr-border-color, rgba(4, 32, 69, 0.1));
-                        box-shadow: 0 12px 30px rgba(4, 32, 69, 0.1);
-                        z-index: 5;
-                    }
-
-                    .dashboard-toggle-button {
-                        width: 2.5rem;
-                        height: 2.5rem;
-                        border-radius: 9999px;
-                        border: none;
-                        background: transparent;
-                        color: var(--tblr-secondary, #64748b);
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        cursor: pointer;
-                        transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-                    }
-
-                    .dashboard-toggle-button:hover {
-                        background-color: rgba(var(--tblr-primary-rgb, 6, 111, 209), 0.08);
-                        color: var(--tblr-primary, #066fd1);
-                    }
-
-                    .dashboard-toggle-button[data-selected='true'] {
-                        background-color: var(--tblr-primary, #066fd1);
-                        color: #ffffff;
-                        box-shadow: 0 10px 20px rgba(var(--tblr-primary-rgb, 6, 111, 209), 0.35);
-                    }
-
-                    .dashboard-toggle-button:focus-visible {
-                        outline: none;
-                        box-shadow: 0 0 0 0.2rem rgba(var(--tblr-primary-rgb, 6, 111, 209), 0.35);
-                    }
-
-                    .visually-hidden {
-                        position: absolute;
-                        width: 1px;
-                        height: 1px;
-                        padding: 0;
-                        margin: -1px;
-                        overflow: hidden;
-                        clip: rect(0, 0, 0, 0);
-                        white-space: nowrap;
-                        border: 0;
-                    }
-
-                    .dashboard-transition > * {
-                        opacity: 1;
-                        transform: translateY(0);
-                        transition: opacity 0.22s ease, transform 0.22s ease;
-                    }
-
-                    .dashboard-transition.is-transitioning > * {
-                        opacity: 0;
-                        transform: translateY(12px);
-                    }
-
-                    .dashboard-transition.is-transitioning > *:nth-child(1) {
-                        transition-delay: 0ms;
-                    }
-
-                    .dashboard-transition.is-transitioning > *:nth-child(2) {
-                        transition-delay: 40ms;
-                    }
-
-                    .dashboard-transition.is-transitioning > *:nth-child(3) {
-                        transition-delay: 80ms;
-                    }
-
-                    .dashboard-transition.is-transitioning > *:nth-child(4) {
-                        transition-delay: 120ms;
-                    }
-                `}</style>
-            </WorkspaceLayout>
+            </AppShell>
         </>
-    );
-}
-
-type DashboardViewToggleButtonsProps = {
-    view: DashboardViewMode;
-    onSelect: (mode: DashboardViewMode) => void;
-};
-
-function DashboardViewToggleButtons({ view, onSelect }: DashboardViewToggleButtonsProps) {
-    const isRevenueActive = view === 'revenue';
-    const isClientActive = view === 'client';
-
-    return (
-        <div className="dashboard-view-toggle" role="group" aria-label="Dashboard view modes">
-            <button
-                type="button"
-                className="dashboard-toggle-button"
-                data-selected={isRevenueActive}
-                aria-pressed={isRevenueActive}
-                onClick={() => onSelect('revenue')}
-                title="Revenue view"
-            >
-                <LuDollarSign size={18} aria-hidden="true" />
-                <span className="visually-hidden">Revenue view</span>
-            </button>
-            <button
-                type="button"
-                className="dashboard-toggle-button"
-                data-selected={isClientActive}
-                aria-pressed={isClientActive}
-                onClick={() => onSelect('client')}
-                title="Client view"
-            >
-                <LuUser size={18} aria-hidden="true" />
-                <span className="visually-hidden">Client view</span>
-            </button>
-        </div>
-    );
-}
-
-function CalendarGlyph() {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
-    );
-}
-
-function RevenueGlyph() {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 1v22" />
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6" />
-        </svg>
-    );
-}
-
-function BalanceGlyph() {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 3H7" />
-            <path d="M7 7h14" />
-            <path d="M3 3v18" />
-            <path d="m3 7 5 5-5 5" />
-        </svg>
-    );
-}
-
-function ClientsGlyph() {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
     );
 }
 
