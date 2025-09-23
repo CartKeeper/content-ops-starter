@@ -22,7 +22,7 @@ export function Card({ as: Component = 'section', variant = 'default', className
     return (
         <Component
             className={clsx(
-                'rounded-card border border-border-subtle bg-surface shadow-card transition-shadow duration-150 hover:shadow-lg',
+                'crm-card rounded-card border border-border-subtle bg-surface shadow-card transition-shadow duration-150 hover:shadow-lg',
                 VARIANT_PADDING[variant],
                 className
             )}

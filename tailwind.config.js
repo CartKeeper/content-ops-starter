@@ -24,7 +24,8 @@ module.exports = {
         extend: {
             boxShadow: {
                 header: '0px 2px 8px rgba(27, 32, 50, .08)',
-                card: 'var(--shadow-card)'
+                card: 'var(--shadow-card)',
+                glow: '0 0 var(--outline-blur) var(--outline-spread) hsl(var(--outline-color) / var(--outline-alpha))'
             },
             borderRadius: {
                 card: 'var(--radius-card)',
@@ -44,6 +45,12 @@ module.exports = {
                     page: 'var(--surface-page)'
                 },
                 accent: {
+                    DEFAULT: 'var(--crm-accent)',
+                    contrast: 'var(--crm-accent-contrast)',
+                    soft: 'var(--crm-accent-soft)',
+                    hover: 'var(--crm-accent-hover)',
+                    active: 'var(--crm-accent-active)',
+                    bright: 'var(--crm-accent-bright)',
                     indigo: 'var(--accent-indigo)',
                     emerald: 'var(--accent-emerald)',
                     violet: 'var(--accent-violet)',

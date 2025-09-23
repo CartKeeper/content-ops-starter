@@ -5,6 +5,26 @@
 @tailwind utilities;
 
 :root {
+    /* base CRM theme tokens */
+    --crm-bg-canvas: #f4f6fb;
+    --crm-bg-surface: #ffffff;
+    --crm-bg-elevated: #f8fafc;
+    --crm-border-card: rgba(15, 23, 42, 0.08);
+    --crm-border-muted: rgba(15, 23, 42, 0.16);
+    --crm-accent: #6366f1;
+    --crm-accent-soft: rgba(99, 102, 241, 0.22);
+    --crm-accent-hover: #4f46e5;
+    --crm-accent-active: #4338ca;
+    --crm-accent-bright: #8b9cf9;
+    --crm-accent-contrast: #ffffff;
+    --crm-accent-rgb: 99, 102, 241;
+    --crm-accent-glow: rgba(99, 102, 241, 0.35);
+    --crm-accent-glow-strong: rgba(99, 102, 241, 0.55);
+    --outline-alpha: 0.45;
+    --outline-blur: 14px;
+    --outline-spread: 2px;
+    --outline-color: 244 92% 68%;
+
     /* spacing scale tuned to Tabler rhythm */
     --space-1: 0.25rem;
     --space-2: 0.5rem;
@@ -22,11 +42,12 @@
     /* elevations */
     --shadow-card: 0 1px 0 rgba(15, 23, 42, 0.04), 0 10px 30px rgba(15, 23, 42, 0.06);
 
-    /* surfaces */
-    --surface-page: #f4f6fb;
-    --surface-muted: #eff2f8;
-    --surface-raised: #ffffff;
-    --surface-card: #ffffff;
+    /* derived aliases for Tailwind mapping */
+    --surface-page: var(--crm-bg-canvas);
+    --surface-muted: var(--crm-bg-surface);
+    --surface-muted: color-mix(in srgb, var(--crm-bg-canvas) 60%, var(--crm-bg-surface) 40%);
+    --surface-raised: var(--crm-bg-elevated);
+    --surface-card: var(--crm-bg-surface);
     --surface-inverse: #0f172a;
 
     /* text */
@@ -35,8 +56,8 @@
     --text-inverse: #ffffff;
 
     /* borders */
-    --border-subtle: rgba(15, 23, 42, 0.08);
-    --border-strong: rgba(15, 23, 42, 0.16);
+    --border-subtle: var(--crm-border-card);
+    --border-strong: var(--crm-border-muted);
 
     /* accent palette (oklch values mapped to CSS color) */
     --accent-indigo: oklch(0.56 0.19 0.55);
@@ -72,6 +93,34 @@
 }
 
 @layer components {
+    .crm-card {
+        position: relative;
+        isolation: isolate;
+    }
+
+    .crm-card::before {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: inherit;
+        pointer-events: none;
+        opacity: 0;
+        transform: scale(0.98);
+        transition: opacity 150ms ease, transform 150ms ease;
+        box-shadow: 0 0 var(--outline-blur) var(--outline-spread)
+            hsl(var(--outline-color) / var(--outline-alpha));
+    }
+
+    .crm-outline-mode .crm-card::before {
+        opacity: 0.12;
+    }
+
+    .crm-outline-mode .crm-card:hover::before,
+    .crm-outline-mode .crm-card:focus-within::before {
+        opacity: 1;
+        transform: scale(1);
+    }
+
     .sb-markdown {
         @apply leading-relaxed;
         a {
