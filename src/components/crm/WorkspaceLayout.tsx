@@ -1,10 +1,12 @@
 import * as React from 'react';
+import { IconHelpCircle, IconPlayerPlay, IconRefresh } from '@tabler/icons-react';
 import classNames from 'classnames';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import type { IconType } from 'react-icons';
 
 import { INTEGRATION_CATEGORIES } from '../../data/integrations';
+import { useProductTour } from '../../providers/ProductTourProvider';
 import { useNetlifyIdentity } from '../auth';
 import { ApertureMark } from './ApertureMark';
 import {
@@ -370,6 +372,14 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         alignment: themeAlignment
     } = useDropdown<HTMLDivElement>({ defaultAlignment: 'end' });
     const {
+        isOpen: isHelpOpen,
+        close: closeHelp,
+        toggle: toggleHelp,
+        containerRef: helpDropdownRef,
+        placement: helpPlacement,
+        alignment: helpAlignment
+    } = useDropdown<HTMLDivElement>({ defaultAlignment: 'end' });
+    const {
         isOpen: isNotificationsOpen,
         close: closeNotifications,
         toggle: toggleNotifications,
@@ -404,9 +414,10 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         setIsNavOpen(false);
         closeApps();
         closeThemeMenu();
+        closeHelp();
         closeNotifications();
         closeProfile();
-    }, [router.asPath, closeApps, closeThemeMenu, closeNotifications, closeProfile]);
+    }, [router.asPath, closeApps, closeThemeMenu, closeHelp, closeNotifications, closeProfile]);
 
     React.useEffect(() => {
         function handleKeydown(event: KeyboardEvent) {
@@ -414,6 +425,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                 setIsNavOpen(false);
                 closeApps();
                 closeThemeMenu();
+                closeHelp();
                 closeNotifications();
                 closeProfile();
             }
@@ -423,7 +435,7 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         return () => {
             document.removeEventListener('keydown', handleKeydown);
         };
-    }, [closeApps, closeThemeMenu, closeNotifications, closeProfile]);
+    }, [closeApps, closeThemeMenu, closeHelp, closeNotifications, closeProfile]);
 
     const headingLabel = activeItem ? activeItem.label : 'Workspace';
 
@@ -464,6 +476,41 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
             };
         }).filter((collection) => collection.apps.length > 0);
     }, [connectedIntegrations]);
+
+    const {
+        isEnabled: isTourEnabled,
+        isReady: isTourReady,
+        isActive: isTourActive,
+        hasDismissed: tourDismissed,
+        startTour: startProductTour,
+        resetTour: resetProductTour,
+    } = useProductTour();
+
+    const handleTakeTour = React.useCallback(() => {
+        closeHelp();
+        if (!isTourEnabled || !isTourReady) {
+            console.warn('Product tour is currently disabled.');
+            return;
+        }
+
+        const started = startProductTour({ force: true });
+        if (!started) {
+            console.warn('Product tour could not be started.');
+        }
+    }, [closeHelp, isTourEnabled, isTourReady, startProductTour]);
+
+    const handleResetTour = React.useCallback(() => {
+        resetProductTour();
+        closeHelp();
+    }, [closeHelp, resetProductTour]);
+
+    const showResetTour = isTourEnabled && tourDismissed && !isTourActive;
+    const tourButtonDisabled = !isTourEnabled || !isTourReady;
+    const tourButtonLabel = isTourActive
+        ? 'Resume tour'
+        : tourDismissed
+          ? 'Restart tour'
+          : 'Take a tour';
 
     return (
         <div className={classNames('page', resolvedThemeMode === 'dark' ? 'theme-dark' : 'theme-light')}>
@@ -705,6 +752,62 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
                                 )}
                             >
                                 <ThemeMenu />
+                            </div>
+                        </div>
+                        <div
+                            className={classNames('nav-item dropdown crm-action-dropdown', { show: isHelpOpen })}
+                            ref={helpDropdownRef}
+                            data-dropdown-placement={isHelpOpen ? helpPlacement : undefined}
+                            data-dropdown-alignment={isHelpOpen ? helpAlignment : undefined}
+                        >
+                            <button
+                                type="button"
+                                className="btn btn-icon"
+                                aria-label="Open help menu"
+                                aria-expanded={isHelpOpen}
+                                onClick={toggleHelp}
+                                data-dropdown-toggle
+                            >
+                                <IconHelpCircle className="icon" aria-hidden />
+                            </button>
+                            <div
+                                className={classNames(
+                                    'dropdown-menu dropdown-menu-card dropdown-menu-md',
+                                    {
+                                        'dropdown-menu-end': helpAlignment === 'end',
+                                        'dropdown-menu-start': helpAlignment === 'start',
+                                        show: isHelpOpen,
+                                    },
+                                )}
+                            >
+                                <div className="card">
+                                    <div className="card-body d-grid gap-2">
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
+                                            onClick={handleTakeTour}
+                                            disabled={tourButtonDisabled}
+                                        >
+                                            <IconPlayerPlay size={18} aria-hidden />
+                                            <span>{tourButtonLabel}</span>
+                                        </button>
+                                        {showResetTour ? (
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-secondary d-flex align-items-center justify-content-center gap-2"
+                                                onClick={handleResetTour}
+                                            >
+                                                <IconRefresh size={18} aria-hidden />
+                                                <span>Reset tour progress</span>
+                                            </button>
+                                        ) : null}
+                                        {!isTourEnabled ? (
+                                            <p className="mb-0 text-center text-secondary small">
+                                                Enable guided tours by setting <code>NEXT_PUBLIC_ENABLE_TOUR=true</code>.
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div

@@ -16,6 +16,7 @@ import type { InvoiceRecord, InvoiceStatus } from '../../types/invoice';
 import { buildInvoiceClientOptions } from '../../utils/build-invoice-client-options';
 import { readCmsCollection } from '../../utils/read-cms-collection';
 import { useAutoDismiss } from '../../utils/use-auto-dismiss';
+import { BILLING_ENABLED } from '../../utils/feature-flags';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -41,6 +42,7 @@ function formatCurrency(value: number): string {
 
 function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
     const identity = useNetlifyIdentity();
+    const billingEnabled = BILLING_ENABLED;
     const [invoiceList, setInvoiceList] = React.useState<InvoiceRecord[]>(() =>
         Array.isArray(invoices) ? invoices : []
     );
@@ -258,6 +260,11 @@ function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
                 return;
             }
 
+            if (!billingEnabled) {
+                notify('error', 'Online payment links are disabled in this environment.');
+                return;
+            }
+
             setCheckoutInvoiceId(invoice.id);
 
             try {
@@ -306,7 +313,7 @@ function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
                 setCheckoutInvoiceId(null);
             }
         },
-        [identity, notify]
+        [billingEnabled, identity, notify]
     );
 
     const openModal = React.useCallback(() => {
@@ -350,6 +357,12 @@ function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
                                 Monitor outstanding balances, trigger new payment links, and keep every client invoice in sync
                                 with the studio ledger.
                             </p>
+                            {!billingEnabled ? (
+                                <div className="alert alert-warning mt-4 mb-0" role="status">
+                                    Online payment links are disabled for this environment. Set{' '}
+                                    <code>NEXT_PUBLIC_BILLING_ENABLED=true</code> and configure Stripe keys to enable checkout.
+                                </div>
+                            ) : null}
                         </div>
                         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                             <Link
@@ -442,9 +455,10 @@ function InvoicesWorkspace({ invoices }: InvoicesPageProps) {
                             invoices={filteredInvoices}
                             onUpdateStatus={handleUpdateInvoiceStatus}
                             onGeneratePdf={handleGenerateInvoicePdf}
-                            onCreateCheckout={handleCreateCheckoutSession}
+                            onCreateCheckout={billingEnabled ? handleCreateCheckoutSession : undefined}
                             generatingInvoiceId={pdfInvoiceId}
                             checkoutInvoiceId={checkoutInvoiceId}
+                            allowCheckout={billingEnabled}
                         />
                     </SectionCard>
                 </div>

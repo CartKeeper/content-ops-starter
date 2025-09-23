@@ -71,6 +71,24 @@
     color-scheme: light;
 }
 
+html:not([data-tour-active='true']) .driver-overlay,
+html:not([data-tour-active='true']) .driver-popover,
+html:not([data-tour-active='true']) .driver-backdrop,
+html:not([data-tour-active='true']) .driver-stage,
+html:not([data-tour-active='true']) .driver-highlighted-element,
+html:not([data-tour-active='true']) .react-joyride__overlay,
+html:not([data-tour-active='true']) .react-joyride__spotlight,
+html:not([data-tour-active='true']) .reactour__mask,
+html:not([data-tour-active='true']) .reactour__helper,
+html:not([data-tour-active='true']) .shepherd-modal-overlay-container,
+html:not([data-tour-active='true']) .shepherd-content,
+html:not([data-tour-active='true']) [data-tour-overlay],
+html:not([data-tour-active='true']) [data-driver='stage'] {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
 @layer base {
     body {
         @apply text-base antialiased;
