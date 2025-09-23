@@ -52,7 +52,7 @@ type CalendarEvent = EventInput & {
 };
 
 type FullCalendarRef = {
-    getApi: () => { updateSize: () => void };
+    getApi?: () => { updateSize?: () => void };
 };
 
 type ModalState =
@@ -102,11 +102,16 @@ function BookingCalendarWorkspace({ bookings: initialBookings }: BookingsPagePro
     );
 
     React.useEffect(() => {
-        if (!calendarRef.current) {
+        const ref = calendarRef.current;
+        if (!ref || typeof ref.getApi !== 'function') {
             return;
         }
 
-        const api = calendarRef.current.getApi();
+        const api = ref.getApi();
+        if (!api || typeof api.updateSize !== 'function') {
+            return;
+        }
+
         const handle = window.setTimeout(() => api.updateSize(), 120);
         return () => window.clearTimeout(handle);
     }, [calendarEvents]);
