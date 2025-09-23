@@ -66,8 +66,6 @@ function ProjectsWorkspace() {
     const identity = useNetlifyIdentity();
     const client = getSupabaseBrowserClient();
     const workspaceId = identity.user?.workspaceId ?? null;
-    const currentWorkspace = workspaceId ? { id: workspaceId } : null;
-    const wsId = currentWorkspace?.id ?? null;
 
     const [controls, setControls] = React.useState<ProjectsToolbarState>({ search: '', status: 'ALL', tag: '' });
     const [drawerMode, setDrawerMode] = React.useState<'create' | 'edit'>('create');
@@ -131,22 +129,22 @@ function ProjectsWorkspace() {
     }, [controls.status, projects]);
 
     React.useEffect(() => {
-        if (!wsId) {
+        if (!workspaceId) {
             return;
         }
 
         const channel = client
-            .channel(`projects:${wsId}`)
+            .channel(`projects:${workspaceId}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'projects', filter: `workspace_id=eq.${wsId}` },
+                { event: '*', schema: 'public', table: 'projects', filter: `workspace_id=eq.${workspaceId}` },
                 () => {
                     void mutateRef.current?.();
                 }
             )
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'project_tasks', filter: `workspace_id=eq.${wsId}` },
+                { event: '*', schema: 'public', table: 'project_tasks', filter: `workspace_id=eq.${workspaceId}` },
                 () => {
                     void mutateRef.current?.();
                 }
@@ -156,7 +154,7 @@ function ProjectsWorkspace() {
         return () => {
             void client.removeChannel(channel);
         };
-    }, [client, wsId]);
+    }, [client, workspaceId]);
 
     const hasError = Boolean(error);
 
