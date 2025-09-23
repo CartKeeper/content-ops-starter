@@ -25,6 +25,7 @@ type InvoiceTableProps = {
     onCreateCheckout?: (invoice: InvoiceRecord) => void;
     generatingInvoiceId?: string | null;
     checkoutInvoiceId?: string | null;
+    allowCheckout?: boolean;
 };
 
 export function InvoiceTable({
@@ -33,8 +34,11 @@ export function InvoiceTable({
     onGeneratePdf,
     onCreateCheckout,
     generatingInvoiceId,
-    checkoutInvoiceId
+    checkoutInvoiceId,
+    allowCheckout = true
 }: InvoiceTableProps) {
+    const checkoutAllowed = allowCheckout !== false;
+
     return (
         <div className="d-grid gap-3">
             {invoices.map((invoice, index) => {
@@ -91,11 +95,11 @@ export function InvoiceTable({
                                             {generatingInvoiceId === invoice.id
                                                 ? 'Preparing…'
                                                 : invoice.pdfUrl
-                                                  ? 'Regenerate PDF'
-                                                  : 'Generate PDF'}
+                                                    ? 'Regenerate PDF'
+                                                    : 'Generate PDF'}
                                         </button>
                                     ) : null}
-                                    {onCreateCheckout && invoice.status !== 'Paid' ? (
+                                    {onCreateCheckout && checkoutAllowed && invoice.status !== 'Paid' ? (
                                         <button
                                             type="button"
                                             onClick={() => onCreateCheckout(invoice)}

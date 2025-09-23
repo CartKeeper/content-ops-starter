@@ -14,7 +14,7 @@ import {
     LIGHT_BACKGROUND_TOKENS,
     OUTLINE_LEVEL_TOKENS,
 } from '../../utils/theme-constants';
-import { sanitizeTheme, type ThemeResponsePayload } from '../../server/theme/schema';
+import { createDefaultTheme, sanitizeTheme, type ThemeResponsePayload } from '../../server/theme/schema';
 
 type ThemePartial = Partial<Omit<ThemePreferences, 'background' | 'outline'>> & {
     background?: Partial<ThemeBackgroundSettings>;
@@ -55,6 +55,16 @@ function cloneTheme(theme: ThemePreferences): ThemePreferences {
         accent: theme.accent,
         background: { ...theme.background },
         outline: { ...theme.outline },
+    };
+}
+
+function createSystemDefaultTheme(): ThemePreferences {
+    const base = createDefaultTheme();
+    return {
+        ...base,
+        mode: 'system',
+        background: { ...base.background },
+        outline: { ...base.outline },
     };
 }
 
@@ -289,10 +299,13 @@ function loadCache(): ThemeCachePayload | null {
 }
 
 const cached = typeof window !== 'undefined' ? loadCache() : null;
+const fallbackTheme = createSystemDefaultTheme();
 
-const initialWorkspace = cached?.workspace ? cloneTheme(cached.workspace) : cloneTheme(DEFAULT_THEME);
+const initialWorkspace = cached?.workspace ? cloneTheme(cached.workspace) : cloneTheme(fallbackTheme);
 const initialUserOverrides = cached?.userOverrides ? cloneTheme(cached.userOverrides) : null;
-const initialCurrent = cached?.current ? cloneTheme(cached.current) : cloneTheme(initialUserOverrides ?? initialWorkspace);
+const initialCurrent = cached?.current
+    ? cloneTheme(cached.current)
+    : cloneTheme(initialUserOverrides ?? initialWorkspace);
 const initialSource: ThemeSource = cached?.source ?? 'workspace';
 
 const useThemeStoreBase = create<ThemeStoreState>((set, get) => {
@@ -344,9 +357,14 @@ const useThemeStoreBase = create<ThemeStoreState>((set, get) => {
                     get().applyPayload(payload, true);
                 } catch (error) {
                     console.error('Failed to hydrate theme', error);
+                    const fallback = createSystemDefaultTheme();
                     commit((prev) => ({
                         ...prev,
                         ready: true,
+                        current: fallback,
+                        workspace: fallback,
+                        userOverrides: null,
+                        source: 'workspace',
                     }));
                 } finally {
                     hydratePromise = null;

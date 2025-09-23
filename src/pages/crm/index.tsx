@@ -42,6 +42,7 @@ import type { IconKey } from '../../ui/icons';
 import { DashboardGrid, type DashboardCardKey, type DashboardViewMode } from '../../ui/dashboard/DashboardGrid';
 import { DashboardViewToggle } from '../../ui/dashboard/DashboardViewToggle';
 import { useDashboardView } from '../../ui/hooks/useDashboardView';
+import { BILLING_ENABLED } from '../../utils/feature-flags';
 
 dayjs.extend(isBetween);
 
@@ -1035,6 +1036,7 @@ function CrmDashboardWorkspace({
     const [pdfInvoiceId, setPdfInvoiceId] = React.useState<string | null>(null);
     const [checkoutInvoiceId, setCheckoutInvoiceId] = React.useState<string | null>(null);
     const [feedback, setFeedback] = React.useState<FeedbackNotice | null>(null);
+    const billingEnabled = BILLING_ENABLED;
     const { view, setView, availableViews } = useDashboardView<DashboardViewMode>({
         availableViews: DASHBOARD_VIEWS,
         defaultView: 'overview',
@@ -1270,6 +1272,11 @@ function CrmDashboardWorkspace({
                 return;
             }
 
+            if (!billingEnabled) {
+                notify('error', 'Online payment links are disabled in this environment.');
+                return;
+            }
+
             setCheckoutInvoiceId(invoice.id);
 
             try {
@@ -1318,7 +1325,7 @@ function CrmDashboardWorkspace({
                 setCheckoutInvoiceId(null);
             }
         },
-        [identity, notify]
+        [billingEnabled, identity, notify]
     );
 
     const metricStats = React.useMemo(
@@ -1503,9 +1510,12 @@ function CrmDashboardWorkspace({
                         invoices={openInvoices}
                         onUpdateStatus={canManageStudio ? handleUpdateInvoiceStatus : undefined}
                         onGeneratePdf={canManageStudio ? handleGenerateInvoicePdf : undefined}
-                        onCreateCheckout={canManageStudio ? handleCreateCheckoutSession : undefined}
+                        onCreateCheckout={
+                            canManageStudio && billingEnabled ? handleCreateCheckoutSession : undefined
+                        }
                         generatingInvoiceId={pdfInvoiceId}
                         checkoutInvoiceId={checkoutInvoiceId}
+                        allowCheckout={billingEnabled}
                     />
                 </CardBody>
             </Card>

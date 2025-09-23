@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { supabaseAdmin } from '../../../lib/supabase-admin';
 import { authenticateRequest } from '../../../utils/api-auth';
+import type { ThemePreferences } from '../../../types/theme';
 import {
     ThemePreferencesSchema,
     createDefaultTheme,
@@ -16,28 +17,53 @@ const PutRequestSchema = z.union([
     z.object({ theme_prefs: ThemePreferencesSchema.nullable() }),
 ]);
 
+function cloneTheme(theme: ThemePreferences): ThemePreferences {
+    return {
+        ...theme,
+        background: { ...theme.background },
+        outline: { ...theme.outline },
+    };
+}
+
+function createAnonymousThemePayload(): ThemeResponsePayload {
+    const base = createDefaultTheme();
+    const systemTheme: ThemePreferences = {
+        ...base,
+        mode: 'system',
+        background: { ...base.background },
+        outline: { ...base.outline },
+    };
+
+    const workspaceTheme = cloneTheme(systemTheme);
+    const theme = cloneTheme(systemTheme);
+
+    return {
+        theme,
+        workspaceTheme,
+        userOverrides: null,
+        source: 'workspace',
+    };
+}
+
 export default async function handler(request: NextApiRequest, response: NextApiResponse) {
     const session = await authenticateRequest(request);
 
-    if (!session) {
-        return response.status(401).json({ error: 'Authentication required.' });
-    }
-
     if (request.method === 'GET') {
+        if (!session) {
+            return response.status(200).json(createAnonymousThemePayload());
+        }
+
         try {
             const payload = await buildThemePayloadForUser(session.userId);
             return response.status(200).json(payload);
         } catch (error) {
             console.error('Failed to load theme preferences', error);
-            const fallback = createDefaultTheme();
-            const payload: ThemeResponsePayload = {
-                theme: fallback,
-                workspaceTheme: fallback,
-                userOverrides: null,
-                source: 'workspace',
-            };
-            return response.status(200).json(payload);
+            return response.status(200).json(createAnonymousThemePayload());
         }
+    }
+
+    if (!session) {
+        return response.status(401).json({ error: 'Authentication required.' });
     }
 
     if (request.method === 'PUT') {
