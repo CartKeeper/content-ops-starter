@@ -2,10 +2,12 @@ import * as React from 'react';
 import type { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import fs from 'fs/promises';
 import path from 'path';
+import { LuDollarSign, LuUser } from 'react-icons/lu';
 
 import {
     BookingList,
@@ -18,7 +20,6 @@ import {
     StatCard,
     TaskList,
     WorkspaceLayout,
-    useCrmAuth,
     type BookingRecord,
     type BookingStatus,
     type ChartPoint,
@@ -88,11 +89,60 @@ type CmsSettings = {
     custom_fields?: Array<{ label?: string; value?: string }>;
 };
 
+type CmsGalleryEntry = {
+    client?: string;
+    project?: string;
+    status?: string;
+};
+
+type GalleryStatus = 'Pending' | 'Delivered' | 'In Review';
+
+type GalleryRecord = {
+    id: string;
+    client: string;
+    project: string;
+    status: GalleryStatus;
+};
+
 type SecondaryPanelVisibility = {
     upcomingShoots?: boolean;
     activeClients?: boolean;
     openInvoices?: boolean;
     studioTasks?: boolean;
+    galleriesToDeliver?: boolean;
+};
+
+type DashboardViewMode = 'overview' | 'revenue' | 'client';
+
+type DashboardMetricKey = 'shootsScheduled' | 'invoicesPaid' | 'outstandingBalance' | 'activeClients';
+
+type DashboardPanelKey =
+    | 'upcomingShoots'
+    | 'activeClients'
+    | 'openInvoices'
+    | 'studioTasks'
+    | 'galleriesToDeliver';
+
+const DASHBOARD_VIEWS: DashboardViewMode[] = ['overview', 'revenue', 'client'];
+
+const METRIC_ORDER: Record<DashboardViewMode, DashboardMetricKey[]> = {
+    overview: ['shootsScheduled', 'invoicesPaid', 'outstandingBalance', 'activeClients'],
+    revenue: ['invoicesPaid', 'outstandingBalance', 'shootsScheduled', 'activeClients'],
+    client: ['activeClients', 'shootsScheduled', 'invoicesPaid', 'outstandingBalance']
+};
+
+const PANEL_ORDER: Record<DashboardViewMode, DashboardPanelKey[]> = {
+    overview: ['upcomingShoots', 'activeClients', 'openInvoices', 'studioTasks'],
+    revenue: ['openInvoices', 'upcomingShoots', 'activeClients', 'studioTasks'],
+    client: ['activeClients', 'upcomingShoots', 'studioTasks', 'galleriesToDeliver', 'openInvoices']
+};
+
+const PANEL_CLASSNAMES: Record<DashboardPanelKey, string> = {
+    upcomingShoots: 'col-12 col-xl-6',
+    activeClients: 'col-12 col-xl-6',
+    openInvoices: 'col-12 col-xl-4',
+    studioTasks: 'col-12 col-xl-4',
+    galleriesToDeliver: 'col-12 col-xl-4'
 };
 
 type MetricSnapshot = {
@@ -126,6 +176,7 @@ type CrmPageProps = {
     studioName: string;
     settings: CmsSettings | null;
     secondaryPanelVisibility: SecondaryPanelVisibility;
+    galleries: GalleryRecord[];
 };
 
 type FeedbackNotice = {
@@ -148,6 +199,7 @@ const preciseCurrencyFormatter = new Intl.NumberFormat('en-US', {
 
 const BOOKING_STATUSES: BookingStatus[] = ['Confirmed', 'Pending', 'Editing'];
 const INVOICE_STATUSES: InvoiceStatus[] = ['Draft', 'Sent', 'Paid', 'Overdue'];
+const GALLERY_STATUSES: GalleryStatus[] = ['Pending', 'Delivered', 'In Review'];
 
 function formatCurrency(value: number): string {
     return currencyFormatter.format(Math.round(value));
@@ -177,6 +229,16 @@ function normalizeInvoiceStatus(value: string | undefined): InvoiceStatus {
     return match ?? 'Draft';
 }
 
+function normalizeGalleryStatus(value: string | undefined): GalleryStatus {
+    if (!value) {
+        return 'Pending';
+    }
+
+    const normalized = value.trim();
+    const match = GALLERY_STATUSES.find((status) => status.toLowerCase() === normalized.toLowerCase());
+    return match ?? 'Pending';
+}
+
 function parseTimeRange(value: string | undefined): { start: string; end?: string } {
     if (!value) {
         return { start: '09:00 AM', end: undefined };
@@ -201,6 +263,22 @@ function getInvoiceTotal(invoice: InvoiceRecord): number {
     }
 
     return 0;
+}
+
+function createGalleryRecords(entries: CmsGalleryEntry[]): GalleryRecord[] {
+    return entries.map((entry, index) => {
+        const client = entry.client?.trim() ?? 'Untitled client';
+        const project = entry.project?.trim() ?? 'Untitled project';
+        const status = normalizeGalleryStatus(entry.status);
+        const baseId = `${client}-${project}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+        return {
+            id: baseId ? `${baseId}-${index}` : `gallery-${index}`,
+            client,
+            project,
+            status
+        } satisfies GalleryRecord;
+    });
 }
 
 function computePercentChange(previous: number, current: number): number {
@@ -473,7 +551,8 @@ function resolvePanelVisibility(settings: CmsSettings | null): SecondaryPanelVis
         upcomingShoots: true,
         activeClients: true,
         openInvoices: true,
-        studioTasks: true
+        studioTasks: true,
+        galleriesToDeliver: true
     };
 
     const resolved: SecondaryPanelVisibility = { ...defaults };
@@ -483,7 +562,8 @@ function resolvePanelVisibility(settings: CmsSettings | null): SecondaryPanelVis
             'show upcoming shoots': 'upcomingShoots',
             'show active clients': 'activeClients',
             'show open invoices': 'openInvoices',
-            'show studio tasks': 'studioTasks'
+            'show studio tasks': 'studioTasks',
+            'show galleries to deliver': 'galleriesToDeliver'
         };
 
         settings.custom_fields.forEach((field) => {
@@ -503,7 +583,8 @@ function resolvePanelVisibility(settings: CmsSettings | null): SecondaryPanelVis
         upcomingShoots: ['NEXT_PUBLIC_CRM_SHOW_UPCOMING_SHOOTS', 'CRM_SHOW_UPCOMING_SHOOTS'],
         activeClients: ['NEXT_PUBLIC_CRM_SHOW_ACTIVE_CLIENTS', 'CRM_SHOW_ACTIVE_CLIENTS'],
         openInvoices: ['NEXT_PUBLIC_CRM_SHOW_OPEN_INVOICES', 'CRM_SHOW_OPEN_INVOICES'],
-        studioTasks: ['NEXT_PUBLIC_CRM_SHOW_STUDIO_TASKS', 'CRM_SHOW_STUDIO_TASKS']
+        studioTasks: ['NEXT_PUBLIC_CRM_SHOW_STUDIO_TASKS', 'CRM_SHOW_STUDIO_TASKS'],
+        galleriesToDeliver: ['NEXT_PUBLIC_CRM_SHOW_GALLERIES_TO_DELIVER', 'CRM_SHOW_GALLERIES_TO_DELIVER']
     };
 
     (Object.keys(envKeys) as Array<keyof SecondaryPanelVisibility>).forEach((key) => {
@@ -930,15 +1011,20 @@ function CrmDashboardWorkspace({
     users,
     studioName,
     settings,
-    secondaryPanelVisibility
+    secondaryPanelVisibility,
+    galleries
 }: CrmWorkspaceProps) {
     const identity = useNetlifyIdentity();
-    const { signOut, guardEnabled } = useCrmAuth();
+    const router = useRouter();
 
     const [invoiceList, setInvoiceList] = React.useState<InvoiceRecord[]>(invoices);
     const [pdfInvoiceId, setPdfInvoiceId] = React.useState<string | null>(null);
     const [checkoutInvoiceId, setCheckoutInvoiceId] = React.useState<string | null>(null);
     const [feedback, setFeedback] = React.useState<FeedbackNotice | null>(null);
+    const [view, setView] = React.useState<DashboardViewMode>('overview');
+    const [isTransitioning, setIsTransitioning] = React.useState(false);
+    const viewInitializedRef = React.useRef(false);
+    const previousViewRef = React.useRef<DashboardViewMode>('overview');
 
     useAutoDismiss(feedback, () => setFeedback(null));
 
@@ -961,7 +1047,181 @@ function CrmDashboardWorkspace({
         );
     }, [normalizedIdentityEmail, users]);
 
+    const dashboardViewStorageKey = React.useMemo(() => {
+        const identifier = currentUser?.id ?? normalizedIdentityEmail ?? 'default';
+        return `crm:dashboard:view:${identifier}`;
+    }, [currentUser?.id, normalizedIdentityEmail]);
+
     const isAdmin = identity.isAdmin;
+
+    React.useEffect(() => {
+        if (!router.isReady) {
+            return;
+        }
+
+        const queryValue = router.query.view;
+        const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue;
+        const normalized = typeof raw === 'string' ? raw.trim().toLowerCase() : null;
+        const hasValidParam = normalized ? DASHBOARD_VIEWS.includes(normalized as DashboardViewMode) : false;
+
+        if (!viewInitializedRef.current) {
+            let initial: DashboardViewMode = 'overview';
+
+            if (hasValidParam) {
+                initial = normalized as DashboardViewMode;
+            } else if (typeof window !== 'undefined') {
+                try {
+                    const stored = window.localStorage.getItem(dashboardViewStorageKey);
+                    if (stored && DASHBOARD_VIEWS.includes(stored as DashboardViewMode)) {
+                        initial = stored as DashboardViewMode;
+                    }
+                } catch (error) {
+                    console.warn('Unable to restore dashboard view preference', error);
+                }
+            }
+
+            viewInitializedRef.current = true;
+            previousViewRef.current = initial;
+            setView(initial);
+            return;
+        }
+
+        if (hasValidParam) {
+            const nextView = normalized as DashboardViewMode;
+            if (nextView !== view) {
+                setView(nextView);
+            }
+            return;
+        }
+
+        if (!hasValidParam && view !== 'overview') {
+            setView('overview');
+        }
+    }, [dashboardViewStorageKey, router.isReady, router.query.view, setView, view]);
+
+    React.useEffect(() => {
+        if (!router.isReady || !viewInitializedRef.current) {
+            return;
+        }
+
+        const queryValue = router.query.view;
+        const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue;
+        const normalized = typeof raw === 'string' ? raw.trim().toLowerCase() : null;
+        const effectiveParam = normalized && DASHBOARD_VIEWS.includes(normalized as DashboardViewMode)
+            ? (normalized as DashboardViewMode)
+            : 'overview';
+
+        if (effectiveParam === view) {
+            return;
+        }
+
+        const nextQuery: Record<string, string | string[]> = { ...router.query };
+
+        if (view === 'overview') {
+            delete nextQuery.view;
+        } else {
+            nextQuery.view = view;
+        }
+
+        void router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true });
+    }, [router, view]);
+
+    React.useEffect(() => {
+        if (!viewInitializedRef.current || typeof window === 'undefined') {
+            return;
+        }
+
+        try {
+            window.localStorage.setItem(dashboardViewStorageKey, view);
+        } catch (error) {
+            console.warn('Unable to persist dashboard view preference', error);
+        }
+    }, [dashboardViewStorageKey, view]);
+
+    React.useEffect(() => {
+        if (!viewInitializedRef.current) {
+            return;
+        }
+
+        if (previousViewRef.current === view) {
+            return;
+        }
+
+        previousViewRef.current = view;
+
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        setIsTransitioning(true);
+        const timer = window.setTimeout(() => setIsTransitioning(false), 220);
+        return () => window.clearTimeout(timer);
+    }, [view]);
+
+    React.useEffect(() => {
+        const combo = {
+            lastKey: null as string | null,
+            timer: null as number | null
+        };
+
+        function resetCombo() {
+            if (combo.timer !== null) {
+                window.clearTimeout(combo.timer);
+                combo.timer = null;
+            }
+            combo.lastKey = null;
+        }
+
+        function handleKeydown(event: KeyboardEvent) {
+            if (event.defaultPrevented) {
+                return;
+            }
+
+            if (event.metaKey || event.ctrlKey || event.altKey) {
+                return;
+            }
+
+            const target = event.target as HTMLElement | null;
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+                return;
+            }
+
+            const key = event.key.toLowerCase();
+
+            if (combo.lastKey === 'g') {
+                if (key === 'r') {
+                    event.preventDefault();
+                    setView((current) => (current === 'revenue' ? 'overview' : 'revenue'));
+                } else if (key === 'c') {
+                    event.preventDefault();
+                    setView((current) => (current === 'client' ? 'overview' : 'client'));
+                } else if (key === 'o') {
+                    event.preventDefault();
+                    setView('overview');
+                }
+
+                resetCombo();
+                return;
+            }
+
+            if (key === 'g') {
+                combo.lastKey = 'g';
+                if (combo.timer !== null) {
+                    window.clearTimeout(combo.timer);
+                }
+                combo.timer = window.setTimeout(() => {
+                    combo.lastKey = null;
+                    combo.timer = null;
+                }, 800);
+            }
+        }
+
+        window.addEventListener('keydown', handleKeydown);
+        return () => {
+            window.removeEventListener('keydown', handleKeydown);
+            resetCombo();
+        };
+    }, [setView]);
 
     const summaryMetrics = React.useMemo(() => {
         if (isAdmin) {
@@ -980,6 +1240,40 @@ function CrmDashboardWorkspace({
 
     const summaryOwnerName = summaryMetrics.userId ? summaryMetrics.label : studioName;
 
+    const metricCards = React.useMemo(
+        () => ({
+            shootsScheduled: {
+                title: 'Shoots scheduled',
+                value: `${summaryMetrics.scheduledThisWeek}`,
+                change: summaryMetrics.scheduledChange,
+                changeLabel: 'vs last week',
+                icon: <CalendarGlyph />
+            },
+            invoicesPaid: {
+                title: 'Invoices paid',
+                value: formatCurrency(summaryMetrics.paidThisMonth),
+                change: summaryMetrics.revenueChange,
+                changeLabel: 'vs last month',
+                icon: <RevenueGlyph />
+            },
+            outstandingBalance: {
+                title: 'Outstanding balance',
+                value: formatCurrency(summaryMetrics.outstandingBalance),
+                change: summaryMetrics.outstandingChange,
+                changeLabel: 'vs prior month',
+                icon: <BalanceGlyph />
+            },
+            activeClients: {
+                title: 'Active clients',
+                value: `${summaryMetrics.activeClientCount}`,
+                change: summaryMetrics.retentionChange,
+                changeLabel: 'retention delta',
+                icon: <ClientsGlyph />
+            }
+        }),
+        [summaryMetrics]
+    );
+
     const orderedUserMetrics = React.useMemo(
         () =>
             metrics.perUser
@@ -997,6 +1291,12 @@ function CrmDashboardWorkspace({
         () => invoiceList.filter((invoice) => invoice.status !== 'Paid'),
         [invoiceList]
     );
+
+    const pendingGalleries = React.useMemo(
+        () => galleries.filter((gallery) => gallery.status === 'Pending'),
+        [galleries]
+    );
+    const deliveredGalleryCount = galleries.length - pendingGalleries.length;
 
     const handleUpdateInvoiceStatus = React.useCallback(
         async (id: string, status: InvoiceStatus) => {
@@ -1150,29 +1450,245 @@ function CrmDashboardWorkspace({
         [identity, notify]
     );
 
+    const metricOrder = METRIC_ORDER[view];
+    const panelOrder = PANEL_ORDER[view];
+    const transitionClassName = isTransitioning ? 'dashboard-transition is-transitioning' : 'dashboard-transition';
+
+    const teamPerformanceSection =
+        isAdmin && orderedUserMetrics.length > 0 ? (
+            <div key="team-performance" className={`row row-cards mt-4 ${transitionClassName}`}>
+                <div className="col-12">
+                    <SectionCard
+                        title="Team performance"
+                        description="Break down shoots and revenue momentum by photographer."
+                    >
+                        <div className="table-responsive">
+                            <table className="table card-table table-vcenter">
+                                <thead>
+                                    <tr>
+                                        <th>Team member</th>
+                                        <th>Scheduled</th>
+                                        <th>Paid this month</th>
+                                        <th>Outstanding</th>
+                                        <th>Active clients</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {orderedUserMetrics.map((entry) => (
+                                        <tr key={entry.userId ?? entry.label}>
+                                            <td>
+                                                <div className="fw-semibold">{entry.label}</div>
+                                                <div className="text-secondary small">
+                                                    {entry.scheduledThisWeek} shoots scheduled ·{' '}
+                                                    {formatCurrencyExact(entry.paidThisMonth)} collected
+                                                </div>
+                                            </td>
+                                            <td>{entry.scheduledThisWeek}</td>
+                                            <td>{formatCurrencyExact(entry.paidThisMonth)}</td>
+                                            <td>{formatCurrencyExact(entry.outstandingBalance)}</td>
+                                            <td>{entry.activeClientCount}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </SectionCard>
+                </div>
+            </div>
+        )
+        : null;
+
+    const insightsSection = (
+        <div key="insights" className={`row row-cards mt-4 ${transitionClassName}`}>
+            <div className="col-lg-7">
+                <OverviewChart data={chartData} />
+            </div>
+            <div className="col-lg-5">
+                <DashboardCard
+                    title="Studio signal"
+                    value={formatCurrencyExact(summaryMetrics.paidThisMonth + summaryMetrics.outstandingBalance)}
+                    trend={{
+                        value: `${summaryMetrics.scheduledThisWeek} sessions in pipeline`,
+                        label: 'Combined revenue potential',
+                        isPositive: summaryMetrics.scheduledChange >= 0
+                    }}
+                >
+                    <div className="mb-2">
+                        {summaryOwnerName} is tracking {summaryMetrics.activeClientCount} active clients with{' '}
+                        {upcomingBookings.length} upcoming shoots on the calendar. Finance is watching {openInvoices.length} open
+                        invoices this cycle.
+                    </div>
+                    {settings?.custom_fields && settings.custom_fields.length > 0 ? (
+                        <ul className="list-unstyled small mb-0">
+                            {settings.custom_fields.map((field, index) => (
+                                <li key={index}>
+                                    <span className="fw-semibold">{field.label}:</span> {field.value ?? '—'}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
+                </DashboardCard>
+            </div>
+        </div>
+    );
+
+    const panelNodes: Record<DashboardPanelKey, React.ReactNode | null> = {
+        upcomingShoots:
+            secondaryPanelVisibility.upcomingShoots !== false ? (
+                <SectionCard
+                    title="Upcoming Shoots"
+                    description="Stay ready for every session with a quick view of the week ahead."
+                    action={
+                        <Link href="/studio/calendars" className="btn btn-sm btn-outline-primary">
+                            Open calendar
+                        </Link>
+                    }
+                >
+                    <BookingList bookings={upcomingBookings} />
+                </SectionCard>
+            ) : null,
+        activeClients:
+            secondaryPanelVisibility.activeClients !== false ? (
+                <SectionCard
+                    title="Active Clients"
+                    description="From loyal regulars to new leads, see who needs attention next."
+                    action={
+                        <Link href="/clients" className="btn btn-sm btn-outline-primary">
+                            View all clients
+                        </Link>
+                    }
+                >
+                    <ClientTable clients={clients} />
+                </SectionCard>
+            ) : null,
+        openInvoices:
+            secondaryPanelVisibility.openInvoices !== false ? (
+                <SectionCard
+                    title="Open Invoices"
+                    description="Collect payments faster with a focused list of outstanding balances."
+                    action={
+                        <Link href="/invoices" className="btn btn-sm btn-outline-primary">
+                            View all invoices
+                        </Link>
+                    }
+                >
+                    <InvoiceTable
+                        invoices={openInvoices}
+                        onUpdateStatus={canManageStudio ? handleUpdateInvoiceStatus : undefined}
+                        onGeneratePdf={canManageStudio ? handleGenerateInvoicePdf : undefined}
+                        onCreateCheckout={canManageStudio ? handleCreateCheckoutSession : undefined}
+                        generatingInvoiceId={pdfInvoiceId}
+                        checkoutInvoiceId={checkoutInvoiceId}
+                    />
+                </SectionCard>
+            ) : null,
+        studioTasks:
+            secondaryPanelVisibility.studioTasks !== false ? (
+                <SectionCard
+                    title="Studio Tasks"
+                    description="Keep production moving with next actions across your team."
+                    action={
+                        canManageStudio ? <button className="btn btn-sm btn-outline-primary">Create task</button> : undefined
+                    }
+                >
+                    <TaskList tasks={tasks} />
+                </SectionCard>
+            ) : null,
+        galleriesToDeliver:
+            secondaryPanelVisibility.galleriesToDeliver !== false ? (
+                <SectionCard
+                    title="Galleries to deliver"
+                    description="Deliver polished galleries to keep clients delighted and informed."
+                    action={
+                        <Link href="/galleries" className="btn btn-sm btn-outline-primary">
+                            Review galleries
+                        </Link>
+                    }
+                >
+                    {pendingGalleries.length > 0 ? (
+                        <ul className="list-unstyled mb-0">
+                            {pendingGalleries.slice(0, 4).map((gallery) => (
+                                <li
+                                    key={gallery.id}
+                                    className="d-flex align-items-start justify-content-between py-2"
+                                >
+                                    <div>
+                                        <div className="fw-semibold">{gallery.client}</div>
+                                        <div className="text-secondary small">{gallery.project}</div>
+                                    </div>
+                                    <span className="badge bg-warning-lt text-warning">Pending</span>
+                                </li>
+                            ))}
+                            {pendingGalleries.length > 4 ? (
+                                <li className="text-secondary small pt-1">
+                                    +{pendingGalleries.length - 4} more awaiting delivery
+                                </li>
+                            ) : null}
+                        </ul>
+                    ) : (
+                        <div className="text-secondary small">All galleries are delivered. Nice work!</div>
+                    )}
+                    {deliveredGalleryCount > 0 ? (
+                        <div className="text-secondary small mt-3">
+                            <span className="fw-semibold">{deliveredGalleryCount}</span> recently delivered for review.
+                        </div>
+                    ) : null}
+                </SectionCard>
+            ) : null
+    };
+
+    const panelElements = panelOrder.reduce<React.ReactNode[]>((acc, key, index) => {
+        const node = panelNodes[key];
+        if (!node) {
+            return acc;
+        }
+
+        acc.push(
+            <div key={key} className={`${PANEL_CLASSNAMES[key]} dashboard-panel`} style={{ order: index }}>
+                {node}
+            </div>
+        );
+        return acc;
+    }, []);
+
+    const panelsSection = panelElements.length > 0 ? (
+        <div key="panels" className={`row row-cards mt-4 ${transitionClassName}`}>
+            {panelElements}
+        </div>
+    ) : null;
+
+    const sectionOrder: Record<DashboardViewMode, Array<'teamPerformance' | 'insights' | 'panels'>> = {
+        overview: ['teamPerformance', 'insights', 'panels'],
+        revenue: ['insights', 'panels', 'teamPerformance'],
+        client: ['panels', 'insights', 'teamPerformance']
+    };
+
+    const sections: Record<'teamPerformance' | 'insights' | 'panels', React.ReactNode | null> = {
+        teamPerformance: teamPerformanceSection,
+        insights: insightsSection,
+        panels: panelsSection
+    };
+
     return (
         <>
             <Head>
                 <title>{studioName} · Photography CRM</title>
             </Head>
             <WorkspaceLayout>
-                <div className="page-header d-print-none">
+                <div className="page-header d-print-none position-relative pb-2 mb-2">
                     <div className="row align-items-center">
                         <div className="col">
-                            <div className="page-pretitle">Workspace snapshot</div>
-                            <h2 className="page-title">{studioName} dashboard</h2>
-                            <div className="text-secondary mt-2">
+                            <div className="page-pretitle mb-1">Workspace snapshot</div>
+                            <h2 className="page-title mb-1">{studioName} dashboard</h2>
+                            <div className="text-secondary mt-1">
                                 Monitor bookings, revenue momentum, and client health with a refreshed Tabler-inspired layout.
                             </div>
-                            {guardEnabled ? (
-                                <div className="mt-3 d-flex flex-wrap gap-2">
-                                    <button type="button" onClick={signOut} className="btn btn-outline-secondary">
-                                        Sign out
-                                    </button>
-                                </div>
-                            ) : null}
                         </div>
                     </div>
+                    <DashboardViewToggleButtons
+                        view={view}
+                        onSelect={(mode) => setView((current) => (current === mode ? 'overview' : mode))}
+                    />
                 </div>
 
                 {feedback ? (
@@ -1197,207 +1713,155 @@ function CrmDashboardWorkspace({
                     </div>
                 ) : null}
 
-                <div className="row row-cards mt-2">
-                    <div className="col-sm-6 col-xl-3">
-                        <StatCard
-                            title="Shoots scheduled"
-                            value={`${summaryMetrics.scheduledThisWeek}`}
-                            change={summaryMetrics.scheduledChange}
-                            changeLabel="vs last week"
-                            icon={<CalendarGlyph />}
-                        />
-                    </div>
-                    <div className="col-sm-6 col-xl-3">
-                        <StatCard
-                            title="Invoices paid"
-                            value={formatCurrency(summaryMetrics.paidThisMonth)}
-                            change={summaryMetrics.revenueChange}
-                            changeLabel="vs last month"
-                            icon={<RevenueGlyph />}
-                        />
-                    </div>
-                    <div className="col-sm-6 col-xl-3">
-                        <StatCard
-                            title="Outstanding balance"
-                            value={formatCurrency(summaryMetrics.outstandingBalance)}
-                            change={summaryMetrics.outstandingChange}
-                            changeLabel="vs prior month"
-                            icon={<BalanceGlyph />}
-                        />
-                    </div>
-                    <div className="col-sm-6 col-xl-3">
-                        <StatCard
-                            title="Active clients"
-                            value={`${summaryMetrics.activeClientCount}`}
-                            change={summaryMetrics.retentionChange}
-                            changeLabel="retention delta"
-                            icon={<ClientsGlyph />}
-                        />
-                    </div>
-                </div>
+                <div className={`row row-cards mt-4 pt-4 ${transitionClassName}`}>
+                    {metricOrder.map((key, index) => {
+                        const metric = metricCards[key];
+                        if (!metric) {
+                            return null;
+                        }
 
-                {isAdmin && orderedUserMetrics.length > 0 ? (
-                    <div className="row row-cards mt-3">
-                        <div className="col-12">
-                            <SectionCard
-                                title="Team performance"
-                                description="Break down shoots and revenue momentum by photographer."
-                            >
-                                <div className="table-responsive">
-                                    <table className="table card-table table-vcenter">
-                                        <thead>
-                                            <tr>
-                                                <th>Team member</th>
-                                                <th>Scheduled</th>
-                                                <th>Paid this month</th>
-                                                <th>Outstanding</th>
-                                                <th>Active clients</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {orderedUserMetrics.map((entry) => (
-                                                <tr key={entry.userId ?? entry.label}>
-                                                    <td>
-                                                        <div className="fw-semibold">{entry.label}</div>
-                                                        <div className="text-secondary small">
-                                                            {entry.scheduledThisWeek} shoots scheduled ·{' '}
-                                                            {formatCurrencyExact(entry.paidThisMonth)} collected
-                                                        </div>
-                                                    </td>
-                                                    <td>{entry.scheduledThisWeek}</td>
-                                                    <td>{formatCurrencyExact(entry.paidThisMonth)}</td>
-                                                    <td>{formatCurrencyExact(entry.outstandingBalance)}</td>
-                                                    <td>{entry.activeClientCount}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </SectionCard>
-                        </div>
-                    </div>
-                ) : null}
-
-                <div className="row row-cards mt-3">
-                    <div className="col-lg-7">
-                        <OverviewChart data={chartData} />
-                    </div>
-                    <div className="col-lg-5">
-                        <DashboardCard
-                            title="Studio signal"
-                            value={formatCurrencyExact(
-                                summaryMetrics.paidThisMonth + summaryMetrics.outstandingBalance
-                            )}
-                            trend={{
-                                value: `${summaryMetrics.scheduledThisWeek} sessions in pipeline`,
-                                label: 'Combined revenue potential',
-                                isPositive: summaryMetrics.scheduledChange >= 0
-                            }}
-                        >
-                            <div className="mb-2">
-                                {summaryOwnerName} is tracking {summaryMetrics.activeClientCount} active clients with{' '}
-                                {upcomingBookings.length} upcoming shoots on the calendar. Finance is watching{' '}
-                                {openInvoices.length} open invoices this cycle.
+                        return (
+                            <div key={key} className="col-sm-6 col-xl-3" style={{ order: index }}>
+                                <StatCard
+                                    title={metric.title}
+                                    value={metric.value}
+                                    change={metric.change}
+                                    changeLabel={metric.changeLabel}
+                                    icon={metric.icon}
+                                />
                             </div>
-                            {settings?.custom_fields && settings.custom_fields.length > 0 ? (
-                                <ul className="list-unstyled small mb-0">
-                                    {settings.custom_fields.map((field, index) => (
-                                        <li key={index}>
-                                            <span className="fw-semibold">{field.label}:</span> {field.value ?? '—'}
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : null}
-                        </DashboardCard>
-                    </div>
+                        );
+                    })}
                 </div>
 
-                <div className="row row-cards mt-3">
-                    <div className="col-lg-8">
-                        <div className="row row-cards">
-                            {secondaryPanelVisibility.upcomingShoots !== false ? (
-                                <div className="col-12">
-                                    <SectionCard
-                                        title="Upcoming Shoots"
-                                        description="Stay ready for every session with a quick view of the week ahead."
-                                        action={
-                                            <Link href="/studio/calendars" className="btn btn-sm btn-outline-primary">
-                                                Open calendar
-                                            </Link>
-                                        }
-                                    >
-                                        <BookingList bookings={upcomingBookings} />
-                                    </SectionCard>
-                                </div>
-                            ) : null}
+                {sectionOrder[view].map((key) => {
+                    const section = sections[key];
+                    return section ? section : null;
+                })}
 
-                            {secondaryPanelVisibility.activeClients !== false ? (
-                                <div className="col-12">
-                                    <SectionCard
-                                        title="Active Clients"
-                                        description="From loyal regulars to new leads, see who needs attention next."
-                                        action={
-                                            <Link href="/clients" className="btn btn-sm btn-outline-primary">
-                                                View all clients
-                                            </Link>
-                                        }
-                                    >
-                                        <ClientTable clients={clients} />
-                                    </SectionCard>
-                                </div>
-                            ) : null}
-                        </div>
-                    </div>
+                <style jsx>{`
+                    .dashboard-view-toggle {
+                        position: absolute;
+                        right: 0;
+                        bottom: -1.5rem;
+                        display: inline-flex;
+                        gap: 0.5rem;
+                        padding: 0.25rem;
+                        border-radius: 9999px;
+                        background-color: var(--tblr-card-bg, #ffffff);
+                        border: 1px solid var(--tblr-border-color, rgba(4, 32, 69, 0.1));
+                        box-shadow: 0 12px 30px rgba(4, 32, 69, 0.1);
+                        z-index: 5;
+                    }
 
-                    <div className="col-lg-4">
-                        <div className="row row-cards">
-                            {secondaryPanelVisibility.openInvoices !== false ? (
-                                <div className="col-12">
-                                    <SectionCard
-                                        title="Open Invoices"
-                                        description="Collect payments faster with a focused list of outstanding balances."
-                                        action={
-                                            <Link href="/invoices" className="btn btn-sm btn-outline-primary">
-                                                View all invoices
-                                            </Link>
-                                        }
-                                    >
-                                        <InvoiceTable
-                                            invoices={openInvoices}
-                                            onUpdateStatus={
-                                                canManageStudio ? handleUpdateInvoiceStatus : undefined
-                                            }
-                                            onGeneratePdf={canManageStudio ? handleGenerateInvoicePdf : undefined}
-                                            onCreateCheckout={
-                                                canManageStudio ? handleCreateCheckoutSession : undefined
-                                            }
-                                            generatingInvoiceId={pdfInvoiceId}
-                                            checkoutInvoiceId={checkoutInvoiceId}
-                                        />
-                                    </SectionCard>
-                                </div>
-                            ) : null}
+                    .dashboard-toggle-button {
+                        width: 2.5rem;
+                        height: 2.5rem;
+                        border-radius: 9999px;
+                        border: none;
+                        background: transparent;
+                        color: var(--tblr-secondary, #64748b);
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
+                        transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+                    }
 
-                            {secondaryPanelVisibility.studioTasks !== false ? (
-                                <div className="col-12">
-                                    <SectionCard
-                                        title="Studio Tasks"
-                                        description="Keep production moving with next actions across your team."
-                                        action={
-                                            canManageStudio ? (
-                                                <button className="btn btn-sm btn-outline-primary">Create task</button>
-                                            ) : undefined
-                                        }
-                                    >
-                                        <TaskList tasks={tasks} />
-                                    </SectionCard>
-                                </div>
-                            ) : null}
-                        </div>
-                    </div>
-                </div>
+                    .dashboard-toggle-button:hover {
+                        background-color: rgba(var(--tblr-primary-rgb, 6, 111, 209), 0.08);
+                        color: var(--tblr-primary, #066fd1);
+                    }
+
+                    .dashboard-toggle-button[data-selected='true'] {
+                        background-color: var(--tblr-primary, #066fd1);
+                        color: #ffffff;
+                        box-shadow: 0 10px 20px rgba(var(--tblr-primary-rgb, 6, 111, 209), 0.35);
+                    }
+
+                    .dashboard-toggle-button:focus-visible {
+                        outline: none;
+                        box-shadow: 0 0 0 0.2rem rgba(var(--tblr-primary-rgb, 6, 111, 209), 0.35);
+                    }
+
+                    .visually-hidden {
+                        position: absolute;
+                        width: 1px;
+                        height: 1px;
+                        padding: 0;
+                        margin: -1px;
+                        overflow: hidden;
+                        clip: rect(0, 0, 0, 0);
+                        white-space: nowrap;
+                        border: 0;
+                    }
+
+                    .dashboard-transition > * {
+                        opacity: 1;
+                        transform: translateY(0);
+                        transition: opacity 0.22s ease, transform 0.22s ease;
+                    }
+
+                    .dashboard-transition.is-transitioning > * {
+                        opacity: 0;
+                        transform: translateY(12px);
+                    }
+
+                    .dashboard-transition.is-transitioning > *:nth-child(1) {
+                        transition-delay: 0ms;
+                    }
+
+                    .dashboard-transition.is-transitioning > *:nth-child(2) {
+                        transition-delay: 40ms;
+                    }
+
+                    .dashboard-transition.is-transitioning > *:nth-child(3) {
+                        transition-delay: 80ms;
+                    }
+
+                    .dashboard-transition.is-transitioning > *:nth-child(4) {
+                        transition-delay: 120ms;
+                    }
+                `}</style>
             </WorkspaceLayout>
         </>
+    );
+}
+
+type DashboardViewToggleButtonsProps = {
+    view: DashboardViewMode;
+    onSelect: (mode: DashboardViewMode) => void;
+};
+
+function DashboardViewToggleButtons({ view, onSelect }: DashboardViewToggleButtonsProps) {
+    const isRevenueActive = view === 'revenue';
+    const isClientActive = view === 'client';
+
+    return (
+        <div className="dashboard-view-toggle" role="group" aria-label="Dashboard view modes">
+            <button
+                type="button"
+                className="dashboard-toggle-button"
+                data-selected={isRevenueActive}
+                aria-pressed={isRevenueActive}
+                onClick={() => onSelect('revenue')}
+                title="Revenue view"
+            >
+                <LuDollarSign size={18} aria-hidden="true" />
+                <span className="visually-hidden">Revenue view</span>
+            </button>
+            <button
+                type="button"
+                className="dashboard-toggle-button"
+                data-selected={isClientActive}
+                aria-pressed={isClientActive}
+                onClick={() => onSelect('client')}
+                title="Client view"
+            >
+                <LuUser size={18} aria-hidden="true" />
+                <span className="visually-hidden">Client view</span>
+            </button>
+        </div>
     );
 }
 
@@ -1452,11 +1916,12 @@ export default function CrmDashboardPage(props: CrmPageProps) {
 }
 
 export const getStaticProps: GetStaticProps<CrmPageProps> = async () => {
-    const [bookingEntries, invoiceEntries, clientEntries, userEntries, settings] = await Promise.all([
+    const [bookingEntries, invoiceEntries, clientEntries, userEntries, galleryEntries, settings] = await Promise.all([
         readCmsCollection<CmsBookingEntry>('crm-bookings.json'),
         readCmsCollection<CmsInvoiceEntry>('crm-invoices.json'),
         readCmsCollection<CmsClientEntry>('crm-clients.json'),
         readCmsCollection<CmsUserEntry>('crm-users.json'),
+        readCmsCollection<CmsGalleryEntry>('crm-galleries.json'),
         readCmsSettings('crm-settings.json')
     ]);
 
@@ -1486,6 +1951,7 @@ export const getStaticProps: GetStaticProps<CrmPageProps> = async () => {
     const studioName = settings?.custom_fields?.find((field) => field.label?.toLowerCase() === 'studio name')?.value?.trim() ??
         'Codex Studio';
     const secondaryPanelVisibility = resolvePanelVisibility(settings);
+    const galleryRecords = createGalleryRecords(galleryEntries);
 
     return {
         props: {
@@ -1499,7 +1965,8 @@ export const getStaticProps: GetStaticProps<CrmPageProps> = async () => {
             users,
             studioName,
             settings,
-            secondaryPanelVisibility
+            secondaryPanelVisibility,
+            galleries: galleryRecords
         }
     };
 };
