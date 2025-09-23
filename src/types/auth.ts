@@ -16,6 +16,7 @@ export type AuthUser = {
     status: string | null;
     emailVerified: boolean;
     calendarId: string | null;
+    workspaceId: string | null;
     deactivatedAt: string | null;
     lastLoginAt: string | null;
 };

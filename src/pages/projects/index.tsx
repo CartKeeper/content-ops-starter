@@ -2,6 +2,7 @@ import * as React from 'react';
 import Head from 'next/head';
 import useSWR from 'swr';
 
+import { useNetlifyIdentity } from '../../components/auth';
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
 import { NewProjectDrawer } from '../../components/projects';
 import { PROJECT_STATUS_META } from '../../components/projects/status-meta';
@@ -62,6 +63,12 @@ type ProjectsToolbarState = {
 };
 
 function ProjectsWorkspace() {
+    const identity = useNetlifyIdentity();
+    const client = getSupabaseBrowserClient();
+    const workspaceId = identity.user?.workspaceId ?? null;
+    const currentWorkspace = workspaceId ? { id: workspaceId } : null;
+    const wsId = currentWorkspace?.id ?? null;
+
     const [controls, setControls] = React.useState<ProjectsToolbarState>({ search: '', status: 'ALL', tag: '' });
     const [drawerMode, setDrawerMode] = React.useState<'create' | 'edit'>('create');
     const [activeProject, setActiveProject] = React.useState<ProjectRecord | null>(null);
@@ -100,6 +107,12 @@ function ProjectsWorkspace() {
         revalidateOnFocus: false
     });
 
+    const mutateRef = React.useRef(mutateProjects);
+
+    React.useEffect(() => {
+        mutateRef.current = mutateProjects;
+    }, [mutateProjects]);
+
     const projects = data?.data ?? [];
 
     const tagOptions = React.useMemo(() => {
@@ -118,21 +131,32 @@ function ProjectsWorkspace() {
     }, [controls.status, projects]);
 
     React.useEffect(() => {
-        const client = getSupabaseBrowserClient();
+        if (!wsId) {
+            return;
+        }
+
         const channel = client
-            .channel('projects-board')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
-                void mutateProjects();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'project_tasks' }, () => {
-                void mutateProjects();
-            })
+            .channel(`projects:${wsId}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'projects', filter: `workspace_id=eq.${wsId}` },
+                () => {
+                    void mutateRef.current?.();
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'project_tasks', filter: `workspace_id=eq.${wsId}` },
+                () => {
+                    void mutateRef.current?.();
+                }
+            )
             .subscribe();
 
         return () => {
             void client.removeChannel(channel);
         };
-    }, [mutateProjects]);
+    }, [client, wsId]);
 
     const hasError = Boolean(error);
 

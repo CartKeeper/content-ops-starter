@@ -14,6 +14,9 @@ import {
 
 import { cn } from '../../lib/cn';
 
+const getNoopSortedRowModel = () => (table: any) => table.getPreSortedRowModel();
+const getNoopPaginationRowModel = () => (table: any) => table.getPrePaginationRowModel();
+
 type DataTableProps<TData> = {
     columns: ColumnDef<TData, any>[];
     data: TData[];
@@ -58,8 +61,8 @@ export function DataTable<TData>({
         onPaginationChange,
         onRowSelectionChange,
         getCoreRowModel: getCoreRowModel(),
-        ...(manualSorting ? {} : { getSortedRowModel: getSortedRowModel() }),
-        ...(manualPagination ? {} : { getPaginationRowModel: getPaginationRowModel() }),
+        getSortedRowModel: manualSorting ? getNoopSortedRowModel() : getSortedRowModel(),
+        getPaginationRowModel: manualPagination ? getNoopPaginationRowModel() : getPaginationRowModel(),
         manualPagination,
         manualSorting,
         pageCount,
