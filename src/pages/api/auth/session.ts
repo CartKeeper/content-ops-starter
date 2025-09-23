@@ -25,6 +25,7 @@ function mapUser(record: Record<string, any>): AuthUser {
         status: record.status ?? null,
         emailVerified: Boolean(record.email_verified_at),
         calendarId: record.calendar_id ?? null,
+        workspaceId: record.workspace_id ?? null,
         deactivatedAt: record.deactivated_at ?? null,
         lastLoginAt: record.last_login_at ?? null,
     };
@@ -46,7 +47,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
         const query = await supabaseAdmin
             .from('users')
             .select(
-                'id,email,name,roles,role,permissions,created_at,updated_at,role_title,phone,welcome_message,avatar_url,status,email_verified_at,calendar_id,deactivated_at,last_login_at'
+                'id,email,name,roles,role,permissions,created_at,updated_at,role_title,phone,welcome_message,avatar_url,status,email_verified_at,calendar_id,workspace_id,deactivated_at,last_login_at'
             )
             .eq('id', payload.userId)
             .maybeSingle();
