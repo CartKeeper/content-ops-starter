@@ -105,11 +105,18 @@ const GalleryPortalPage: NextPage<InferGetStaticPropsType<typeof getStaticProps>
     const [pendingCredential, setPendingCredential] = React.useState('');
 
     React.useEffect(() => {
-        if (availableViews.includes(activeView)) {
+        if (availableViews.length === 0) {
             return;
         }
-        setActiveView(availableViews[0]);
-    }, [availableViews, activeView]);
+
+        setActiveView((current) => {
+            if (availableViews.includes(current)) {
+                return current;
+            }
+
+            return availableViews[0];
+        });
+    }, [availableViews]);
 
     React.useEffect(() => {
         if (!gallery.portalSettings?.token) {
