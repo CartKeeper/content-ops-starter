@@ -3,6 +3,10 @@ import { useRef } from 'react';
 
 /** Throws/logs if a component renders >limit times within windowMs. */
 export function useRenderFuse(name: string, limit = 50, windowMs = 1000) {
+    if (typeof performance === 'undefined') {
+        return;
+    }
+
     const count = useRef(0);
     const start = useRef(performance.now());
     const now = performance.now();
