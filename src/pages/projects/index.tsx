@@ -106,12 +106,11 @@ function ProjectsWorkspace() {
     });
 
     const mutateRef = React.useRef(mutateProjects);
-    const rafId = React.useRef<number | null>(null);
-
     React.useEffect(() => {
         mutateRef.current = mutateProjects;
     }, [mutateProjects]);
 
+    const rafId = React.useRef<number | null>(null);
     const requestMutate = React.useCallback(() => {
         if (typeof window === 'undefined') {
             void mutateRef.current?.();
@@ -165,13 +164,9 @@ function ProjectsWorkspace() {
             .subscribe();
 
         return () => {
-            if (typeof window !== 'undefined' && rafId.current != null) {
-                window.cancelAnimationFrame(rafId.current);
-                rafId.current = null;
-            }
             void client.removeChannel(channel);
         };
-    }, [client, requestMutate, workspaceId]);
+    }, [client, workspaceId, requestMutate]);
 
     const hasError = Boolean(error);
 
