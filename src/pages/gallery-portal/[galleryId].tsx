@@ -118,17 +118,27 @@ const GalleryPortalPage: NextPage<InferGetStaticPropsType<typeof getStaticProps>
         });
     }, [availableViews]);
 
+    const queryToken = React.useMemo(() => {
+        const rawToken = router.query.token;
+        if (Array.isArray(rawToken)) {
+            return rawToken[0] ?? null;
+        }
+
+        return typeof rawToken === 'string' ? rawToken : null;
+    }, [router.query.token]);
+
     React.useEffect(() => {
-        if (!gallery.portalSettings?.token) {
+        if (!gallery.portalSettings?.token || !queryToken) {
             return;
         }
 
-        const queryToken = Array.isArray(router.query.token) ? router.query.token[0] : router.query.token;
-        if (queryToken && safeCompare(queryToken, gallery.portalSettings.token)) {
-            setIsAuthenticated(true);
-            setErrorMessage(null);
+        if (!safeCompare(queryToken, gallery.portalSettings.token)) {
+            return;
         }
-    }, [router.query, gallery.portalSettings?.token]);
+
+        setIsAuthenticated((current) => (current ? current : true));
+        setErrorMessage((current) => (current === null ? current : null));
+    }, [gallery.portalSettings?.token, queryToken]);
 
     const handleCredentialSubmit = React.useCallback(
         (value: string) => {
