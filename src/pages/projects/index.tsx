@@ -106,10 +106,27 @@ function ProjectsWorkspace() {
     });
 
     const mutateRef = React.useRef(mutateProjects);
+    const rafId = React.useRef<number | null>(null);
 
     React.useEffect(() => {
         mutateRef.current = mutateProjects;
     }, [mutateProjects]);
+
+    const requestMutate = React.useCallback(() => {
+        if (typeof window === 'undefined') {
+            void mutateRef.current?.();
+            return;
+        }
+
+        if (rafId.current != null) {
+            return;
+        }
+
+        rafId.current = window.requestAnimationFrame(() => {
+            rafId.current = null;
+            void mutateRef.current?.();
+        });
+    }, []);
 
     const projects = data?.data ?? [];
 
@@ -138,23 +155,23 @@ function ProjectsWorkspace() {
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'projects', filter: `workspace_id=eq.${workspaceId}` },
-                () => {
-                    void mutateRef.current?.();
-                }
+                requestMutate
             )
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'project_tasks', filter: `workspace_id=eq.${workspaceId}` },
-                () => {
-                    void mutateRef.current?.();
-                }
+                requestMutate
             )
             .subscribe();
 
         return () => {
+            if (typeof window !== 'undefined' && rafId.current != null) {
+                window.cancelAnimationFrame(rafId.current);
+                rafId.current = null;
+            }
             void client.removeChannel(channel);
         };
-    }, [client, workspaceId]);
+    }, [client, requestMutate, workspaceId]);
 
     const hasError = Boolean(error);
 
