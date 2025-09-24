@@ -2,14 +2,7 @@ import * as React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
-import type {
-    ColumnDef,
-    OnChangeFn,
-    PaginationState,
-    RowSelectionState,
-    SortingState,
-    Updater
-} from '@tanstack/react-table';
+import type { ColumnDef, OnChangeFn, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
 import DataToolbar, { type SortOption, type ToolbarFilter } from '../../components/data/DataToolbar';
 import DataTable from '../../components/data/DataTable';
@@ -18,7 +11,7 @@ import { formatDate } from '../../lib/formatters';
 import type { ContactRecord } from '../../types/contact';
 import { getContactName } from '../../types/contact';
 import { deriveStage, type ContactStage } from '../../lib/contacts';
-import { isSamePagination, isSameSorting } from '../../lib/react-table';
+import { isSamePagination, isSameSorting, isSameRowSelection } from '@/utils/tableEquality';
 import ContactFormModal from '../../components/contacts/ContactFormModal';
 
 type OwnerOption = { id: string; name: string | null };
@@ -49,10 +42,6 @@ type ContactTableRow = {
 };
 
 type ToastMessage = { id: string; title: string; tone: 'success' | 'error'; description?: string };
-
-function resolveUpdater<T>(updater: Updater<T>, previous: T): T {
-    return typeof updater === 'function' ? (updater as (old: T) => T)(previous) : updater;
-}
 
 const CONTACT_SORT_OPTIONS: Array<SortOption & { state: SortingState }> = [
     { id: 'name-asc', label: 'Name (A-Z)', state: [{ id: 'name', desc: false }] },
@@ -111,29 +100,35 @@ function ContactsWorkspace() {
     const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
     const [notifications, setNotifications] = React.useState<ToastMessage[]>([]);
 
+    const handleSortingChange = React.useCallback<OnChangeFn<SortingState>>((updater) => {
+        setSorting((previous) => {
+            const nextState = typeof updater === 'function' ? updater(previous) : updater;
+            if (isSameSorting(previous, nextState)) {
+                return previous;
+            }
+
+            const match = CONTACT_SORT_OPTIONS.find(
+                (option) =>
+                    option.state.length === nextState.length &&
+                    option.state.every((entry, index) => entry.id === nextState[index]?.id && entry.desc === nextState[index]?.desc)
+            );
+            setSortValue(match?.id ?? DEFAULT_CONTACT_SORT.id);
+
+            return nextState;
+        });
+    }, []);
+
     const handlePaginationChange = React.useCallback<OnChangeFn<PaginationState>>((updater) => {
         setPagination((previous) => {
-            const nextState = resolveUpdater(updater, previous);
+            const nextState = typeof updater === 'function' ? updater(previous) : updater;
             return isSamePagination(previous, nextState) ? previous : nextState;
         });
     }, []);
 
     const handleRowSelectionChange = React.useCallback<OnChangeFn<RowSelectionState>>((updater) => {
         setRowSelection((previous) => {
-            const nextState = resolveUpdater(updater, previous);
-
-            if (previous === nextState) {
-                return previous;
-            }
-
-            const previousKeys = Object.keys(previous);
-            const nextKeys = Object.keys(nextState);
-
-            if (previousKeys.length === nextKeys.length && previousKeys.every((key) => previous[key] === nextState[key])) {
-                return previous;
-            }
-
-            return nextState;
+            const nextState = typeof updater === 'function' ? updater(previous) : updater;
+            return isSameRowSelection(previous, nextState) ? previous : nextState;
         });
     }, []);
 
@@ -218,6 +213,26 @@ function ContactsWorkspace() {
         return Math.max(1, Math.ceil(total / size));
     }, [contactsResponse]);
 
+    const pageCountRef = React.useRef<number | null>(null);
+    React.useEffect(() => {
+        if (typeof pageCount !== 'number') {
+            return;
+        }
+        if (pageCount === pageCountRef.current) {
+            return;
+        }
+        pageCountRef.current = pageCount;
+
+        setPagination((previous) => {
+            const maxIndex = Math.max(0, pageCount - 1);
+            if (previous.pageIndex <= maxIndex) {
+                return previous;
+            }
+            const nextState = { ...previous, pageIndex: maxIndex };
+            return isSamePagination(previous, nextState) ? previous : nextState;
+        });
+    }, [pageCount]);
+
     const ownerOptions = React.useMemo(() => {
         const options = contactsResponse?.meta.availableFilters.owners ?? [];
         const entries = options.map((owner) => ({ value: owner.id, label: owner.name ?? owner.id }));
@@ -297,19 +312,6 @@ function ContactsWorkspace() {
             ...previous,
             { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, title, tone, description }
         ]);
-    }, []);
-
-    const handleSortingChange = React.useCallback<OnChangeFn<SortingState>>((updater) => {
-        setSorting((previous) => {
-            const nextState = resolveUpdater(updater, previous);
-            const match = CONTACT_SORT_OPTIONS.find(
-                (option) =>
-                    option.state.length === nextState.length &&
-                    option.state.every((entry, index) => entry.id === nextState[index]?.id && entry.desc === nextState[index]?.desc)
-            );
-            setSortValue(match?.id ?? DEFAULT_CONTACT_SORT.id);
-            return isSameSorting(previous, nextState) ? previous : nextState;
-        });
     }, []);
 
     const handleAddContactClick = React.useCallback(() => {
