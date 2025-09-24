@@ -1,9 +1,13 @@
+import { randomUUID } from 'crypto';
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import type { SessionPayload } from '../../../lib/jwt';
 import type { ContactRecord } from '../../../types/contact';
 import { authenticateRequest } from '../../../utils/api-auth';
 import { getSupabaseClient } from '../../../utils/supabase-client';
+import { readContactsFromDisk, writeContactsToDisk } from '../../../server/contacts/local-store';
+import { readCmsCollection } from '../../../utils/read-cms-collection';
 
 type ErrorResponse = { error: string };
 
@@ -25,6 +29,8 @@ type ContactListResponse = {
 type ContactSingleResponse = { data: ContactRecord };
 
 type ContactsResponse = ContactListResponse | ContactSingleResponse | ErrorResponse;
+
+type SupabaseClient = ReturnType<typeof getSupabaseClient>;
 
 const ALLOWED_METHODS = ['GET', 'POST'] as const;
 
@@ -119,8 +125,11 @@ function normalizeStatuses(stages: string[], statuses: string[]): Array<ContactR
     return Array.from(set);
 }
 
-async function fetchSupabaseFilterOptions(ownerUserId: string | null, canViewAll: boolean) {
-    const supabase = getSupabaseClient();
+async function fetchSupabaseFilterOptions(
+    supabase: SupabaseClient,
+    ownerUserId: string | null,
+    canViewAll: boolean
+) {
 
     let ownerQuery = supabase
         .from('contacts')
@@ -210,9 +219,9 @@ function applySupabaseSorting(query: ReturnType<typeof getSupabaseClient>['from'
 async function handleGetSupabase(
     req: NextApiRequest,
     res: NextApiResponse<ContactsResponse>,
-    session: SessionPayload
+    session: SessionPayload,
+    supabase: SupabaseClient
 ) {
-    const supabase = getSupabaseClient();
 
     const contactIdParam = req.query.id;
     const rawContactId = Array.isArray(contactIdParam) ? contactIdParam[0] : contactIdParam;
@@ -309,7 +318,11 @@ async function handleGetSupabase(
         return;
     }
 
-    const filters = await fetchSupabaseFilterOptions(canViewAll ? null : session.userId, canViewAll);
+    const filters = await fetchSupabaseFilterOptions(
+        supabase,
+        canViewAll ? null : session.userId,
+        canViewAll
+    );
 
     res.status(200).json({
         data: data ?? [],
@@ -373,7 +386,8 @@ function sanitizeString(value: unknown): string | null {
 async function handlePostSupabase(
     req: NextApiRequest,
     res: NextApiResponse<ContactsResponse>,
-    session: SessionPayload
+    session: SessionPayload,
+    supabase: SupabaseClient
 ) {
     const payload = parseContactBody(req.body);
 
@@ -407,7 +421,6 @@ async function handlePostSupabase(
         return;
     }
 
-    const supabase = getSupabaseClient();
     const now = new Date().toISOString();
 
     const insertPayload = {
@@ -443,6 +456,423 @@ async function handlePostSupabase(
     res.status(201).json({ data: data as ContactRecord });
 }
 
+function coerceString(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+}
+
+function coerceIsoString(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function coerceStatus(value: unknown): ContactRecord['status'] {
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'lead' || normalized === 'active' || normalized === 'client') {
+            return normalized;
+        }
+    }
+
+    return null;
+}
+
+function normalizeLocalContact(record: Partial<ContactRecord> & Record<string, unknown>): ContactRecord {
+    return {
+        id: typeof record.id === 'string' && record.id.trim() ? record.id.trim() : randomUUID(),
+        owner_user_id: coerceString(record.owner_user_id),
+        first_name: coerceString(record.first_name),
+        last_name: coerceString(record.last_name),
+        email: coerceString(record.email),
+        phone: coerceString(record.phone),
+        notes: coerceString(record.notes),
+        address: coerceString(record.address),
+        city: coerceString(record.city),
+        state: coerceString(record.state),
+        business: coerceString(record.business),
+        status: coerceStatus(record.status),
+        created_at: coerceIsoString(record.created_at),
+        updated_at: coerceIsoString(record.updated_at),
+    } satisfies ContactRecord;
+}
+
+function compareNullableString(
+    a: string | null | undefined,
+    b: string | null | undefined,
+    ascending: boolean
+): number {
+    const aHasValue = typeof a === 'string' && a.trim().length > 0;
+    const bHasValue = typeof b === 'string' && b.trim().length > 0;
+
+    if (!aHasValue && !bHasValue) {
+        return 0;
+    }
+
+    if (!aHasValue) {
+        return 1;
+    }
+
+    if (!bHasValue) {
+        return -1;
+    }
+
+    const aValue = a.trim().toLowerCase();
+    const bValue = b.trim().toLowerCase();
+
+    if (aValue === bValue) {
+        return 0;
+    }
+
+    const comparison = aValue < bValue ? -1 : 1;
+    return ascending ? comparison : -comparison;
+}
+
+function compareIsoDates(
+    a: string | null | undefined,
+    b: string | null | undefined,
+    ascending: boolean
+): number {
+    const parse = (value: string | null | undefined) => {
+        if (!value || typeof value !== 'string') {
+            return null;
+        }
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return null;
+        }
+        const timestamp = Date.parse(trimmed);
+        return Number.isNaN(timestamp) ? null : timestamp;
+    };
+
+    const aTime = parse(a);
+    const bTime = parse(b);
+
+    if (aTime === bTime) {
+        return 0;
+    }
+
+    if (aTime === null) {
+        return 1;
+    }
+
+    if (bTime === null) {
+        return -1;
+    }
+
+    return ascending ? aTime - bTime : bTime - aTime;
+}
+
+function sortLocalContacts(records: ContactRecord[], sort: string): ContactRecord[] {
+    const sorted = [...records];
+
+    switch (sort) {
+        case 'name-desc':
+            sorted.sort((a, b) => {
+                const last = compareNullableString(a.last_name, b.last_name, false);
+                if (last !== 0) {
+                    return last;
+                }
+                const first = compareNullableString(a.first_name, b.first_name, false);
+                if (first !== 0) {
+                    return first;
+                }
+                return compareNullableString(a.business, b.business, false);
+            });
+            break;
+        case 'created-asc':
+            sorted.sort((a, b) => compareIsoDates(a.created_at, b.created_at, true));
+            break;
+        case 'created-desc':
+            sorted.sort((a, b) => compareIsoDates(a.created_at, b.created_at, false));
+            break;
+        case 'updated-asc':
+            sorted.sort((a, b) => {
+                const primary = compareIsoDates(a.updated_at, b.updated_at, true);
+                if (primary !== 0) {
+                    return primary;
+                }
+                return compareIsoDates(a.created_at, b.created_at, true);
+            });
+            break;
+        case 'updated-desc':
+            sorted.sort((a, b) => {
+                const primary = compareIsoDates(a.updated_at, b.updated_at, false);
+                if (primary !== 0) {
+                    return primary;
+                }
+                return compareIsoDates(a.created_at, b.created_at, false);
+            });
+            break;
+        case 'name-asc':
+        default:
+            sorted.sort((a, b) => {
+                const last = compareNullableString(a.last_name, b.last_name, true);
+                if (last !== 0) {
+                    return last;
+                }
+                const first = compareNullableString(a.first_name, b.first_name, true);
+                if (first !== 0) {
+                    return first;
+                }
+                return compareNullableString(a.business, b.business, true);
+            });
+            break;
+    }
+
+    return sorted;
+}
+
+async function buildLocalOwnerOptions(
+    contacts: ContactRecord[],
+    canViewAll: boolean,
+    session: SessionPayload
+): Promise<OwnerOption[]> {
+    const ownerIds = new Set<string>();
+    contacts.forEach((record) => {
+        const id = typeof record.owner_user_id === 'string' ? record.owner_user_id.trim() : '';
+        if (id) {
+            ownerIds.add(id);
+        }
+    });
+
+    const users = await readCmsCollection<{ id?: string; name?: string | null }>('crm-users.json');
+    const nameMap = new Map<string, string | null>();
+    users.forEach((user) => {
+        const id = typeof user?.id === 'string' ? user.id.trim() : '';
+        if (id) {
+            nameMap.set(id, typeof user?.name === 'string' ? user.name : null);
+        }
+    });
+
+    if (!canViewAll) {
+        if (ownerIds.has(session.userId) || nameMap.has(session.userId)) {
+            return [{ id: session.userId, name: nameMap.get(session.userId) ?? null }];
+        }
+        return [];
+    }
+
+    return Array.from(ownerIds)
+        .map((id) => ({ id, name: nameMap.get(id) ?? null }))
+        .sort((a, b) => {
+            const aLabel = (a.name ?? a.id).toLowerCase();
+            const bLabel = (b.name ?? b.id).toLowerCase();
+            if (aLabel < bLabel) {
+                return -1;
+            }
+            if (aLabel > bLabel) {
+                return 1;
+            }
+            return 0;
+        });
+}
+
+function buildLocalStatusOptions(contacts: ContactRecord[]): Array<NonNullable<ContactRecord['status']>> {
+    return Array.from(
+        new Set(
+            contacts
+                .map((record) => (typeof record.status === 'string' ? record.status.trim().toLowerCase() : null))
+                .filter((value): value is NonNullable<ContactRecord['status']> =>
+                    value === 'lead' || value === 'active' || value === 'client'
+                )
+        )
+    ).sort();
+}
+
+function matchesSearch(record: ContactRecord, search: string): boolean {
+    const term = search.trim().toLowerCase();
+    if (!term) {
+        return true;
+    }
+
+    const fields = [
+        record.first_name,
+        record.last_name,
+        record.email,
+        record.phone,
+        record.business,
+    ];
+
+    return fields.some((value) => (typeof value === 'string' ? value.toLowerCase().includes(term) : false));
+}
+
+function matchesStatuses(
+    record: ContactRecord,
+    statuses: Array<ContactRecord['status'] | null>
+): boolean {
+    if (statuses.length === 0) {
+        return true;
+    }
+
+    const includeNull = statuses.some((status) => status === null);
+    const normalized = new Set(
+        statuses.filter((status): status is NonNullable<ContactRecord['status']> => Boolean(status))
+    );
+
+    const value = record.status ?? null;
+
+    if (value === null) {
+        return includeNull;
+    }
+
+    return normalized.size === 0 ? includeNull : normalized.has(value);
+}
+
+function matchesOwner(
+    record: ContactRecord,
+    ownerIds: string[],
+    includeUnassigned: boolean
+): boolean {
+    if (ownerIds.length === 0 && !includeUnassigned) {
+        return true;
+    }
+
+    const ownerId = typeof record.owner_user_id === 'string' ? record.owner_user_id.trim() : '';
+    if (ownerId && ownerIds.includes(ownerId)) {
+        return true;
+    }
+
+    if (!ownerId && includeUnassigned) {
+        return true;
+    }
+
+    return ownerIds.length === 0 && includeUnassigned && !ownerId;
+}
+
+async function handleGetLocal(
+    req: NextApiRequest,
+    res: NextApiResponse<ContactsResponse>,
+    session: SessionPayload
+) {
+    const canViewAll = session.role === 'admin' || session.permissions.canManageUsers;
+    const queryState = parseQuery(req);
+    const normalizedStatuses = normalizeStatuses(queryState.stages, queryState.statuses);
+    const includeUnassignedOwner = queryState.owners.includes('unassigned');
+    const ownerIds = canViewAll
+        ? queryState.owners.filter((owner) => owner && owner !== 'unassigned')
+        : [session.userId];
+
+    const rawContacts = await readContactsFromDisk();
+    const normalizedContacts = rawContacts.map((record) => normalizeLocalContact(record ?? {}));
+    const accessibleContacts = canViewAll
+        ? normalizedContacts
+        : normalizedContacts.filter((record) => record.owner_user_id === session.userId);
+
+    const filters = {
+        owners: await buildLocalOwnerOptions(accessibleContacts, canViewAll, session),
+        statuses: buildLocalStatusOptions(accessibleContacts),
+    };
+
+    let filtered = accessibleContacts.filter((record) => matchesSearch(record, queryState.search));
+
+    filtered = filtered.filter((record) => matchesStatuses(record, normalizedStatuses));
+
+    filtered = filtered.filter((record) => matchesOwner(record, ownerIds, includeUnassignedOwner));
+
+    const sorted = sortLocalContacts(filtered, queryState.sort);
+    const total = sorted.length;
+    const from = (queryState.page - 1) * queryState.pageSize;
+    const to = from + queryState.pageSize;
+    const pageData = sorted.slice(from, to);
+
+    res.status(200).json({
+        data: pageData,
+        meta: {
+            page: queryState.page,
+            pageSize: queryState.pageSize,
+            total,
+            availableFilters: filters,
+        },
+    });
+}
+
+async function handlePostLocal(
+    req: NextApiRequest,
+    res: NextApiResponse<ContactsResponse>,
+    session: SessionPayload
+) {
+    const payload = parseContactBody(req.body);
+
+    if (!payload) {
+        res.status(400).json({ error: 'Request body must be a JSON object' });
+        return;
+    }
+
+    let first = sanitizeString(payload.first_name ?? payload.firstName);
+    let last = sanitizeString(payload.last_name ?? payload.lastName);
+
+    if (!first && !last) {
+        const name = sanitizeString(payload.name);
+        if (name) {
+            const parsed = splitName(name);
+            first = parsed.first;
+            last = parsed.last;
+        }
+    }
+
+    const email = sanitizeString(payload.email);
+    const phone = sanitizeString(payload.phone);
+    const address = sanitizeString(payload.address);
+    const city = sanitizeString(payload.city);
+    const state = sanitizeString(payload.state);
+    const business = sanitizeString(payload.business);
+    const notes = sanitizeString(payload.notes);
+
+    if (!first && !last && !business && !email) {
+        res.status(400).json({ error: 'Provide at least a first name, last name, business, or email for the contact' });
+        return;
+    }
+
+    const now = new Date().toISOString();
+    const newRecord: ContactRecord = {
+        id: randomUUID(),
+        owner_user_id: session.userId,
+        first_name: first,
+        last_name: last,
+        email,
+        phone,
+        address,
+        city,
+        state,
+        business,
+        notes,
+        status: 'lead',
+        created_at: now,
+        updated_at: now,
+    };
+
+    const existing = (await readContactsFromDisk()).map((record) => normalizeLocalContact(record ?? {}));
+
+    if (email) {
+        const normalizedEmail = email.toLowerCase();
+        const conflict = existing.some(
+            (record) => record.owner_user_id === session.userId && record.email?.toLowerCase() === normalizedEmail
+        );
+
+        if (conflict) {
+            res.status(409).json({ error: 'A contact with this email already exists for this owner.' });
+            return;
+        }
+    }
+
+    existing.push(newRecord);
+    await writeContactsToDisk(existing);
+
+    res.status(201).json({ data: newRecord });
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse<ContactsResponse>) {
     res.setHeader('Content-Type', 'application/json');
 
@@ -454,12 +884,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse<ContactsRespons
         return;
     }
 
+    let supabase: SupabaseClient | null = null;
+
     try {
-        getSupabaseClient();
+        supabase = getSupabaseClient();
     } catch (error) {
-        console.error('Supabase is not configured', error);
-        res.status(500).json({ error: 'Database configuration is missing.' });
-        return;
+        console.warn('Supabase client unavailable. Falling back to local contacts data.', error);
     }
 
     const session = await authenticateRequest(req);
@@ -474,12 +904,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse<ContactsRespons
     }
 
     if (method === 'GET') {
-        await handleGetSupabase(req, res, session);
+        if (supabase) {
+            await handleGetSupabase(req, res, session, supabase);
+        } else {
+            await handleGetLocal(req, res, session);
+        }
         return;
     }
 
     if (method === 'POST') {
-        await handlePostSupabase(req, res, session);
+        if (supabase) {
+            await handlePostSupabase(req, res, session, supabase);
+        } else {
+            await handlePostLocal(req, res, session);
+        }
     }
 }
 
