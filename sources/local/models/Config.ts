@@ -19,15 +19,6 @@ export const Config: Model = {
         },
         {
             type: 'reference',
-            name: 'header',
-            label: 'Header configuration',
-            required: false,
-            hidden: false,
-            localized: false,
-            models: ['Header']
-        },
-        {
-            type: 'reference',
             name: 'footer',
             label: 'Footer configuration',
             required: false,
