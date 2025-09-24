@@ -2,7 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
 import type { SessionPayload } from '../../../lib/jwt';
-import { supabaseAdmin } from '../../../lib/supabase-admin';
+import {
+    SupabaseAdminUnavailableError,
+    isSupabaseConfigured,
+    supabaseAdmin
+} from '../../../lib/supabase-admin';
 import { authenticateRequest } from '../../../utils/api-auth';
 
 const STATUS_VALUES = ['Lead', 'Active', 'Inactive'] as const;
@@ -30,6 +34,7 @@ type ClientsResponse = {
     page: number;
     pageSize: number;
     total: number;
+    error?: string;
 };
 
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -171,7 +176,7 @@ function parseStatusFilters(value: string | string[] | undefined): ClientStatus[
 
 async function handleGet(
     req: NextApiRequest,
-    res: NextApiResponse<ClientsResponse | { error: string }>,
+    res: NextApiResponse<ClientsResponse>,
     session: SessionPayload
 ) {
     const searchParam = typeof req.query.search === 'string' ? req.query.search : '';
@@ -185,46 +190,78 @@ async function handleGet(
     const offset = (page - 1) * pageSize;
 
     const sortOption = SORT_MAP[sortKey] ?? SORT_MAP['name-asc'];
-
-    const canViewAll = session.role === 'admin' || session.permissions.canManageUsers;
-
-    let query = supabaseAdmin
-        .from('clients')
-        .select(
-            'id, created_at, updated_at, name, email, phone, status, outstanding_cents, last_activity, upcoming_shoot, portal_url, portal_enabled, tags',
-            { count: 'exact' }
-        )
-        .order(sortOption.column, { ascending: sortOption.ascending, nullsFirst: sortOption.nullsFirst });
-
-    if (!canViewAll) {
-        query = query.eq('owner_user_id', session.userId);
-    }
-
-    if (searchParam.trim()) {
-        const value = normaliseSearch(searchParam);
-        const like = `%${value}%`;
-        query = query.or(`name.ilike.${like},email.ilike.${like},phone.ilike.${like}`);
-    }
-
-    if (statusFilters.length > 0) {
-        query = query.in('status', statusFilters);
-    }
-
-    const { data, error, count } = await query.range(offset, offset + pageSize - 1);
-
-    if (error) {
-        console.error('Failed to fetch clients', error);
-        return res.status(500).json({ error: error.message ?? 'Failed to load clients' });
-    }
-
-    const resultData = data ?? [];
-
-    return res.status(200).json({
-        data: resultData,
+    const baseResponse: ClientsResponse = {
+        data: [],
         page,
         pageSize,
-        total: typeof count === 'number' ? count : resultData.length
-    });
+        total: 0
+    };
+
+    if (!isSupabaseConfigured) {
+        return res.status(200).json({
+            ...baseResponse,
+            error: 'Supabase admin client is not configured.'
+        });
+    }
+
+    try {
+        const canViewAll = session.role === 'admin' || session.permissions.canManageUsers;
+
+        let query = supabaseAdmin
+            .from('clients')
+            .select(
+                'id, created_at, updated_at, name, email, phone, status, outstanding_cents, last_activity, upcoming_shoot, portal_url, portal_enabled, tags',
+                { count: 'exact' }
+            )
+            .order(sortOption.column, { ascending: sortOption.ascending, nullsFirst: sortOption.nullsFirst });
+
+        if (!canViewAll) {
+            query = query.eq('owner_user_id', session.userId);
+        }
+
+        if (searchParam.trim()) {
+            const value = normaliseSearch(searchParam);
+            const like = `%${value}%`;
+            query = query.or(`name.ilike.${like},email.ilike.${like},phone.ilike.${like}`);
+        }
+
+        if (statusFilters.length > 0) {
+            query = query.in('status', statusFilters);
+        }
+
+        const { data, error, count } = await query.range(offset, offset + pageSize - 1);
+
+        if (error) {
+            throw new Error(error.message ?? 'Failed to load clients');
+        }
+
+        const resultData = (data ?? []) as ClientRecord[];
+
+        return res.status(200).json({
+            data: resultData,
+            page,
+            pageSize,
+            total: typeof count === 'number' ? count : resultData.length
+        });
+    } catch (error: unknown) {
+        const message =
+            error instanceof SupabaseAdminUnavailableError
+                ? error.message
+                : error instanceof Error
+                  ? error.message
+                  : 'Failed to load clients';
+
+        if (!(error instanceof SupabaseAdminUnavailableError)) {
+            console.error('Failed to fetch clients', error);
+        }
+
+        const status = error instanceof SupabaseAdminUnavailableError ? 200 : 500;
+
+        return res.status(status).json({
+            ...baseResponse,
+            error: message
+        });
+    }
 }
 
 async function handlePost(

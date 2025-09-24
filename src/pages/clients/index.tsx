@@ -46,6 +46,7 @@ type ClientsApiResponse = {
     page: number;
     pageSize: number;
     total: number;
+    error?: string;
 };
 
 type MetricsResponse = {
@@ -53,6 +54,7 @@ type MetricsResponse = {
     outstandingCents: number;
     upcomingCount60d: number;
     portalReadyCount: number;
+    error?: string;
 };
 
 const SORT_OPTIONS = [
@@ -185,9 +187,15 @@ function ClientsWorkspace() {
         mutate: mutateClients
     } = useSWR<ClientsApiResponse>(clientsKey, fetcher);
 
-    const { data: metricsData, mutate: mutateMetrics } = useSWR<MetricsResponse>('/api/clients/metrics', fetcher);
+    const {
+        data: metricsData,
+        error: metricsError,
+        mutate: mutateMetrics
+    } = useSWR<MetricsResponse>('/api/clients/metrics', fetcher);
 
     const clients = clientsData?.data ?? [];
+    const clientsWarning = clientsError ? null : clientsData?.error;
+    const metricsWarning = metricsError ? null : metricsData?.error;
     const showEmptyState = !isLoadingClients && clients.length === 0;
 
     const handleClientCreated = React.useCallback(
@@ -206,6 +214,17 @@ function ClientsWorkspace() {
 
     return (
         <div className="d-flex flex-column gap-4 pb-5">
+            {metricsError ? (
+                <div className="alert alert-danger" role="status">
+                    {metricsError.message}
+                </div>
+            ) : null}
+
+            {!metricsError && metricsWarning ? (
+                <div className="alert alert-warning" role="status">
+                    {metricsWarning}
+                </div>
+            ) : null}
             <div className="row row-cards">
                 <div className="col-sm-6 col-lg-3">
                     <KpiCard
@@ -288,6 +307,12 @@ function ClientsWorkspace() {
                     {clientsError ? (
                         <div className="alert alert-danger" role="status">
                             {clientsError.message}
+                        </div>
+                    ) : null}
+
+                    {!clientsError && clientsWarning ? (
+                        <div className="alert alert-warning" role="status">
+                            {clientsWarning}
                         </div>
                     ) : null}
 
