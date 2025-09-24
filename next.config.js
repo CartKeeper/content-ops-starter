@@ -24,13 +24,28 @@ if (supabaseAnonKey) {
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY = supabaseAnonKey;
 }
 
+const defaultAllowedDevOrigins = [
+    '127.0.0.1',
+    '127.0.0.1:3000',
+    'localhost',
+    'localhost:3000',
+    '[::1]',
+    '[::1]:3000'
+];
+
 const nextConfig = {
     env,
     trailingSlash: true,
     reactStrictMode: true,
-    allowedDevOrigins: [
-        '192.168.1.84'
-    ]
+    // Allow the default local development hosts in addition to any
+    // explicitly configured LAN address so the dev server can service
+    // hot-module reloading and other /_next requests.
+    allowedDevOrigins: Array.from(
+        new Set([
+            ...defaultAllowedDevOrigins,
+            '192.168.1.84'
+        ])
+    )
 };
 
 module.exports = nextConfig;
