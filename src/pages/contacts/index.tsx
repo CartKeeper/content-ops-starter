@@ -2,7 +2,14 @@ import * as React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
-import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table';
+import type {
+    ColumnDef,
+    OnChangeFn,
+    PaginationState,
+    RowSelectionState,
+    SortingState,
+    Updater
+} from '@tanstack/react-table';
 import { CrmAuthGuard, WorkspaceLayout } from '../../components/crm';
 import DataToolbar, { type SortOption, type ToolbarFilter } from '../../components/data/DataToolbar';
 import DataTable from '../../components/data/DataTable';
@@ -11,6 +18,7 @@ import { formatDate } from '../../lib/formatters';
 import type { ContactRecord } from '../../types/contact';
 import { getContactName } from '../../types/contact';
 import { deriveStage, type ContactStage } from '../../lib/contacts';
+import { isSamePagination, isSameSorting } from '../../lib/react-table';
 import ContactFormModal from '../../components/contacts/ContactFormModal';
 
 type OwnerOption = { id: string; name: string | null };
@@ -41,6 +49,10 @@ type ContactTableRow = {
 };
 
 type ToastMessage = { id: string; title: string; tone: 'success' | 'error'; description?: string };
+
+function resolveUpdater<T>(updater: Updater<T>, previous: T): T {
+    return typeof updater === 'function' ? (updater as (old: T) => T)(previous) : updater;
+}
 
 const CONTACT_SORT_OPTIONS: Array<SortOption & { state: SortingState }> = [
     { id: 'name-asc', label: 'Name (A-Z)', state: [{ id: 'name', desc: false }] },
@@ -99,6 +111,32 @@ function ContactsWorkspace() {
     const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
     const [notifications, setNotifications] = React.useState<ToastMessage[]>([]);
 
+    const handlePaginationChange = React.useCallback<OnChangeFn<PaginationState>>((updater) => {
+        setPagination((previous) => {
+            const nextState = resolveUpdater(updater, previous);
+            return isSamePagination(previous, nextState) ? previous : nextState;
+        });
+    }, []);
+
+    const handleRowSelectionChange = React.useCallback<OnChangeFn<RowSelectionState>>((updater) => {
+        setRowSelection((previous) => {
+            const nextState = resolveUpdater(updater, previous);
+
+            if (previous === nextState) {
+                return previous;
+            }
+
+            const previousKeys = Object.keys(previous);
+            const nextKeys = Object.keys(nextState);
+
+            if (previousKeys.length === nextKeys.length && previousKeys.every((key) => previous[key] === nextState[key])) {
+                return previous;
+            }
+
+            return nextState;
+        });
+    }, []);
+
     const openContactModal = React.useCallback(
         (targetId: string) => {
             const nextQuery = { ...router.query, contactId: targetId } as Record<string, any>;
@@ -137,7 +175,8 @@ function ContactsWorkspace() {
 
     React.useEffect(() => {
         const match = CONTACT_SORT_OPTIONS.find((option) => option.id === sortValue);
-        setSorting(match?.state ?? DEFAULT_CONTACT_SORT.state);
+        const nextState = match?.state ?? DEFAULT_CONTACT_SORT.state;
+        setSorting((previous) => (isSameSorting(previous, nextState) ? previous : nextState));
     }, [sortValue]);
 
     const ownerLabelMap = React.useMemo(() => {
@@ -260,21 +299,18 @@ function ContactsWorkspace() {
         ]);
     }, []);
 
-    const handleSortingChange = React.useCallback(
-        (updater: SortingState | ((old: SortingState) => SortingState)) => {
-            setSorting((previous) => {
-                const nextState = typeof updater === 'function' ? updater(previous) : updater;
-                const match = CONTACT_SORT_OPTIONS.find(
-                    (option) =>
-                        option.state.length === nextState.length &&
-                        option.state.every((entry, index) => entry.id === nextState[index]?.id && entry.desc === nextState[index]?.desc)
-                );
-                setSortValue(match?.id ?? DEFAULT_CONTACT_SORT.id);
-                return nextState;
-            });
-        },
-        []
-    );
+    const handleSortingChange = React.useCallback<OnChangeFn<SortingState>>((updater) => {
+        setSorting((previous) => {
+            const nextState = resolveUpdater(updater, previous);
+            const match = CONTACT_SORT_OPTIONS.find(
+                (option) =>
+                    option.state.length === nextState.length &&
+                    option.state.every((entry, index) => entry.id === nextState[index]?.id && entry.desc === nextState[index]?.desc)
+            );
+            setSortValue(match?.id ?? DEFAULT_CONTACT_SORT.id);
+            return isSameSorting(previous, nextState) ? previous : nextState;
+        });
+    }, []);
 
     const handleAddContactClick = React.useCallback(() => {
         openContactModal('new');
@@ -315,12 +351,12 @@ function ContactsWorkspace() {
         async (record: ContactRecord, mode: 'create' | 'update') => {
             addNotification(mode === 'create' ? 'Contact added' : 'Contact updated', 'success', getContactName(record));
             if (mode === 'create') {
-                setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+                handlePaginationChange((previous) => ({ ...previous, pageIndex: 0 }));
             }
-            setRowSelection({});
+            handleRowSelectionChange({});
             await mutateContacts();
         },
-        [addNotification, mutateContacts]
+        [addNotification, handlePaginationChange, handleRowSelectionChange, mutateContacts]
     );
 
     const handleContactError = React.useCallback(
@@ -334,28 +370,40 @@ function ContactsWorkspace() {
         setStageFilter([]);
         setStatusFilter([]);
         setOwnerFilter([]);
-        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-    }, []);
+        handlePaginationChange((previous) => ({ ...previous, pageIndex: 0 }));
+    }, [handlePaginationChange]);
 
-    const handleSearchChange = React.useCallback((value: string) => {
-        setSearch(value);
-        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-    }, []);
+    const handleSearchChange = React.useCallback(
+        (value: string) => {
+            setSearch(value);
+            handlePaginationChange((previous) => ({ ...previous, pageIndex: 0 }));
+        },
+        [handlePaginationChange]
+    );
 
-    const handleStageFilterChange = React.useCallback((value: string[]) => {
-        setStageFilter(value);
-        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-    }, []);
+    const handleStageFilterChange = React.useCallback(
+        (value: string[]) => {
+            setStageFilter(value);
+            handlePaginationChange((previous) => ({ ...previous, pageIndex: 0 }));
+        },
+        [handlePaginationChange]
+    );
 
-    const handleStatusFilterChange = React.useCallback((value: string[]) => {
-        setStatusFilter(value);
-        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-    }, []);
+    const handleStatusFilterChange = React.useCallback(
+        (value: string[]) => {
+            setStatusFilter(value);
+            handlePaginationChange((previous) => ({ ...previous, pageIndex: 0 }));
+        },
+        [handlePaginationChange]
+    );
 
-    const handleOwnerFilterChange = React.useCallback((value: string[]) => {
-        setOwnerFilter(value);
-        setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-    }, []);
+    const handleOwnerFilterChange = React.useCallback(
+        (value: string[]) => {
+            setOwnerFilter(value);
+            handlePaginationChange((previous) => ({ ...previous, pageIndex: 0 }));
+        },
+        [handlePaginationChange]
+    );
 
     const filters = React.useMemo<ToolbarFilter[]>(() => {
         const entries: ToolbarFilter[] = [
@@ -393,7 +441,7 @@ function ContactsWorkspace() {
                 onSortChange={setSortValue}
                 selectedCount={Object.keys(rowSelection).length}
                 pageSize={pagination.pageSize}
-                onPageSizeChange={(value) => setPagination({ pageIndex: 0, pageSize: value })}
+                onPageSizeChange={(value) => handlePaginationChange({ pageIndex: 0, pageSize: value })}
             />
 
             {contactsError ? (
@@ -426,9 +474,9 @@ function ContactsWorkspace() {
                     sorting={sorting}
                     onSortingChange={handleSortingChange}
                     pagination={pagination}
-                    onPaginationChange={setPagination}
+                    onPaginationChange={handlePaginationChange}
                     rowSelection={rowSelection}
-                    onRowSelectionChange={setRowSelection}
+                    onRowSelectionChange={handleRowSelectionChange}
                     manualPagination
                     manualSorting
                     pageCount={pageCount}

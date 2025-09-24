@@ -66,7 +66,9 @@ export function DataTable<TData>({
         manualPagination,
         manualSorting,
         pageCount,
-        autoResetPageIndex: !manualPagination
+        autoResetAll: false,
+        autoResetPageIndex: false,
+        autoResetExpanded: false
     });
 
     const { pageIndex, pageSize } = table.getState().pagination;
